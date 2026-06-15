@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* White-label: these are overridden per company at runtime */
+  --brand: #2E75B6;
+  --brand-dark: #1F3A5F;
+}
+
+html, body {
+  padding: 0;
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: #f5f7fa;
+  color: #1a1a1a;
+}
