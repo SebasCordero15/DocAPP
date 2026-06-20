@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(docker compose up *)",
+      "Bash(docker compose *)",
+      "Bash(curl -s -X POST http://localhost:3000/api/folders -H 'Content-Type: application/json' -b /tmp/acme.txt -d '{\"name\":\"Contracts\"}')",
+      "Bash(python3 -m json.tool)",
+      "Bash(curl -s -X DELETE \"http://localhost:3000/api/files/cmq653b930009xoydikpveq2b\" -b /tmp/acme.txt)",
+      "Bash(curl -s \"http://localhost:3000/api/folders/cmq64dn960007wr9fsmeqrdbm\" -b /tmp/acme.txt)",
+      "Bash(curl -s -X POST http://localhost:3000/api/auth/login -H 'Content-Type: application/json' -d '{\"companySlug\":\"globex\",\"email\":\"admin@globex.com\",\"password\":\"password123\"}' -c /tmp/globex.txt -w '\\\\nHTTP %{http_code}')",
+      "Bash(curl -s \"http://localhost:3000/api/folders/cmq64dn960007wr9fsmeqrdbm\" -b /tmp/globex.txt)",
+      "Bash(curl -s -X OPTIONS http://localhost:9000/docvault/ -H 'Origin: http://localhost:3000' -H 'Access-Control-Request-Method: PUT' -H 'Access-Control-Request-Headers: content-type' -D - -o /dev/null)",
+      "Bash(npm test *)",
+      "Bash(curl *)",
+      "Bash(psql *)",
+      "Bash(npx prisma *)",
+      "Bash(npx tsc *)",
+      "Bash(pkill -f \"next dev\")",
+      "Bash(node *)",
+      "Bash(npx jest *)",
+      "Bash(npx vitest *)",
+      "Bash(npx tsx -e ' *)",
+      "Bash(npx tsx *)",
+      "Bash(python3 -c ' *)"
+    ]
+  }
+}

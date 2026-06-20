@@ -1,0 +1,400 @@
+// DocVault — Multi-tenant document management platform
+// Prisma schema. Every tenant-scoped table carries companyId for isolation.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN               // platform operator — not tied to any company
+  COMPANY_ADMIN @map("ADMIN") // full control within their company; DB stores "ADMIN"
+  EDITOR                    // can upload/edit where permitted
+  VIEWER                    // read-only where permitted
+}
+
+enum AccessLevel {
+  NONE
+  READ
+  EDIT
+  MANAGE
+}
+
+enum ResourceType {
+  FOLDER
+  FILE
+}
+
+enum Plan {
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
+enum FileStatus {
+  DRAFT
+  IN_REVIEW
+  REVIEWED
+  PENDING_APPROVAL
+}
+
+enum ChangeRequestType {
+  NEW_UPLOAD
+  EDIT_METADATA
+  REPLACE_FILE
+  DELETE
+  REVISION_DATE_CHANGE
+  OTHER
+}
+
+enum ChangeRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TaskType {
+  REVIEW
+  UPDATE
+  APPROVE
+  OTHER
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum Industry {
+  LEGAL
+  FINANCE
+  HEALTHCARE
+  REAL_ESTATE
+  TECH
+  OTHER
+}
+
+enum DocumentType {
+  PROCEDIMIENTO
+  MANUAL
+  INSTRUCTIVO
+  FORMATO
+  POLITICA
+  OTRO
+}
+
+enum ReviewChainStatus {
+  IN_REVIEW
+  COMPLETED
+  REJECTED
+  RETURNED_TO_CREATOR
+}
+
+// ---------- Tenancy ----------
+model Company {
+  id             String    @id @default(cuid())
+  name           String
+  slug           String    @unique
+  logoUrl        String?
+  primaryColor   String    @default("#2563eb")
+  secondaryColor String    @default("#1e40af")
+  accentColor    String    @default("#7c3aed")
+  fontFamily     String    @default("Inter")
+  industry       Industry  @default(OTHER)
+  customDomain   String?
+  plan           Plan      @default(BASIC)
+  maxUsers       Int       @default(10)
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  users          User[]
+  folders        Folder[]
+  files          File[]
+  permissions    Permission[]
+  auditLogs      AuditLog[]
+  notifications  Notification[]
+  userInvites    UserInvite[]
+  tasks          DocumentTask[]
+  changeRequests ChangeRequest[]
+  reviewChains   ReviewChain[]
+}
+
+// ---------- Users ----------
+model User {
+  id                  String    @id @default(cuid())
+  companyId           String?   // null for SUPER_ADMIN
+  email               String
+  name                String
+  passwordHash        String
+  role                Role      @default(VIEWER)
+  isActive            Boolean   @default(true)
+  lastLoginAt         DateTime?
+  forcePasswordChange Boolean   @default(false)
+  createdAt           DateTime  @default(now())
+
+  company              Company?   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  auditLogs            AuditLog[]
+  notifications        Notification[]
+  assignedFiles        File[]     @relation("AssignedReviewer")
+  encargadoFiles       File[]     @relation("EncargadoDocumento")
+  uploadedFiles        File[]     @relation("FileUploader")
+  permissions          Permission[]
+  assignedTasks        DocumentTask[] @relation("TaskAssignee")
+  createdTasks         DocumentTask[] @relation("TaskAssigner")
+  changeRequests       ChangeRequest[] @relation("ChangeRequester")
+  reviewedRequests     ChangeRequest[] @relation("ChangeReviewer")
+  reviewChainsCreated  ReviewChain[]   @relation("ChainCreator")
+
+  // Email unique per company. SUPER_ADMIN has null companyId — uniqueness
+  // for that role is enforced at the application layer.
+  @@unique([companyId, email])
+  @@index([companyId])
+}
+
+// ---------- Folder hierarchy ----------
+model Folder {
+  id        String    @id @default(cuid())
+  companyId String
+  name      String
+  parentId  String?   // null = root folder
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  company        Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  parent         Folder?        @relation("FolderChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children       Folder[]       @relation("FolderChildren")
+  files          File[]
+  permissions    Permission[]
+  changeRequests ChangeRequest[]
+
+  @@index([companyId])
+  @@index([parentId])
+}
+
+// ---------- Files (metadata only; bytes live in object storage) ----------
+model File {
+  id            String    @id @default(cuid())
+  companyId     String
+  folderId      String?
+  name          String
+  storageKey    String
+  mimeType      String
+  size          Int
+  version       Int       @default(1)
+  reviewDueDate      DateTime?
+  reviewIntervalDays Int?      // if set, auto-advance due date on complete-review
+  assignedToId       String?
+  previewRows        Json?     // string[][] — first ≤10 rows for Excel/CSV; null for other types
+  deletedAt          DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // ── Who uploaded this file (for PENDING_APPROVAL visibility scoping) ──────
+  uploadedByUserId     String?
+
+  // ── Document status (OVERDUE is computed: fechaRevision < now AND status != REVIEWED) ──
+  status               FileStatus @default(DRAFT)
+
+  // ── Listado Maestro fields ──────────────────────────────────────────────────
+  codigo               String?
+  nombreDocumento      String?
+  versionStr           String?   // user-facing version label (e.g. "v1.3")
+  fechaEmision         DateTime?
+  fechaRevision        DateTime?
+  fechaActualizacion   DateTime?
+  controlCambios       String?
+  encargadoDocumentoId String?
+
+  // ── Document creation module fields ─────────────────────────────────────────
+  departamento         String?
+  tipoDocumento        DocumentType?
+
+  company              Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  folder               Folder?        @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  assignedTo           User?          @relation("AssignedReviewer", fields: [assignedToId], references: [id], onDelete: SetNull)
+  encargadoDocumento   User?          @relation("EncargadoDocumento", fields: [encargadoDocumentoId], references: [id], onDelete: SetNull)
+  uploadedBy           User?          @relation("FileUploader", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  permissions          Permission[]
+  notifications        Notification[]
+  tasks                DocumentTask[]
+  changeRequests       ChangeRequest[]
+  reviewChain          ReviewChain?
+
+  @@unique([companyId, codigo])
+  @@index([companyId])
+  @@index([folderId])
+  @@index([reviewDueDate])
+  @@index([encargadoDocumentoId])
+  @@index([status])
+  @@index([uploadedByUserId])
+}
+
+// ---------- Permissions (per user, per resource) ----------
+model Permission {
+  id           String       @id @default(cuid())
+  companyId    String
+  userId       String
+  resourceType ResourceType
+  folderId     String?
+  fileId       String?
+  accessLevel  AccessLevel  @default(READ)
+  inherited    Boolean      @default(false)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folder  Folder? @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  file    File?   @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([folderId])
+  @@index([fileId])
+}
+
+// ---------- Audit log ----------
+model AuditLog {
+  id           String   @id @default(cuid())
+  companyId    String?  // nullable: SUPER_ADMIN actions may not belong to a company
+  userId       String?
+  action       String
+  resourceType String?
+  resourceId   String?
+  detail       String?
+  createdAt    DateTime @default(now())
+
+  company Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([createdAt])
+}
+
+// ---------- User invites ----------
+model UserInvite {
+  id        String    @id @default(cuid())
+  companyId String
+  email     String
+  role      Role      @default(VIEWER)
+  token     String    @unique
+  createdBy String    // userId of the COMPANY_ADMIN who sent it
+  expiresAt DateTime  // 48 h from creation
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([token])
+}
+
+// ---------- Notifications ----------
+model Notification {
+  id        String   @id @default(cuid())
+  companyId String
+  userId    String
+  type      String
+  message   String
+  fileId    String?  // linked file, if relevant
+  dedupKey  String?  // (userId, dedupKey) unique — prevents duplicate job notifications
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  file    File?   @relation(fields: [fileId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, dedupKey])
+  @@index([companyId])
+  @@index([userId])
+}
+
+// ---------- Document Tasks ----------
+model DocumentTask {
+  id               String     @id @default(cuid())
+  companyId        String
+  fileId           String
+  assignedToUserId String
+  assignedByUserId String
+  type             TaskType
+  status           TaskStatus @default(PENDING)
+  dueDate                  DateTime?
+  notes                    String?
+  autoApproveOnCompletion  Boolean   @default(false)
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+  completedAt              DateTime?
+  rejectionNote            String?
+
+  // Review chain fields (for sequential document review workflow)
+  reviewChainId    String?
+  stepOrder        Int?
+
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  file        File         @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  assignedTo  User         @relation("TaskAssignee", fields: [assignedToUserId], references: [id], onDelete: Cascade)
+  assignedBy  User         @relation("TaskAssigner", fields: [assignedByUserId], references: [id], onDelete: Cascade)
+  reviewChain ReviewChain? @relation(fields: [reviewChainId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([fileId])
+  @@index([assignedToUserId])
+  @@index([assignedByUserId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([reviewChainId])
+}
+
+// ---------- Review Chains (sequential document review workflow) ----------
+model ReviewChain {
+  id              String            @id @default(cuid())
+  companyId       String
+  fileId          String            @unique
+  status          ReviewChainStatus @default(IN_REVIEW)
+  currentStep     Int               @default(1)
+  totalSteps      Int
+  createdByUserId String
+  rejectionNote   String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  company   Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  file      File           @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  createdBy User           @relation("ChainCreator", fields: [createdByUserId], references: [id])
+  steps     DocumentTask[]
+
+  @@index([companyId])
+  @@index([status])
+}
+
+// ---------- Change Requests (approval workflow) ----------
+model ChangeRequest {
+  id                String              @id @default(cuid())
+  companyId         String
+  type              ChangeRequestType
+  status            ChangeRequestStatus @default(PENDING)
+  fileId            String?             // null only during NEW_UPLOAD before File record exists (we create File immediately with PENDING_APPROVAL)
+  folderId          String?             // target folder for NEW_UPLOAD
+  requestedByUserId String
+  reviewedByUserId  String?
+  proposedChanges   Json                // shape varies by type — see API comments
+  adminNotes        String?
+  createdAt         DateTime            @default(now())
+  reviewedAt        DateTime?
+
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  file        File?    @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  folder      Folder?  @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  requestedBy User     @relation("ChangeRequester", fields: [requestedByUserId], references: [id], onDelete: Cascade)
+  reviewedBy  User?    @relation("ChangeReviewer",  fields: [reviewedByUserId],  references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([fileId])
+  @@index([requestedByUserId])
+  @@index([status])
+}
