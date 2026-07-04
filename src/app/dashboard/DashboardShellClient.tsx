@@ -59,7 +59,7 @@ export default function DashboardShellClient({
   const SIDEBAR_W = sidebarOpen ? 240 : 64;
 
   const navItems = [
-    { label: "Documents",       icon: <Files size={18} />,         href: "/dashboard",                        badge: 0 },
+    { label: "Documentos",      icon: <Files size={18} />,         href: "/dashboard",                        badge: 0 },
     { label: "Listado Maestro", icon: <ClipboardList size={18} />, href: "/dashboard/listado-maestro",        badge: 0 },
     { label: "Pendientes",      icon: <ClipboardCheck size={18} />, href: "/dashboard/pendientes",            badge: pendingTotal },
     { label: "Control Cambios", icon: <History size={18} />,       href: "/dashboard/control-cambios",        badge: 0 },
@@ -67,11 +67,11 @@ export default function DashboardShellClient({
       { label: "Crear Documento", icon: <FilePlus size={18} />,    href: "/dashboard/crear-documento",        badge: 0 },
     ] : []),
     ...(isAdmin ? [
-      { label: "Team",        icon: <Users size={18} />,      href: "/dashboard/team",        badge: 0 },
-      { label: "Permissions", icon: <Shield size={18} />,     href: "/dashboard/permissions", badge: 0 },
-      { label: "Solicitudes", icon: <Inbox size={18} />,      href: "/dashboard/solicitudes", badge: pendingCRCount },
-      { label: "Reportes",    icon: <BarChart2 size={18} />,  href: "/dashboard/reportes",   badge: 0 },
-      { label: "Audit",       icon: <ScrollText size={18} />, href: "/dashboard/audit",      badge: 0 },
+      { label: "Equipo",       icon: <Users size={18} />,      href: "/dashboard/team",        badge: 0 },
+      { label: "Permisos",     icon: <Shield size={18} />,     href: "/dashboard/permissions", badge: 0 },
+      { label: "Solicitudes",  icon: <Inbox size={18} />,      href: "/dashboard/solicitudes", badge: pendingCRCount },
+      { label: "Reportes",     icon: <BarChart2 size={18} />,  href: "/dashboard/reportes",   badge: 0 },
+      { label: "Auditoría",    icon: <ScrollText size={18} />, href: "/dashboard/audit",      badge: 0 },
     ] : []),
   ];
 

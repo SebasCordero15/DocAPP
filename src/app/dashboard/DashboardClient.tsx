@@ -616,9 +616,9 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
           {!folderId && !loading && (
             <div className="fade-up" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 14, marginBottom: 28 }}>
               {[
-                { label: "Folders",         value: subfolders.length, color: brand,     icon: <FolderOpen size={20} /> },
-                { label: "Files",           value: files.length,      color: accent,    icon: <Files size={20} /> },
-                { label: "Pending Reviews", value: pendingReviews,    color: "#d97706", icon: <Calendar size={20} /> },
+                { label: "Carpetas",             value: subfolders.length, color: brand,     icon: <FolderOpen size={20} /> },
+                { label: "Archivos",             value: files.length,      color: accent,    icon: <Files size={20} /> },
+                { label: "Revisiones pendientes", value: pendingReviews,    color: "#d97706", icon: <Calendar size={20} /> },
                 { label: "Overdue",         value: overdueCount,      color: "#dc2626", icon: <CheckCircle size={20} /> },
               ].map(({ label, value, color, icon }) => (
                 <div key={label} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "18px 20px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
@@ -849,7 +849,7 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
               {/* Folder grid */}
               {visibleFolders.length > 0 && (
                 <>
-                  <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1 }}>Folders</p>
+                  <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1 }}>Carpetas</p>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12, marginBottom: 24 }}>
                     {visibleFolders.map((f) => {
                       const isRenaming = renamingId === f.id;
@@ -890,7 +890,7 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
               {/* File grid */}
               {visibleFiles.length > 0 && (
                 <>
-                  <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1 }}>Files</p>
+                  <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1 }}>Archivos</p>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
                     {visibleFiles.map((f) => (
                       <div
