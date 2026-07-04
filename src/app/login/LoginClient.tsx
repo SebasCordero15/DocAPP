@@ -22,7 +22,14 @@ export default function LoginClient() {
         body: JSON.stringify({ email, password }),
       });
       if (res.ok) {
-        window.location.href = "/dashboard";
+        const d = await res.json().catch(() => ({}));
+        if (d.role === "SUPER_ADMIN") {
+          window.location.href = "/superadmin";
+        } else if (d.forcePasswordChange) {
+          window.location.href = "/dashboard/cambiar-contrasena";
+        } else {
+          window.location.href = "/dashboard";
+        }
       } else {
         const d = await res.json().catch(() => ({}));
         setError(d.error ?? "Credenciales inválidas");

@@ -29,11 +29,12 @@ export async function GET(req: NextRequest) {
   const where: Record<string, unknown> = {
     companyId,
     deletedAt: null,
-    // Non-admins cannot see pending-approval files uploaded by others
+    // Non-admins: only show fully approved files, own uploads, or active task assignments
     ...(!isAdminRole(role) ? {
       OR: [
-        { status: { not: "PENDING_APPROVAL" } },
+        { status: "REVIEWED" },
         { uploadedByUserId: userId },
+        { tasks: { some: { assignedToUserId: userId, status: { not: "COMPLETED" } } } },
       ],
     } : {}),
     ...(codigo    ? { codigo:    { contains: codigo,    mode: "insensitive" } } : {}),

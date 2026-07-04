@@ -69,11 +69,11 @@ export async function validateActiveSession(
       isActive: true,
       role: true,
       companyId: true,
-      company: { select: { isActive: true } },
+      company: { select: { isActive: true, deletedAt: true } },
     },
   });
   if (!user || !user.isActive) return null;
-  if (user.company && !user.company.isActive) return null;
+  if (user.company && (!user.company.isActive || user.company.deletedAt)) return null;
 
   // Return a fresh payload with role/companyId from DB, not from the JWT.
   // This ensures role changes and company moves take effect immediately.

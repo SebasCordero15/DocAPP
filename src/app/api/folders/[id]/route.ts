@@ -36,8 +36,9 @@ export async function GET(
         companyId, folderId: folder.id, deletedAt: null,
         ...(!isAdmin ? {
           OR: [
-            { status: { not: "PENDING_APPROVAL" } },
+            { status: "REVIEWED" },
             { uploadedByUserId: session.userId },
+            { tasks: { some: { assignedToUserId: session.userId, status: { not: "COMPLETED" } } } },
           ],
         } : {}),
       },

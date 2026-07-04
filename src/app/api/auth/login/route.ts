@@ -33,13 +33,14 @@ export async function POST(req: NextRequest) {
       prisma.user.update({ where: { id: superAdmin.id }, data: { lastLoginAt: new Date() } }),
       logAction({ companyId: null, userId: superAdmin.id, action: "LOGIN" }),
     ]);
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, role: "SUPER_ADMIN" });
   }
 
   // Company user — resolve company from email (no slug needed)
   const matches = await prisma.user.findMany({
     where: { email, role: { not: "SUPER_ADMIN" } },
     include: { company: true },
+    // Select forcePasswordChange so we can signal the client
   });
 
   if (matches.length === 0) {
@@ -69,5 +70,5 @@ export async function POST(req: NextRequest) {
   await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
   await logAction({ companyId: user.companyId, userId: user.id, action: "LOGIN" });
 
-  return NextResponse.json({ ok: true, role: user.role });
+  return NextResponse.json({ ok: true, role: user.role, forcePasswordChange: user.forcePasswordChange });
 }

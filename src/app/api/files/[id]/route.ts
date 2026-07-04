@@ -29,6 +29,8 @@ const patchSchema = z.object({
   fechaActualizacion:   z.string().datetime().optional().nullable(),
   controlCambios:       z.string().max(5000).optional().nullable(),
   encargadoDocumentoId: z.string().optional().nullable(),
+  // Admin-only folder move
+  folderId: z.string().optional().nullable(),
 }).refine(
   (d) => Object.values(d).some((v) => v !== undefined),
   { message: "Provide at least one field to update" }
@@ -65,7 +67,7 @@ export async function PATCH(
     reviewDueDate, reviewIntervalDays, assignedToId, completeReview,
     status, codigo, nombreDocumento, versionStr,
     fechaEmision, fechaRevision, fechaActualizacion,
-    controlCambios, encargadoDocumentoId,
+    controlCambios, encargadoDocumentoId, folderId,
   } = parsed.data;
 
   // Validate relational fields regardless of bypass
@@ -161,6 +163,8 @@ export async function PATCH(
   if (fechaActualizacion !== undefined) updateData.fechaActualizacion   = fechaActualizacion ? new Date(fechaActualizacion) : null;
   if (controlCambios !== undefined)     updateData.controlCambios       = controlCambios;
   if (encargadoDocumentoId !== undefined) updateData.encargadoDocumentoId = encargadoDocumentoId;
+  // folderId move is admin-only — bypass check already confirmed above for this path
+  if (folderId !== undefined && bypass)  updateData.folderId             = folderId;
 
   const updated = await prisma.file.update({
     where: { id: file.id },

@@ -171,7 +171,7 @@ export async function POST(
       if (prevTask) {
         await tx.documentTask.update({
           where: { id: prevTask.id },
-          data: { status: "PENDING", completedAt: null },
+          data: { status: "PENDING", completedAt: null, rejectionNote: notes ?? null },
         });
         await tx.notification.create({
           data: {

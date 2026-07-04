@@ -114,17 +114,10 @@ export default function ReportesClient({ company }: Props) {
   ] : [];
 
   return (
-    <main style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: `'${company.fontFamily}', Inter, system-ui, sans-serif` }}>
-      <header style={{ background: brand, color: "#fff", padding: "14px 28px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <button onClick={() => router.push("/dashboard")} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "#fff", padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontSize: 13 }}>
-            ← Dashboard
-          </button>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <BarChart2 size={18} />
-            <strong style={{ fontSize: 16 }}>Reporte de Cambios</strong>
-          </div>
-        </div>
+    <div style={{ flex: 1, overflowY: "auto", background: "#f1f5f9", fontFamily: `'${company.fontFamily}', Inter, system-ui, sans-serif` }}>
+      {/* Section header */}
+      <div style={{ background: brand, color: "#fff", padding: "12px 28px", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, zIndex: 10 }}>
+        <strong style={{ fontSize: 16 }}>Reporte de Cambios</strong>
         <button
           onClick={exportCSV}
           disabled={details.length === 0}
@@ -132,7 +125,7 @@ export default function ReportesClient({ company }: Props) {
         >
           <Download size={14} /> Exportar CSV
         </button>
-      </header>
+      </div>
 
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 24px" }}>
 
@@ -220,7 +213,7 @@ export default function ReportesClient({ company }: Props) {
           )}
         </div>
       </div>
-    </main>
+    </div>
   );
 }
 

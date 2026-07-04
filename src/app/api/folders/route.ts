@@ -23,11 +23,12 @@ export async function GET() {
     prisma.file.findMany({
       where: {
         companyId, folderId: null, deletedAt: null,
-        // Non-admins: hide PENDING_APPROVAL files uploaded by someone else
+        // Non-admins: only show fully approved files, own uploads, or active task assignments
         ...(!isAdmin ? {
           OR: [
-            { status: { not: "PENDING_APPROVAL" } },
+            { status: "REVIEWED" },
             { uploadedByUserId: session.userId },
+            { tasks: { some: { assignedToUserId: session.userId, status: { not: "COMPLETED" } } } },
           ],
         } : {}),
       },

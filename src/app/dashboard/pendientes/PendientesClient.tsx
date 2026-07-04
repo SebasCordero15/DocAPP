@@ -6,8 +6,8 @@ import FileIcon from "@/components/FileIcon";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-type MainTab = "mis" | "equipo";
-type DocTab  = "en_revision" | "borrador" | "revisados" | "atrasadas";
+type MainTab = "acciones" | "seguimiento" | "equipo";
+type DocTab  = "en_revision" | "atrasadas";
 
 type TaskType   = "REVIEW" | "UPDATE" | "APPROVE" | "OTHER";
 type TaskStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED";
@@ -18,11 +18,30 @@ interface TaskFile {
   status: string; folder: { id: string; name: string } | null;
 }
 interface TaskUser { id: string; name: string; email: string; }
+interface OutgoingTaskInfo {
+  id: string;
+  type: "ACTUALIZACION" | "REVISION" | "CORRECCION";
+  status: string;
+  instructions: string | null;
+  correctionFields: { nombre?: boolean; contenido?: boolean; area?: boolean; carpeta?: boolean; otro?: string | null } | null;
+  currentStep: number;
+  totalSteps: number;
+  step1OutcomeType: string | null;
+  step1StorageKey: string | null;
+  step1VersionStr: string | null;
+}
+
 interface Task {
   id: string; type: TaskType; status: TaskStatus;
-  dueDate: string | null; notes: string | null;
+  dueDate: string | null; notes: string | null; rejectionNote: string | null;
   createdAt: string; completedAt: string | null; isOverdue: boolean;
   file: TaskFile; assignedTo: TaskUser; assignedBy: TaskUser;
+  reviewChainId: string | null;
+  stepOrder: number | null;
+  chainCurrentStep: number | null;
+  chainTotalSteps: number | null;
+  outgoingRequestId: string | null;
+  outgoingRequest: OutgoingTaskInfo | null;
 }
 
 interface DocFile {
@@ -53,6 +72,24 @@ interface ChangeRequest {
   reviewedAt: string | null;
   adminNotes: string | null;
   file: { id: string; name: string; nombreDocumento: string | null; codigo: string | null } | null;
+}
+
+interface RejectedCR {
+  id: string;
+  type: string;
+  createdAt: string;
+  reviewedAt: string | null;
+  adminNotes: string | null;
+  file: { id: string; name: string; nombreDocumento: string | null; codigo: string | null; mimeType: string } | null;
+  reviewedBy: { id: string; name: string } | null;
+}
+
+interface RejectedChain {
+  id: string;
+  rejectionNote: string | null;
+  updatedAt: string;
+  file: { id: string; name: string; nombreDocumento: string | null; codigo: string | null; mimeType: string; status: string } | null;
+  rejectingStep: { stepOrder: number; rejectionNote: string | null; assignedTo: { id: string; name: string } } | null;
 }
 
 interface Props {
@@ -111,7 +148,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
   const isAdmin = userRole === "COMPANY_ADMIN";
 
   // ── tab state
-  const [mainTab, setMainTab] = useState<MainTab>("mis");
+  const [mainTab, setMainTab] = useState<MainTab>("acciones");
   const [docTab,  setDocTab]  = useState<DocTab>("en_revision");
 
   // ── task data
@@ -128,12 +165,131 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
   const [filterUser,   setFilterUser]   = useState("");
   const [filterType,   setFilterType]   = useState("");
 
+  // ── opening a document
+  const [openingDoc, setOpeningDoc] = useState<string | null>(null);
+
+  async function openDoc(fileId: string) {
+    setOpeningDoc(fileId);
+    try {
+      const res = await fetch(`/api/files/${fileId}/download-url`);
+      if (!res.ok) { alert("No se pudo obtener el enlace del documento"); return; }
+      const { url } = await res.json();
+      window.open(url, "_blank");
+    } finally {
+      setOpeningDoc(null);
+    }
+  }
+
   // ── completing a task
   const [completing, setCompleting] = useState<string | null>(null);
+
+  // ── review chain actions (approve / return / reject)
+  const [chainModal, setChainModal] = useState<{
+    taskId: string;
+    action: "APPROVE" | "RETURN_TO_PREVIOUS" | "REJECT";
+    docName: string;
+    stepOrder: number;
+  } | null>(null);
+  const [chainNotes, setChainNotes] = useState("");
+  const [chainWorking, setChainWorking] = useState(false);
+  const [chainError, setChainError] = useState("");
+
+  // ── outgoing request submit modal
+  const [outModal, setOutModal] = useState<{
+    taskId: string;
+    outgoingRequest: OutgoingTaskInfo;
+    docName: string;
+    currentVersion: string | null;
+  } | null>(null);
+  const [outOutcome, setOutOutcome] = useState<"no_changes" | "new_version" | "corrected">("no_changes");
+  const [outFile, setOutFile] = useState<File | null>(null);
+  const [outVersionStr, setOutVersionStr] = useState("");
+  const [outNombreDoc, setOutNombreDoc] = useState("");
+  const [outDepartamento, setOutDepartamento] = useState("");
+  const [outSubmitting, setOutSubmitting] = useState(false);
+  const [outError, setOutError] = useState("");
+
+  function openOutModal(task: Task) {
+    if (!task.outgoingRequest) return;
+    const or = task.outgoingRequest;
+    const docName = task.file.nombreDocumento || task.file.name;
+    // Pre-select sensible default outcome
+    const defaultOutcome: "no_changes" | "new_version" | "corrected" =
+      or.type === "ACTUALIZACION" ? "new_version"
+      : or.type === "REVISION" ? "no_changes"
+      : "corrected";
+    setOutModal({ taskId: task.id, outgoingRequest: or, docName, currentVersion: task.file.versionStr });
+    setOutOutcome(defaultOutcome);
+    setOutFile(null); setOutVersionStr(""); setOutNombreDoc(""); setOutDepartamento("");
+    setOutError("");
+  }
+
+  async function submitOutModal() {
+    if (!outModal) return;
+    const { outgoingRequest: or } = outModal;
+    setOutSubmitting(true); setOutError("");
+
+    let storageKey: string | null = null;
+    let fileName: string | null = null;
+    let mimeType: string | null = null;
+    let size: number | null = null;
+
+    const needsUpload =
+      (outOutcome === "new_version") ||
+      (outOutcome === "corrected" && or.correctionFields?.contenido);
+
+    if (needsUpload && outFile) {
+      // 1. Get presigned URL
+      const urlRes = await fetch(`/api/outgoing-requests/${or.id}/upload-url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: outFile.name, mimeType: outFile.type, size: outFile.size }),
+      });
+      if (!urlRes.ok) {
+        const d = await urlRes.json().catch(() => ({}));
+        setOutError(d.error ?? "Error al obtener URL de subida"); setOutSubmitting(false); return;
+      }
+      const { uploadUrl, storageKey: sk } = await urlRes.json();
+      // 2. Upload file
+      const upRes = await fetch(uploadUrl, { method: "PUT", body: outFile, headers: { "Content-Type": outFile.type } });
+      if (!upRes.ok) { setOutError("Error al subir el archivo"); setOutSubmitting(false); return; }
+      storageKey = sk; fileName = outFile.name; mimeType = outFile.type; size = outFile.size;
+    } else if (needsUpload && !outFile) {
+      setOutError("Se requiere un archivo"); setOutSubmitting(false); return;
+    }
+
+    const metadata: Record<string, string> = {};
+    if (outNombreDoc.trim()) metadata.nombreDocumento = outNombreDoc.trim();
+    if (outDepartamento.trim()) metadata.departamento = outDepartamento.trim();
+
+    const res = await fetch(`/api/outgoing-requests/${or.id}/submit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        outcomeType: outOutcome,
+        storageKey, fileName, mimeType, size,
+        versionStr: outVersionStr.trim() || null,
+        metadata: Object.keys(metadata).length > 0 ? metadata : null,
+      }),
+    });
+    setOutSubmitting(false);
+    if (res.ok) {
+      setOutModal(null);
+      await fetchMyTasks();
+    } else {
+      const d = await res.json().catch(() => ({}));
+      setOutError(d.error ?? "Error al enviar la respuesta");
+    }
+  }
 
   // ── change requests (Mis Solicitudes)
   const [myChangeRequests, setMyChangeRequests] = useState<ChangeRequest[]>([]);
   const [loadingCR, setLoadingCR] = useState(true);
+
+  // ── rechazados / devueltos
+  const [rejectedCRs,    setRejectedCRs]    = useState<RejectedCR[]>([]);
+  const [rejectedChains, setRejectedChains] = useState<RejectedChain[]>([]);
+  const [loadingRejected, setLoadingRejected] = useState(true);
 
   // ── assign modal
   const [showAssign,   setShowAssign]   = useState(false);
@@ -183,9 +339,20 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
     setLoadingCR(false);
   }, []);
 
-  useEffect(() => { fetchMyTasks(); fetchDocCounts(); fetchDocFiles(docTab); fetchMyChangeRequests(); }, []);
+  const fetchRejectedItems = useCallback(async () => {
+    setLoadingRejected(true);
+    const r = await fetch("/api/pendientes/rejected");
+    if (r.ok) {
+      const d = await r.json();
+      setRejectedCRs(d.rejectedCRs ?? []);
+      setRejectedChains(d.rejectedChains ?? []);
+    }
+    setLoadingRejected(false);
+  }, []);
+
+  useEffect(() => { fetchMyTasks(); fetchDocCounts(); fetchDocFiles(docTab); fetchMyChangeRequests(); fetchRejectedItems(); }, []);
   useEffect(() => { if (isAdmin && mainTab === "equipo") { fetchTeamTasks(); fetchCompanyUsers(); } }, [mainTab, filterUser, filterType]);
-  useEffect(() => { fetchDocFiles(docTab); }, [docTab]);
+  useEffect(() => { if (mainTab === "seguimiento") fetchDocFiles(docTab); }, [docTab, mainTab]);
 
   // ── complete a task
   const completeTask = async (taskId: string) => {
@@ -195,9 +362,32 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "COMPLETED" }),
     });
-    await Promise.all([fetchMyTasks(), fetchDocCounts(), fetchDocFiles(docTab), fetchMyChangeRequests()]);
+    await Promise.all([fetchMyTasks(), fetchDocCounts(), fetchDocFiles(docTab), fetchMyChangeRequests(), fetchRejectedItems()]);
     if (isAdmin && mainTab === "equipo") await fetchTeamTasks();
     setCompleting(null);
+  };
+
+  // ── review chain: approve / return to previous / reject
+  const submitChainAction = async () => {
+    if (!chainModal) return;
+    const needsNote = chainModal.action === "RETURN_TO_PREVIOUS" || chainModal.action === "REJECT";
+    if (needsNote && !chainNotes.trim()) { setChainError("Se requiere una nota"); return; }
+    setChainWorking(true); setChainError("");
+    const res = await fetch(`/api/review-chain/${chainModal.taskId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: chainModal.action, notes: chainNotes.trim() || undefined }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setChainError(d.error ?? "Error al procesar la acción");
+      setChainWorking(false);
+      return;
+    }
+    setChainModal(null); setChainNotes("");
+    setChainWorking(false);
+    await Promise.all([fetchMyTasks(), fetchDocCounts(), fetchDocFiles(docTab), fetchMyChangeRequests(), fetchRejectedItems()]);
+    if (isAdmin && mainTab === "equipo") await fetchTeamTasks();
   };
 
   // ── assign a task
@@ -250,16 +440,16 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
 
   const docTabs = [
     { key: "en_revision" as DocTab, label: "En Revisión",         count: docCounts.enRevision, color: p },
-    { key: "borrador"    as DocTab, label: "Borradores",           count: docCounts.borrador,   color: "#92400e" },
-    { key: "revisados"   as DocTab, label: "Revisados",            count: docCounts.revisados,  color: "#166534" },
     { key: "atrasadas"   as DocTab, label: "Revisiones Atrasadas", count: docCounts.atrasadas,  color: "#dc2626" },
   ];
 
   const tasksToShow = mainTab === "equipo" ? teamTasks : myTasks;
-  const loadingTasksNow = loadingTasks && mainTab === "mis";
+  const loadingTasksNow = loadingTasks && mainTab === "acciones";
+  const rejectedCount = rejectedCRs.length + rejectedChains.length;
+  const pendingCRs = myChangeRequests.filter((cr) => cr.status === "PENDING");
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: `'${company.fontFamily}', Inter, system-ui, sans-serif` }}>
+    <div style={{ flex: 1, overflowY: "auto", background: "#f8fafc", fontFamily: `'${company.fontFamily}', Inter, system-ui, sans-serif` }}>
       <style>{`
         .tab-pill { border: none; cursor: pointer; padding: 9px 18px; border-radius: 8px; font-weight: 600; font-size: 13px; transition: all 0.15s; display: flex; align-items: center; gap: 7px; }
         .tab-pill:hover { opacity: 0.85; }
@@ -278,44 +468,49 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
         .modal-box { background: #fff; border-radius: 16px; padding: 28px; width: 460px; max-width: 95vw; box-shadow: 0 24px 64px rgba(0,0,0,0.2); }
       `}</style>
 
-      {/* Top bar */}
-      <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 32px", height: 60, display: "flex", alignItems: "center", gap: 16 }}>
-        <button className="back-btn" onClick={() => router.push("/dashboard")}>← Volver al Dashboard</button>
-        <div style={{ width: 1, height: 24, background: "#e2e8f0" }} />
-        <span style={{ fontWeight: 700, fontSize: 18, color: "#1e293b" }}>Pendientes</span>
+      {/* Main tabs */}
+      <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 32px", display: "flex", gap: 0 }}>
+        {([
+          { key: "acciones"    as MainTab, label: "Acciones",            badge: myTasks.length + rejectedCount },
+          { key: "seguimiento" as MainTab, label: "Seguimiento",         badge: docCounts.enRevision + docCounts.atrasadas + pendingCRs.length },
+          ...(isAdmin ? [{ key: "equipo" as MainTab, label: "Equipo", badge: teamTasks.length }] : []),
+        ]).map((t) => (
+          <button
+            key={t.key}
+            className="main-tab"
+            onClick={() => setMainTab(t.key)}
+            style={{
+              color: mainTab === t.key ? p : "#94a3b8",
+              borderBottomColor: mainTab === t.key ? p : "transparent",
+              display: "flex", alignItems: "center", gap: 7,
+            }}
+          >
+            {t.label}
+            {t.badge > 0 && (
+              <span style={{
+                background: mainTab === t.key ? p : "#e2e8f0",
+                color: mainTab === t.key ? "#fff" : "#64748b",
+                borderRadius: 20, padding: "1px 7px", fontSize: 11, fontWeight: 700,
+              }}>
+                {t.badge}
+              </span>
+            )}
+          </button>
+        ))}
       </div>
-
-      {/* Admin main tabs */}
-      {isAdmin && (
-        <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 32px", display: "flex", gap: 0 }}>
-          {(["mis", "equipo"] as MainTab[]).map((t) => (
-            <button
-              key={t}
-              className="main-tab"
-              onClick={() => setMainTab(t)}
-              style={{
-                color: mainTab === t ? p : "#94a3b8",
-                borderBottomColor: mainTab === t ? p : "transparent",
-              }}
-            >
-              {t === "mis" ? "Mis Pendientes" : "Pendientes del Equipo"}
-            </button>
-          ))}
-        </div>
-      )}
 
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 24px" }}>
 
-        {/* ── Section A: Mis Tareas Asignadas ─────────────────────────────────── */}
-        {(mainTab === "mis" || mainTab === "equipo") && (
+        {/* ── Section A: Mis Tareas / Tareas del Equipo ───────────────────────── */}
+        {(mainTab === "acciones" || mainTab === "equipo") && (
           <section style={{ marginBottom: 48 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <div>
                 <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#1e293b" }}>
-                  {mainTab === "mis" ? "Mis Tareas Asignadas" : "Tareas del Equipo"}
+                  {mainTab === "acciones" ? "Mis Tareas Asignadas" : "Tareas del Equipo"}
                 </h2>
                 <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94a3b8" }}>
-                  {mainTab === "mis"
+                  {mainTab === "acciones"
                     ? "Tareas asignadas específicamente a ti"
                     : "Todas las tareas abiertas en la empresa"}
                 </p>
@@ -350,7 +545,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
               <div style={{ textAlign: "center", padding: "48px 0", color: "#94a3b8" }}>
                 <div style={{ marginBottom: 10 }}><CheckCircle size={40} color="#22c55e" /></div>
                 <div style={{ fontSize: 15, fontWeight: 600 }}>
-                  {mainTab === "mis" ? "No tienes tareas pendientes" : "No hay tareas abiertas en el equipo"}
+                  {mainTab === "acciones" ? "No tienes tareas pendientes" : "No hay tareas abiertas en el equipo"}
                 </div>
               </div>
             ) : (
@@ -358,8 +553,14 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                 const tc = TASK_TYPE_COLORS[task.type];
                 const isCompleting = completing === task.id;
                 const canComplete = task.assignedTo.id === userId || task.assignedBy.id === userId;
+                const isChainTask = !!task.reviewChainId && task.stepOrder !== null;
+                const isMyChainTurn = isChainTask && task.assignedTo.id === userId;
+                const isOutTask = !!task.outgoingRequestId && !!task.outgoingRequest;
+                const isMyOutTurn = isOutTask && task.assignedTo.id === userId;
+                const OUT_TYPE_LABELS: Record<string, string> = { ACTUALIZACION: "Actualización", REVISION: "Revisión", CORRECCION: "Corrección" };
+                const docName = task.file.nombreDocumento || task.file.name;
                 return (
-                  <div key={task.id} className="card" style={{ borderLeft: task.isOverdue ? "4px solid #dc2626" : `4px solid ${p}` }}>
+                  <div key={task.id} className="card" style={{ borderLeft: task.isOverdue ? "4px solid #dc2626" : isChainTask ? `4px solid #7c3aed` : `4px solid ${p}` }}>
                     <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
                       <FileIcon mimeType={task.file.mimeType} size={30} />
 
@@ -367,11 +568,21 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                         {/* Title row */}
                         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
                           <span style={{ fontWeight: 700, fontSize: 15, color: "#1e293b" }}>
-                            {task.file.nombreDocumento || task.file.name}
+                            {docName}
                           </span>
                           <span style={{ background: tc.bg, color: tc.color, borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
                             {TASK_TYPE_LABELS[task.type]}
                           </span>
+                          {isChainTask && (
+                            <span style={{ background: "#ede9fe", color: "#6d28d9", borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>
+                              Cadena · Paso {task.stepOrder}/{task.chainTotalSteps}
+                            </span>
+                          )}
+                          {isOutTask && task.outgoingRequest && (
+                            <span style={{ background: "#fef3c7", color: "#92400e", borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>
+                              Solicitud saliente · {OUT_TYPE_LABELS[task.outgoingRequest.type]}
+                            </span>
+                          )}
                           {task.isOverdue && (
                             <span style={{ background: "#fee2e2", color: "#dc2626", borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>
                               ATRASADA
@@ -401,18 +612,68 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                             {task.notes}
                           </div>
                         )}
+
+                        {/* Motivo de devolución */}
+                        {task.rejectionNote && (
+                          <div style={{ marginTop: 8, padding: "8px 12px", background: "#fff7ed", borderRadius: 6, fontSize: 12, color: "#92400e", borderLeft: "3px solid #f59e0b" }}>
+                            <span style={{ fontWeight: 700 }}>Motivo de devolución:</span> {task.rejectionNote}
+                          </div>
+                        )}
                       </div>
 
                       {/* Actions */}
                       <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
                         <button
                           className="action-btn"
-                          style={{ background: "#f1f5f9", color: "#475569" }}
-                          onClick={() => window.open(`/api/files/${task.file.id}/download-url`, "_blank")}
+                          style={{ background: "#f1f5f9", color: "#475569", opacity: openingDoc === task.file.id ? 0.5 : 1 }}
+                          disabled={openingDoc === task.file.id}
+                          onClick={() => openDoc(task.file.id)}
                         >
-                          Ver doc
+                          {openingDoc === task.file.id ? "…" : "Ver doc"}
                         </button>
-                        {canComplete && task.status !== "COMPLETED" && (
+
+                        {/* Review chain actions */}
+                        {isMyChainTurn && task.status !== "COMPLETED" && (
+                          <>
+                            <button
+                              className="action-btn"
+                              style={{ background: "#dcfce7", color: "#166534" }}
+                              onClick={() => { setChainNotes(""); setChainError(""); setChainModal({ taskId: task.id, action: "APPROVE", docName, stepOrder: task.stepOrder! }); }}
+                            >
+                              Aprobar
+                            </button>
+                            {(task.stepOrder ?? 1) > 1 && (
+                              <button
+                                className="action-btn"
+                                style={{ background: "#fff7ed", color: "#d97706" }}
+                                onClick={() => { setChainNotes(""); setChainError(""); setChainModal({ taskId: task.id, action: "RETURN_TO_PREVIOUS", docName, stepOrder: task.stepOrder! }); }}
+                              >
+                                Devolver
+                              </button>
+                            )}
+                            <button
+                              className="action-btn"
+                              style={{ background: "#fee2e2", color: "#dc2626" }}
+                              onClick={() => { setChainNotes(""); setChainError(""); setChainModal({ taskId: task.id, action: "REJECT", docName, stepOrder: task.stepOrder! }); }}
+                            >
+                              Rechazar
+                            </button>
+                          </>
+                        )}
+
+                        {/* Outgoing request submit button */}
+                        {isMyOutTurn && task.status !== "COMPLETED" && (
+                          <button
+                            className="action-btn"
+                            style={{ background: "#fef3c7", color: "#92400e" }}
+                            onClick={() => openOutModal(task)}
+                          >
+                            Responder
+                          </button>
+                        )}
+
+                        {/* Non-chain complete button */}
+                        {!isChainTask && !isOutTask && canComplete && task.status !== "COMPLETED" && (
                           <button
                             className="action-btn"
                             style={{ background: "#dcfce7", color: "#166534", opacity: isCompleting ? 0.5 : 1 }}
@@ -422,11 +683,12 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                             {isCompleting ? "…" : "Completar"}
                           </button>
                         )}
-                        {isAdmin && mainTab === "equipo" && (
+
+                        {isAdmin && mainTab === "equipo" && !isChainTask && (
                           <button
                             className="action-btn"
                             style={{ background: p + "18", color: p }}
-                            onClick={() => openAssignModal(task.file.id, task.file.nombreDocumento || task.file.name)}
+                            onClick={() => openAssignModal(task.file.id, docName)}
                           >
                             + Asignar
                           </button>
@@ -441,7 +703,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
         )}
 
         {/* ── Section B: Estado General de Documentos ──────────────────────────── */}
-        {mainTab === "mis" && (
+        {mainTab === "seguimiento" && (
           <section style={{ marginBottom: 48 }}>
             <div style={{ marginBottom: 16 }}>
               <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#1e293b" }}>Estado General de Documentos</h2>
@@ -521,25 +783,132 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
           </section>
         )}
 
-        {/* ── Section C: Mis Solicitudes de Cambio ─────────────────────────────── */}
-        {mainTab === "mis" && (
-          <section>
+        {/* ── Section C: Rechazados / Devueltos ───────────────────────────────── */}
+        {mainTab === "acciones" && (rejectedCRs.length > 0 || rejectedChains.length > 0 || loadingRejected) && (
+          <section style={{ marginBottom: 48 }}>
             <div style={{ marginBottom: 16 }}>
-              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#1e293b" }}>Mis Solicitudes de Cambio</h2>
+              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#dc2626" }}>Rechazados / Devueltos</h2>
               <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94a3b8" }}>
-                Cambios que enviaste para aprobación del administrador
+                Documentos que fueron rechazados o devueltos con observaciones
+              </p>
+            </div>
+
+            {loadingRejected ? (
+              [1,2].map((i) => <div key={i} className="skeleton" style={{ height: 72, marginBottom: 8 }} />)
+            ) : (
+              <>
+                {rejectedChains.map((chain) => {
+                  const f = chain.file;
+                  const docName = f?.nombreDocumento || f?.name || "Documento eliminado";
+                  const reason = chain.rejectionNote ?? chain.rejectingStep?.rejectionNote ?? null;
+                  const rejectedBy = chain.rejectingStep?.assignedTo?.name ?? "Revisor";
+                  return (
+                    <div key={chain.id} style={{ background: "#fff", border: "1px solid #fca5a5", borderLeft: "4px solid #dc2626", borderRadius: 10, padding: "14px 18px", marginBottom: 10 }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+                        {f && <FileIcon mimeType={f.mimeType} size={28} />}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+                            <span style={{ fontWeight: 700, fontSize: 14, color: "#1e293b" }}>{docName}</span>
+                            <span style={{ background: "#fee2e2", color: "#dc2626", borderRadius: 5, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>
+                              Cadena rechazada
+                            </span>
+                          </div>
+                          <div style={{ display: "flex", gap: 12, fontSize: 12, color: "#64748b", flexWrap: "wrap" }}>
+                            {f?.codigo && <span>Código: <b>{f.codigo}</b></span>}
+                            <span>Rechazado por: <b>{rejectedBy}</b></span>
+                            <span>Fecha: <b>{new Date(chain.updatedAt).toLocaleDateString("es-MX")}</b></span>
+                          </div>
+                          {reason && (
+                            <div style={{ marginTop: 8, padding: "7px 12px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6, fontSize: 12, color: "#dc2626" }}>
+                              <b>Motivo:</b> {reason}
+                            </div>
+                          )}
+                        </div>
+                        {f && (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+                            <button
+                              className="action-btn"
+                              style={{ background: "#f1f5f9", color: "#475569", opacity: openingDoc === f.id ? 0.5 : 1 }}
+                              disabled={openingDoc === f.id}
+                              onClick={() => openDoc(f.id)}
+                            >
+                              {openingDoc === f.id ? "…" : "Ver documento"}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {rejectedCRs.map((cr) => {
+                  const f = cr.file;
+                  const docName = f?.nombreDocumento || f?.name || "Documento eliminado";
+                  const rejectedBy = cr.reviewedBy?.name ?? "Administrador";
+                  return (
+                    <div key={cr.id} style={{ background: "#fff", border: "1px solid #fca5a5", borderLeft: "4px solid #f97316", borderRadius: 10, padding: "14px 18px", marginBottom: 10 }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+                        {f && <FileIcon mimeType={f.mimeType} size={28} />}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+                            <span style={{ fontWeight: 700, fontSize: 14, color: "#1e293b" }}>{docName}</span>
+                            <span style={{ background: "#fff7ed", color: "#c2410c", borderRadius: 5, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>
+                              Solicitud rechazada
+                            </span>
+                            <span style={{ background: "#f1f5f9", color: "#475569", borderRadius: 5, padding: "1px 7px", fontSize: 11 }}>
+                              {CR_TYPE_LABELS[cr.type] ?? cr.type}
+                            </span>
+                          </div>
+                          <div style={{ display: "flex", gap: 12, fontSize: 12, color: "#64748b", flexWrap: "wrap" }}>
+                            {f?.codigo && <span>Código: <b>{f.codigo}</b></span>}
+                            <span>Rechazado por: <b>{rejectedBy}</b></span>
+                            {cr.reviewedAt && <span>Fecha: <b>{new Date(cr.reviewedAt).toLocaleDateString("es-MX")}</b></span>}
+                          </div>
+                          {cr.adminNotes && (
+                            <div style={{ marginTop: 8, padding: "7px 12px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6, fontSize: 12, color: "#dc2626" }}>
+                              <b>Motivo:</b> {cr.adminNotes}
+                            </div>
+                          )}
+                        </div>
+                        {f && (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+                            <button
+                              className="action-btn"
+                              style={{ background: "#f1f5f9", color: "#475569", opacity: openingDoc === f.id ? 0.5 : 1 }}
+                              disabled={openingDoc === f.id}
+                              onClick={() => openDoc(f.id)}
+                            >
+                              {openingDoc === f.id ? "…" : "Ver documento"}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+          </section>
+        )}
+
+        {/* ── Section D: Mis Solicitudes de Cambio (solo PENDING) ──────────────── */}
+        {mainTab === "seguimiento" && (
+          <section style={{ marginTop: 48 }}>
+            <div style={{ marginBottom: 16 }}>
+              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#1e293b" }}>Mis Solicitudes Pendientes</h2>
+              <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94a3b8" }}>
+                Cambios enviados al administrador que aun no han sido revisados
               </p>
             </div>
 
             {loadingCR ? (
-              [1,2,3].map((i) => <div key={i} className="skeleton" style={{ height: 64, marginBottom: 8 }} />)
-            ) : myChangeRequests.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "40px 0", color: "#94a3b8" }}>
-                <div style={{ fontSize: 36, marginBottom: 8 }}>📝</div>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>No tienes solicitudes de cambio</div>
+              [1,2].map((i) => <div key={i} className="skeleton" style={{ height: 64, marginBottom: 8 }} />)
+            ) : pendingCRs.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "32px 0", color: "#94a3b8" }}>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>No tienes solicitudes pendientes de revision</div>
               </div>
             ) : (
-              myChangeRequests.map((cr) => {
+              pendingCRs.map((cr) => {
                 const sc = CR_STATUS_COLORS[cr.status] ?? CR_STATUS_COLORS.PENDING;
                 const docName = cr.file?.nombreDocumento || cr.file?.name || "Documento eliminado";
                 return (
@@ -580,6 +949,203 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
           </section>
         )}
       </div>
+
+      {/* ── Outgoing request submit modal ───────────────────────────────────── */}
+      {outModal && (
+        <div className="modal-backdrop" onClick={() => !outSubmitting && setOutModal(null)}>
+          <div className="modal-box" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#1e293b" }}>
+                Responder solicitud — {outModal.outgoingRequest.type === "ACTUALIZACION" ? "Actualización" : outModal.outgoingRequest.type === "REVISION" ? "Revisión" : "Corrección"}
+              </h3>
+              {!outSubmitting && (
+                <button onClick={() => setOutModal(null)} style={{ background: "#f1f5f9", border: "none", borderRadius: 6, padding: "4px 8px", cursor: "pointer", color: "#64748b" }}><X size={14} /></button>
+              )}
+            </div>
+
+            <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13 }}>
+              <b>{outModal.docName}</b>
+              {outModal.currentVersion && <span style={{ color: "#94a3b8", marginLeft: 8 }}>Versión actual: {outModal.currentVersion}</span>}
+            </div>
+
+            {outModal.outgoingRequest.instructions && (
+              <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#1e40af" }}>
+                <b>Instrucciones:</b> {outModal.outgoingRequest.instructions}
+              </div>
+            )}
+
+            {/* Step 2: show step 1 result */}
+            {outModal.outgoingRequest.totalSteps === 2 && outModal.outgoingRequest.step1OutcomeType && (
+              <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#166534" }}>
+                <b>Resultado del paso anterior:</b>{" "}
+                {outModal.outgoingRequest.step1OutcomeType === "no_changes" ? "Sin cambios necesarios"
+                  : outModal.outgoingRequest.step1OutcomeType === "new_version" ? `Nueva versión (${outModal.outgoingRequest.step1VersionStr ?? "—"})`
+                  : "Corrección aplicada"}
+              </div>
+            )}
+
+            {/* Outcome selection */}
+            {outModal.outgoingRequest.type === "REVISION" && (
+              <div style={{ marginBottom: 16 }}>
+                <label style={ls}>Resultado de la revisión</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, cursor: "pointer" }}>
+                    <input type="radio" name="outcome" checked={outOutcome === "no_changes"} onChange={() => setOutOutcome("no_changes")} />
+                    El documento está correcto, no requiere cambios
+                  </label>
+                  <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, cursor: "pointer" }}>
+                    <input type="radio" name="outcome" checked={outOutcome === "new_version"} onChange={() => setOutOutcome("new_version")} />
+                    Se requieren cambios — subir nueva versión
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* File upload */}
+            {(outModal.outgoingRequest.type === "ACTUALIZACION" || outOutcome === "new_version" || (outModal.outgoingRequest.type === "CORRECCION" && outModal.outgoingRequest.correctionFields?.contenido)) && (
+              <div style={{ marginBottom: 16 }}>
+                <label style={ls}>
+                  Archivo{outModal.outgoingRequest.type === "ACTUALIZACION" || outModal.outgoingRequest.correctionFields?.contenido ? " *" : " (opcional)"}
+                </label>
+                <input
+                  type="file"
+                  onChange={(e) => setOutFile(e.target.files?.[0] ?? null)}
+                  style={{ width: "100%", fontSize: 13, padding: "6px 0" }}
+                />
+                {outFile && <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{outFile.name} ({(outFile.size / 1024).toFixed(0)} KB)</div>}
+              </div>
+            )}
+
+            {/* Version label */}
+            {(outOutcome === "new_version" || outModal.outgoingRequest.type === "ACTUALIZACION") && (
+              <div style={{ marginBottom: 16 }}>
+                <label style={ls}>Etiqueta de versión (ej. v1.2)</label>
+                <input
+                  style={inputS}
+                  value={outVersionStr}
+                  onChange={(e) => setOutVersionStr(e.target.value)}
+                  placeholder="v1.2"
+                />
+              </div>
+            )}
+
+            {/* Correction metadata fields */}
+            {outModal.outgoingRequest.type === "CORRECCION" && (
+              <>
+                {outModal.outgoingRequest.correctionFields?.nombre && (
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={ls}>Nombre del documento corregido</label>
+                    <input style={inputS} value={outNombreDoc} onChange={(e) => setOutNombreDoc(e.target.value)} placeholder="Nuevo nombre del documento" />
+                  </div>
+                )}
+                {outModal.outgoingRequest.correctionFields?.area && (
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={ls}>Área / departamento</label>
+                    <input style={inputS} value={outDepartamento} onChange={(e) => setOutDepartamento(e.target.value)} placeholder="Área o departamento" />
+                  </div>
+                )}
+              </>
+            )}
+
+            {outError && <p style={{ color: "#dc2626", fontSize: 13, margin: "0 0 10px" }}>{outError}</p>}
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={submitOutModal}
+                disabled={outSubmitting}
+                style={{ flex: 1, background: "#d97706", color: "#fff", border: "none", padding: "11px", borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: "pointer", opacity: outSubmitting ? 0.7 : 1 }}
+              >
+                {outSubmitting ? "Enviando…" : "Enviar respuesta"}
+              </button>
+              <button onClick={() => !outSubmitting && setOutModal(null)} disabled={outSubmitting} style={{ background: "#f1f5f9", color: "#64748b", border: "none", padding: "11px 16px", borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Review chain action modal ────────────────────────────────────────── */}
+      {chainModal && (
+        <div className="modal-backdrop" onClick={() => !chainWorking && setChainModal(null)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: chainModal.action === "APPROVE" ? "#166534" : chainModal.action === "REJECT" ? "#dc2626" : "#d97706" }}>
+                {chainModal.action === "APPROVE" ? "Aprobar revisión" : chainModal.action === "REJECT" ? "Rechazar documento" : "Devolver al revisor anterior"}
+              </h3>
+              {!chainWorking && (
+                <button onClick={() => setChainModal(null)} style={{ background: "#f1f5f9", border: "none", borderRadius: 6, padding: "4px 8px", cursor: "pointer", display: "flex", alignItems: "center", color: "#64748b" }}><X size={14} /></button>
+              )}
+            </div>
+
+            <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#374151" }}>
+              <b>{chainModal.docName}</b> — Paso {chainModal.stepOrder}
+            </div>
+
+            {chainModal.action === "APPROVE" && (
+              <p style={{ fontSize: 13, color: "#64748b", margin: "0 0 16px" }}>
+                {chainModal.stepOrder === (tasksToShow.find(t => t.id === chainModal.taskId)?.chainTotalSteps ?? 1)
+                  ? "Eres el último revisor. Al aprobar, el documento pasará a aprobación final del administrador."
+                  : "Al aprobar, el documento avanza al siguiente revisor en la cadena."}
+              </p>
+            )}
+            {chainModal.action === "RETURN_TO_PREVIOUS" && (
+              <p style={{ fontSize: 13, color: "#92400e", margin: "0 0 12px" }}>
+                El revisor anterior recibirá el documento de vuelta con tu nota.
+              </p>
+            )}
+            {chainModal.action === "REJECT" && (
+              <p style={{ fontSize: 13, color: "#dc2626", margin: "0 0 12px" }}>
+                El documento volverá al estado Borrador y se notificará al creador. Esta acción termina la cadena de revisión.
+              </p>
+            )}
+
+            {(chainModal.action === "RETURN_TO_PREVIOUS" || chainModal.action === "REJECT") && (
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ ...ls, textTransform: "none" }}>Nota <span style={{ color: "#dc2626" }}>*</span></label>
+                <textarea
+                  style={{ ...inputS, height: 90, resize: "vertical" }}
+                  value={chainNotes}
+                  onChange={(e) => setChainNotes(e.target.value)}
+                  placeholder={chainModal.action === "REJECT" ? "Explica por qué se rechaza el documento…" : "Indica qué debe corregir el revisor anterior…"}
+                  autoFocus
+                />
+              </div>
+            )}
+
+            {chainModal.action === "APPROVE" && (
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ ...ls, textTransform: "none" }}>Comentario <span style={{ color: "#94a3b8", fontWeight: 400 }}>(opcional)</span></label>
+                <textarea
+                  style={{ ...inputS, height: 70, resize: "vertical" }}
+                  value={chainNotes}
+                  onChange={(e) => setChainNotes(e.target.value)}
+                  placeholder="Observaciones para el registro de auditoría…"
+                />
+              </div>
+            )}
+
+            {chainError && <p style={{ color: "#dc2626", fontSize: 13, margin: "0 0 10px" }}>{chainError}</p>}
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={submitChainAction}
+                disabled={chainWorking}
+                style={{
+                  flex: 1, border: "none", padding: "11px", borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: "pointer",
+                  background: chainModal.action === "APPROVE" ? "#16a34a" : chainModal.action === "REJECT" ? "#dc2626" : "#d97706",
+                  color: "#fff", opacity: chainWorking ? 0.7 : 1,
+                }}
+              >
+                {chainWorking ? "Procesando…" : chainModal.action === "APPROVE" ? "Confirmar aprobación" : chainModal.action === "REJECT" ? "Rechazar documento" : "Devolver al anterior"}
+              </button>
+              <button onClick={() => !chainWorking && setChainModal(null)} disabled={chainWorking} style={{ background: "#f1f5f9", color: "#64748b", border: "none", padding: "11px 16px", borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Assign task modal ────────────────────────────────────────────────── */}
       {showAssign && (

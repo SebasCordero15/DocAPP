@@ -27,6 +27,20 @@ export async function POST(req: NextRequest) {
 
   const { folderId, name, mimeType, size } = parsed.data;
 
+  // Enforce storage quota
+  const [company, storageStats] = await Promise.all([
+    prisma.company.findUnique({ where: { id: companyId }, select: { maxStorageMB: true } }),
+    prisma.file.aggregate({ where: { companyId, deletedAt: null }, _sum: { size: true } }),
+  ]);
+  const usedBytes = storageStats._sum.size ?? 0;
+  const maxBytes = ((company?.maxStorageMB ?? 5120) as number) * 1024 * 1024;
+  if (usedBytes + size > maxBytes) {
+    return NextResponse.json(
+      { error: "Has alcanzado el límite de almacenamiento de tu plan. Contacta al administrador para actualizar tu plan." },
+      { status: 413 }
+    );
+  }
+
   if (folderId) {
     const folder = await prisma.folder.findFirst({
       where: { id: folderId, companyId, deletedAt: null },

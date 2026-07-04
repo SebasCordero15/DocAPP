@@ -6,10 +6,16 @@ import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/audit";
 import { sendCompanyWelcomeEmail } from "@/lib/email";
 
+const PLAN_LIMITS: Record<string, { maxUsers: number; maxStorageMB: number }> = {
+  BASIC:      { maxUsers: 10,  maxStorageMB: 5120   }, // 5 GB
+  PRO:        { maxUsers: 50,  maxStorageMB: 15360  }, // 15 GB
+  ENTERPRISE: { maxUsers: 250, maxStorageMB: 30720  }, // 30 GB
+};
+
 const schema = z.object({
   name: z.string().min(1).max(100),
   slug: z.string().min(2).max(50).regex(/^[a-z0-9-]+$/, "Slug must be lowercase letters, numbers, and hyphens"),
-  industry: z.enum(["LEGAL", "FINANCE", "HEALTHCARE", "REAL_ESTATE", "TECH", "OTHER"]),
+  industry: z.enum(["FARMACIA", "ALIMENTOS", "MATERIALES", "SERVICIOS", "OTRO", "LEGAL", "FINANCE", "HEALTHCARE", "REAL_ESTATE", "TECH", "OTHER"]),
   plan: z.enum(["BASIC", "PRO", "ENTERPRISE"]).default("BASIC"),
   maxUsers: z.number().int().min(1).max(10000).default(10),
   primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
@@ -43,7 +49,7 @@ export async function POST(req: NextRequest) {
   }
 
   const {
-    name, slug, industry, plan, maxUsers,
+    name, slug, industry, plan,
     primaryColor, secondaryColor, accentColor, fontFamily, logoUrl,
     adminName, adminEmail,
   } = parsed.data;
@@ -56,12 +62,16 @@ export async function POST(req: NextRequest) {
 
   const tempPassword = generateTempPassword();
   const passwordHash = await hashPassword(tempPassword);
+  const planLimits = PLAN_LIMITS[plan] ?? PLAN_LIMITS.BASIC;
 
   let company: Awaited<ReturnType<typeof prisma.company.create>>;
   try {
     company = await prisma.company.create({
       data: {
-        name, slug, industry, plan, maxUsers,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        name, slug, industry: industry as any, plan,
+        maxUsers: planLimits.maxUsers,
+        maxStorageMB: planLimits.maxStorageMB,
         primaryColor, secondaryColor, accentColor, fontFamily,
         logoUrl: logoUrl ?? null,
         users: {

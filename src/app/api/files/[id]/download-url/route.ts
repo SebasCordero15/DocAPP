@@ -20,7 +20,15 @@ export async function GET(
   });
   if (!file) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const level = await resolveFileAccess(session.userId, companyId, session.role, file.id);
+  let level = await resolveFileAccess(session.userId, companyId, session.role, file.id);
+  if (!atLeast(level, "READ")) {
+    // Task assignees can access files in their active tasks even without folder permission
+    const hasActiveTask = await prisma.documentTask.findFirst({
+      where: { fileId: params.id, assignedToUserId: session.userId, status: { not: "COMPLETED" } },
+      select: { id: true },
+    });
+    if (hasActiveTask) level = "READ";
+  }
   if (!atLeast(level, "READ")) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const url = await presignDownload(file.storageKey, file.name);

@@ -154,8 +154,18 @@ export async function GET(req: NextRequest) {
       status: true,
       dueDate: true,
       notes: true,
+      rejectionNote: true,
       createdAt: true,
       completedAt: true,
+      reviewChainId: true,
+      stepOrder: true,
+      outgoingRequestId: true,
+      outgoingRequest: {
+        select: {
+          id: true, type: true, status: true, instructions: true, correctionFields: true,
+          currentStep: true, totalSteps: true, step1OutcomeType: true, step1StorageKey: true, step1VersionStr: true,
+        },
+      },
       file: {
         select: {
           id: true,
@@ -170,17 +180,43 @@ export async function GET(req: NextRequest) {
       },
       assignedTo: { select: { id: true, name: true, email: true } },
       assignedBy: { select: { id: true, name: true, email: true } },
+      reviewChain: {
+        select: { currentStep: true, totalSteps: true, status: true },
+      },
     },
   });
 
+  // For "mine" view: hide sequential tasks that aren't at the current step yet.
+  const filteredTasks = view === "mine"
+    ? tasks.filter((t) => {
+        if (t.reviewChainId && t.reviewChain && t.stepOrder !== null) {
+          return (
+            t.stepOrder === t.reviewChain.currentStep &&
+            t.reviewChain.status === "IN_REVIEW"
+          );
+        }
+        if (t.outgoingRequestId && t.outgoingRequest && t.stepOrder !== null) {
+          return (
+            t.stepOrder === t.outgoingRequest.currentStep &&
+            (t.outgoingRequest.status === "PENDING" || t.outgoingRequest.status === "IN_PROGRESS")
+          );
+        }
+        return true;
+      })
+    : tasks;
+
   const now = new Date();
   return NextResponse.json({
-    tasks: tasks.map((t) => ({
+    tasks: filteredTasks.map((t) => ({
       ...t,
       dueDate: t.dueDate?.toISOString() ?? null,
       completedAt: t.completedAt?.toISOString() ?? null,
       createdAt: t.createdAt.toISOString(),
       isOverdue: t.dueDate ? t.dueDate < now && t.status !== "COMPLETED" : false,
+      chainCurrentStep: t.reviewChain?.currentStep ?? null,
+      chainTotalSteps:  t.reviewChain?.totalSteps  ?? null,
+      reviewChain: undefined, // don't leak full chain object; use the flattened fields above
+      outgoingRequest: t.outgoingRequest ?? null,
     })),
   });
 }

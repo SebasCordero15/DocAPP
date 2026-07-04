@@ -18,7 +18,14 @@ export async function GET(
   });
   if (!file) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const level = await resolveFileAccess(session.userId, session.companyId, session.role, file.id);
+  let level = await resolveFileAccess(session.userId, session.companyId, session.role, file.id);
+  if (!atLeast(level, "READ")) {
+    const hasActiveTask = await prisma.documentTask.findFirst({
+      where: { fileId: params.id, assignedToUserId: session.userId, status: { not: "COMPLETED" } },
+      select: { id: true },
+    });
+    if (hasActiveTask) level = "READ";
+  }
   if (!atLeast(level, "READ")) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const url = await presignView(file.storageKey, file.mimeType);

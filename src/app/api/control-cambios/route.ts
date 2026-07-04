@@ -124,6 +124,15 @@ export async function GET(req: NextRequest) {
     CHANGE_REQUEST_REJECTED:  "Solicitud rechazada",
   };
 
+  // Override label when detail string indicates an outgoing-request origin
+  function resolveLabel(action: string, detail: string | null): string {
+    const base = AUDIT_LABELS[action] ?? action;
+    if (!detail) return base;
+    if (action === "FILE_UPLOAD" && detail.includes("solicitud saliente")) return "Nueva versión (solicitud saliente)";
+    if (action === "FILE_METADATA_UPDATE" && detail.includes("Corrección aprobada")) return "Corrección aprobada (solicitud saliente)";
+    return base;
+  }
+
   const CR_TYPE_LABELS: Record<string, string> = {
     NEW_UPLOAD:           "Nueva subida",
     EDIT_METADATA:        "Edición de metadatos",
@@ -159,7 +168,7 @@ export async function GET(req: NextRequest) {
     entries.push({
       id: `audit-${l.id}`,
       tipo: l.action,
-      tipoLabel: AUDIT_LABELS[l.action] ?? l.action,
+      tipoLabel: resolveLabel(l.action, l.detail),
       documento: file?.nombreDocumento ?? file?.name ?? l.detail ?? null,
       codigo: file?.codigo ?? null,
       fileId,

@@ -116,6 +116,9 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
   const [reviewAssignee, setReviewAssignee] = useState("");
   const [savingReview, setSavingReview] = useState(false);
   const [companyUsers, setCompanyUsers] = useState<UserOption[]>([]);
+  const [moveFolderId, setMoveFolderId] = useState<string>("");
+  const [allFolders, setAllFolders] = useState<{ id: string; name: string }[]>([]);
+  const [movingSave, setMovingSave] = useState(false);
 
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -137,7 +140,6 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
   const [pendingCRCount, setPendingCRCount] = useState(0);
 
   // ── new UI state ────────────────────────────────────────────────────────────
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [searchQuery, setSearchQuery] = useState("");
   const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
@@ -269,6 +271,26 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
     setReviewDate(file.reviewDueDate ? file.reviewDueDate.slice(0, 10) : "");
     setReviewInterval(file.reviewIntervalDays ? String(file.reviewIntervalDays) : "");
     setReviewAssignee(file.assignedToId ?? "");
+    setMoveFolderId("");
+    // Fetch flat list of folders if admin
+    if (isAdmin && allFolders.length === 0) {
+      fetch("/api/folders").then((r) => r.ok ? r.json() : null).then((d) => {
+        if (d?.folders) setAllFolders(d.folders.map((f: FolderItem) => ({ id: f.id, name: f.name })));
+      });
+    }
+  }
+
+  async function moveFileToFolder() {
+    if (!reviewEditFile || !moveFolderId) return;
+    setMovingSave(true);
+    const res = await fetch(`/api/files/${reviewEditFile.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ folderId: moveFolderId }),
+    });
+    setMovingSave(false);
+    if (res.ok) { setReviewEditFile(null); fetchContents(folderId); }
+    else { const d = await res.json().catch(() => ({})); alert(d.error ?? "Error al mover"); }
   }
 
   async function saveReview() {
@@ -345,11 +367,6 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
     else alert("Failed to delete file");
   }
 
-  async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    window.location.href = "/login";
-  }
-
   // ── derived state ───────────────────────────────────────────────────────────
 
   const q = searchQuery.toLowerCase();
@@ -365,34 +382,15 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
 
   // ── render ──────────────────────────────────────────────────────────────────
 
-  const SIDEBAR_W = sidebarOpen ? 240 : 64;
-
   const pendingTotal = pendingCounts.enRevision + pendingCounts.atrasadas;
   const hasAnyPending = pendingTotal > 0 || myPendingCR > 0 || (isAdmin && pendingCRCount > 0);
 
   const canCreate = userRole === "COMPANY_ADMIN" || userRole === "EDITOR";
 
-  const navItems = [
-    { label: "Documents",        icon: <Files size={18} />,         action: () => navigateTo(null), active: true, badge: 0 },
-    { label: "Listado Maestro",  icon: <ClipboardList size={18} />, action: () => router.push("/dashboard/listado-maestro"), active: false, badge: 0 },
-    { label: "Pendientes",       icon: <ClipboardCheck size={18} />, action: () => router.push("/dashboard/pendientes"), active: false, badge: pendingTotal },
-    { label: "Control Cambios",  icon: <History size={18} />,       action: () => router.push("/dashboard/control-cambios"), active: false, badge: 0 },
-    ...(canCreate ? [
-      { label: "Crear Documento", icon: <FilePlus size={18} />, action: () => router.push("/dashboard/crear-documento"), active: false, badge: 0 },
-    ] : []),
-    ...(isAdmin ? [
-      { label: "Team",        icon: <Users size={18} />,      action: () => router.push("/dashboard/team"), active: false, badge: 0 },
-      { label: "Permissions", icon: <Shield size={18} />,     action: () => router.push("/dashboard/permissions"), active: false, badge: 0 },
-      { label: "Solicitudes", icon: <Inbox size={18} />,      action: () => router.push("/dashboard/solicitudes"), active: false, badge: pendingCRCount },
-      { label: "Reportes",    icon: <BarChart2 size={18} />,  action: () => router.push("/dashboard/reportes"), active: false, badge: 0 },
-      { label: "Audit",       icon: <ScrollText size={18} />, action: () => router.push("/dashboard/audit"), active: false, badge: 0 },
-    ] : []),
-  ];
-
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden", fontFamily: `'${font}', Inter, system-ui, sans-serif` }}>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden", minWidth: 0 }}>
 
-      {/* ── Global CSS ───────────────────────────────────────────────────────── */}
+      {/* ── CSS ────────────────────────────────────────────────────────────── */}
       <style>{`
         @keyframes shimmer {
           0% { background-position: -400px 0; }
@@ -409,9 +407,6 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
           to   { opacity: 1; transform: translateY(0); }
         }
         .fade-up { animation: fadeUp 0.18s ease-out; }
-        .nav-item { transition: background 0.15s ease, color 0.15s ease; border-radius: 8px; }
-        .nav-item:hover { background: rgba(255,255,255,0.12) !important; }
-        .nav-active { background: rgba(255,255,255,0.2) !important; }
         .file-row { transition: background 0.1s ease; }
         .file-row:hover { background: #f8fafc !important; }
         .file-card { transition: box-shadow 0.15s ease, transform 0.15s ease; cursor: pointer; }
@@ -429,127 +424,6 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
       `}</style>
-
-      {/* ── Sidebar ──────────────────────────────────────────────────────────── */}
-      <aside style={{
-        width: SIDEBAR_W, flexShrink: 0, height: "100vh",
-        background: brand, color: "#fff",
-        display: "flex", flexDirection: "column",
-        transition: "width 0.22s cubic-bezier(0.4,0,0.2,1)",
-        overflow: "hidden",
-        boxShadow: "2px 0 12px rgba(0,0,0,0.15)",
-        position: "relative", zIndex: 10,
-      }}>
-
-        {/* Logo + Company name */}
-        <div style={{
-          padding: sidebarOpen ? "20px 16px 16px" : "20px 0 16px",
-          borderBottom: "1px solid rgba(255,255,255,0.12)",
-          display: "flex", alignItems: "center",
-          justifyContent: sidebarOpen ? "flex-start" : "center", gap: 10,
-          flexShrink: 0, cursor: "pointer",
-        }} onClick={() => navigateTo(null)}>
-          {company.logoUrl ? (
-            <img src={company.logoUrl} alt="" style={{ width: 34, height: 34, objectFit: "contain", borderRadius: 6, background: "rgba(255,255,255,0.18)", padding: 3, flexShrink: 0 }} />
-          ) : (
-            <div style={{ width: 34, height: 34, borderRadius: 8, background: "rgba(255,255,255,0.22)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 800, flexShrink: 0 }}>
-              {company.name.charAt(0).toUpperCase()}
-            </div>
-          )}
-          {sidebarOpen && (
-            <div style={{ overflow: "hidden" }}>
-              <div style={{ fontWeight: 700, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{company.name}</div>
-              <div style={{ fontSize: 11, opacity: 0.65, marginTop: 1 }}>KE-Control</div>
-            </div>
-          )}
-        </div>
-
-        {/* Nav items */}
-        <nav style={{ flex: 1, padding: "12px 8px", overflowY: "auto", overflowX: "hidden" }}>
-          {navItems.map((item) => (
-            <button
-              key={item.label}
-              onClick={item.action}
-              className={`nav-item${item.active ? " nav-active" : ""}`}
-              title={!sidebarOpen ? item.label : undefined}
-              style={{
-                width: "100%", display: "flex", alignItems: "center",
-                gap: 10, padding: sidebarOpen ? "9px 12px" : "9px 0",
-                justifyContent: sidebarOpen ? "flex-start" : "center",
-                border: "none", background: item.active ? "rgba(255,255,255,0.2)" : "transparent",
-                color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: item.active ? 600 : 400,
-                marginBottom: 2,
-              }}
-            >
-              <span style={{ flexShrink: 0, position: "relative" }}>
-                {item.icon}
-                {item.badge > 0 && !sidebarOpen && (
-                  <span style={{ position: "absolute", top: -5, right: -5, background: "#ef4444", color: "#fff", borderRadius: "50%", width: 14, height: 14, fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", border: "1.5px solid " + brand }}>
-                    {item.badge > 9 ? "9+" : item.badge}
-                  </span>
-                )}
-              </span>
-              {sidebarOpen && <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1 }}>{item.label}</span>}
-              {sidebarOpen && item.badge > 0 && (
-                <span style={{ background: "#ef4444", color: "#fff", borderRadius: 10, padding: "1px 6px", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
-                  {item.badge}
-                </span>
-              )}
-            </button>
-          ))}
-        </nav>
-
-        {/* User section */}
-        <div style={{ padding: sidebarOpen ? "12px 8px 8px" : "12px 0 8px", borderTop: "1px solid rgba(255,255,255,0.12)", flexShrink: 0 }}>
-          {/* User info */}
-          {sidebarOpen && (
-            <div style={{ padding: "8px 12px", marginBottom: 4, display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ width: 30, height: 30, borderRadius: "50%", background: "rgba(255,255,255,0.22)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
-                {userRole.charAt(0).toUpperCase()}
-              </div>
-              <div style={{ overflow: "hidden" }}>
-                <div style={{ fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>{userRole.replace("_", " ")}</div>
-                {isAdmin && <div style={{ fontSize: 10, opacity: 0.65 }}>{activeUserCount}/{maxUsers} users</div>}
-              </div>
-            </div>
-          )}
-          {/* Sign out */}
-          <button
-            onClick={logout}
-            className="nav-item"
-            title={!sidebarOpen ? "Sign out" : undefined}
-            style={{
-              width: "100%", display: "flex", alignItems: "center",
-              gap: 10, padding: sidebarOpen ? "9px 12px" : "9px 0",
-              justifyContent: sidebarOpen ? "flex-start" : "center",
-              border: "none", background: "transparent",
-              color: "rgba(255,255,255,0.75)", cursor: "pointer", fontSize: 13,
-            }}
-          >
-            <LogOut size={16} />
-            {sidebarOpen && <span>Sign out</span>}
-          </button>
-          {/* Collapse toggle */}
-          <button
-            onClick={() => setSidebarOpen((o) => !o)}
-            className="icon-btn"
-            title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
-            style={{
-              width: "100%", display: "flex", alignItems: "center",
-              gap: 10, padding: sidebarOpen ? "9px 12px" : "9px 0",
-              justifyContent: sidebarOpen ? "flex-start" : "center",
-              border: "none", background: "transparent",
-              color: "rgba(255,255,255,0.55)", cursor: "pointer", fontSize: 12, marginTop: 2,
-            }}
-          >
-            {sidebarOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
-            {sidebarOpen && <span>Collapse</span>}
-          </button>
-        </div>
-      </aside>
-
-      {/* ── Right panel ──────────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
 
         {/* Top bar */}
         <header style={{
@@ -738,13 +612,22 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {canEdit && (
-                <button
-                  onClick={() => { setShowNewFolder(!showNewFolder); setRenamingId(null); }}
-                  className="action-btn"
-                  style={{ display: "flex", alignItems: "center", gap: 6, background: brand, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
-                >
-                  <Plus size={15} /> Nueva Carpeta
-                </button>
+                <>
+                  <button
+                    onClick={() => { setShowNewFolder(!showNewFolder); setRenamingId(null); }}
+                    className="action-btn"
+                    style={{ display: "flex", alignItems: "center", gap: 6, background: brand, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
+                  >
+                    <Plus size={15} /> Nueva Carpeta
+                  </button>
+                  <button
+                    onClick={() => router.push("/dashboard/crear-documento")}
+                    className="action-btn"
+                    style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", color: brand, border: `1.5px solid ${brand}`, padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
+                  >
+                    <Plus size={15} /> Crear Documento
+                  </button>
+                </>
               )}
             </div>
             <div style={{ fontSize: 12, color: "#94a3b8" }}>
@@ -890,6 +773,22 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                             </select>
                           </div>
                         )}
+                        {isAdmin && allFolders.length > 0 && (
+                          <div>
+                            <label style={labelStyle}>Mover a carpeta</label>
+                            <div style={{ display: "flex", gap: 6 }}>
+                              <select value={moveFolderId} onChange={(e) => setMoveFolderId(e.target.value)} style={{ ...inputStyle, width: 160 }}>
+                                <option value="">Sin cambio</option>
+                                {allFolders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                              </select>
+                              {moveFolderId && (
+                                <button onClick={moveFileToFolder} disabled={movingSave} style={{ background: "#7c3aed", color: "#fff", border: "none", padding: "8px 12px", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
+                                  {movingSave ? "…" : "Mover"}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
                         <div style={{ display: "flex", gap: 8 }}>
                           <button onClick={saveReview} disabled={savingReview} style={{ background: brand, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
                             {savingReview ? "…" : "Save"}
@@ -992,8 +891,6 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
             </div>
           )}
         </main>
-      </div>
-
 
       {/* ── Spreadsheet preview modal ──────────────────────────────────────── */}
       {previewFile && (

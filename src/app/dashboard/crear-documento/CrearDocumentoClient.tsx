@@ -154,17 +154,11 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
   }
 
   return (
-    <main style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: `'${company.fontFamily}', Inter, system-ui, sans-serif` }}>
-      {/* Header */}
-      <header style={{ background: brand, color: "#fff", padding: "14px 28px", display: "flex", alignItems: "center", gap: 14 }}>
-        <button
-          onClick={() => router.push("/dashboard")}
-          style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "#fff", padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontSize: 13 }}
-        >
-          ← Dashboard
-        </button>
+    <div style={{ flex: 1, overflowY: "auto", background: "#f1f5f9", fontFamily: `'${company.fontFamily}', Inter, system-ui, sans-serif` }}>
+      {/* Section header */}
+      <div style={{ background: brand, color: "#fff", padding: "12px 28px", position: "sticky", top: 0, zIndex: 10 }}>
         <strong style={{ fontSize: 16 }}>Crear Documento</strong>
-      </header>
+      </div>
 
       <div style={{ maxWidth: 680, margin: "0 auto", padding: "32px 24px" }}>
 
@@ -418,7 +412,7 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
 
         </div>
       </div>
-    </main>
+    </div>
   );
 }
 

@@ -57,6 +57,7 @@ export async function GET(
       userCount: company.users.length,
       fileCount: fileStats._count.id,
       storageBytes: fileStats._sum.size ?? 0,
+      maxStorageMB: company.maxStorageMB,
       users: company.users.map((u) => ({
         ...u,
         lastLoginAt: u.lastLoginAt?.toISOString() ?? null,
@@ -70,16 +71,33 @@ export async function GET(
   });
 }
 
-const PLAN_LIMITS: Record<string, number> = { BASIC: 10, PRO: 50, ENTERPRISE: 250 };
+const PLAN_LIMITS: Record<string, { maxUsers: number; maxStorageMB: number }> = {
+  BASIC:      { maxUsers: 10,  maxStorageMB: 5120   }, // 5 GB
+  PRO:        { maxUsers: 50,  maxStorageMB: 15360  }, // 15 GB
+  ENTERPRISE: { maxUsers: 250, maxStorageMB: 30720  }, // 30 GB
+};
+
+const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
 const patchSchema = z.object({
+  // Activation toggle
   isActive: z.boolean().optional(),
+  // Plan (auto-updates limits)
   plan: z.enum(["BASIC", "PRO", "ENTERPRISE"]).optional(),
-}).refine((d) => d.isActive !== undefined || d.plan !== undefined, {
-  message: "Provide at least one of isActive or plan",
+  // Company info
+  name: z.string().min(1).max(100).optional(),
+  industry: z.enum(["FARMACIA", "ALIMENTOS", "MATERIALES", "SERVICIOS", "OTRO", "LEGAL", "FINANCE", "HEALTHCARE", "REAL_ESTATE", "TECH", "OTHER"]).optional(),
+  customDomain: z.string().max(200).nullable().optional(),
+  // Branding
+  primaryColor:   z.string().regex(COLOR_RE).optional(),
+  secondaryColor: z.string().regex(COLOR_RE).optional(),
+  accentColor:    z.string().regex(COLOR_RE).optional(),
+  fontFamily:     z.string().max(50).optional(),
+  // Logo as data: URL (base64) — capped at 700 KB encoded; null = remove
+  logoUrl: z.string().max(700_000).nullable().optional(),
 });
 
-// PATCH /api/superadmin/companies/[id] — update isActive and/or maxUsers
+// PATCH /api/superadmin/companies/[id] — update company info, plan, branding, activation
 export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -92,7 +110,7 @@ export async function PATCH(
   const body = await req.json().catch(() => null);
   const parsed = patchSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid input", details: parsed.error.issues }, { status: 400 });
   }
 
   const existing = await prisma.company.findUnique({ where: { id: params.id } });
@@ -100,26 +118,50 @@ export async function PATCH(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const { isActive, plan } = parsed.data;
-  const newMaxUsers = plan ? PLAN_LIMITS[plan] : undefined;
+  const {
+    isActive, plan,
+    name, industry, customDomain,
+    primaryColor, secondaryColor, accentColor, fontFamily, logoUrl,
+  } = parsed.data;
+
+  const newLimits = plan ? PLAN_LIMITS[plan] : undefined;
 
   const updated = await prisma.company.update({
     where: { id: params.id },
     data: {
-      ...(isActive !== undefined ? { isActive } : {}),
-      ...(plan !== undefined ? { plan, maxUsers: newMaxUsers } : {}),
+      ...(isActive       !== undefined ? { isActive }         : {}),
+      ...(plan           !== undefined ? { plan, maxUsers: newLimits!.maxUsers, maxStorageMB: newLimits!.maxStorageMB } : {}),
+      ...(name           !== undefined ? { name }             : {}),
+      ...(industry       !== undefined ? { industry: industry as Parameters<typeof prisma.company.update>[0]["data"]["industry"] } : {}),
+      ...(customDomain   !== undefined ? { customDomain }     : {}),
+      ...(primaryColor   !== undefined ? { primaryColor }     : {}),
+      ...(secondaryColor !== undefined ? { secondaryColor }   : {}),
+      ...(accentColor    !== undefined ? { accentColor }      : {}),
+      ...(fontFamily     !== undefined ? { fontFamily }       : {}),
+      ...(logoUrl        !== undefined ? { logoUrl }          : {}),
     },
-    select: { id: true, slug: true, name: true, isActive: true, plan: true, maxUsers: true },
+    select: {
+      id: true, slug: true, name: true, isActive: true, plan: true,
+      maxUsers: true, maxStorageMB: true,
+      primaryColor: true, secondaryColor: true, accentColor: true,
+      fontFamily: true, logoUrl: true, customDomain: true, industry: true,
+    },
   });
 
   const changes: string[] = [];
-  if (isActive !== undefined) changes.push(isActive ? "COMPANY_ACTIVATE" : "COMPANY_DEACTIVATE");
-  if (plan !== undefined) changes.push(`plan=${plan} (maxUsers=${newMaxUsers})`);
+  if (isActive     !== undefined) changes.push(isActive ? "activada" : "desactivada");
+  if (plan         !== undefined) changes.push(`plan=${plan}`);
+  if (name         !== undefined) changes.push(`nombre=${name}`);
+  if (industry     !== undefined) changes.push(`industria=${industry}`);
+  if (logoUrl      !== undefined) changes.push(logoUrl ? "logo actualizado" : "logo eliminado");
+  if (primaryColor !== undefined) changes.push("branding actualizado");
 
   await logAction({
     companyId: params.id,
     userId: session.userId,
-    action: isActive !== undefined ? (isActive ? "COMPANY_ACTIVATE" : "COMPANY_DEACTIVATE") : "COMPANY_UPDATE",
+    action: isActive !== undefined
+      ? (isActive ? "COMPANY_ACTIVATE" : "COMPANY_DEACTIVATE")
+      : "COMPANY_UPDATE",
     resourceType: "COMPANY",
     resourceId: params.id,
     detail: `${existing.name} — ${changes.join(", ")}`,

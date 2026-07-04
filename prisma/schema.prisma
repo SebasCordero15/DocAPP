@@ -71,12 +71,19 @@ enum TaskStatus {
 }
 
 enum Industry {
+  // Legacy values — kept so existing DB rows remain valid; displayed as "Otro" in UI
   LEGAL
   FINANCE
   HEALTHCARE
   REAL_ESTATE
   TECH
   OTHER
+  // Current values
+  FARMACIA
+  ALIMENTOS
+  MATERIALES
+  SERVICIOS
+  OTRO
 }
 
 enum DocumentType {
@@ -95,6 +102,21 @@ enum ReviewChainStatus {
   RETURNED_TO_CREATOR
 }
 
+enum OutgoingRequestType {
+  ACTUALIZACION
+  REVISION
+  CORRECCION
+}
+
+enum OutgoingRequestStatus {
+  PENDING
+  IN_PROGRESS
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
 // ---------- Tenancy ----------
 model Company {
   id             String    @id @default(cuid())
@@ -105,11 +127,13 @@ model Company {
   secondaryColor String    @default("#1e40af")
   accentColor    String    @default("#7c3aed")
   fontFamily     String    @default("Inter")
-  industry       Industry  @default(OTHER)
+  industry       Industry  @default(OTRO)
   customDomain   String?
   plan           Plan      @default(BASIC)
   maxUsers       Int       @default(10)
+  maxStorageMB   Int       @default(5120)
   isActive       Boolean   @default(true)
+  deletedAt      DateTime? // soft-delete: set to signal archival; null = active
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -120,9 +144,10 @@ model Company {
   auditLogs      AuditLog[]
   notifications  Notification[]
   userInvites    UserInvite[]
-  tasks          DocumentTask[]
-  changeRequests ChangeRequest[]
-  reviewChains   ReviewChain[]
+  tasks            DocumentTask[]
+  changeRequests   ChangeRequest[]
+  reviewChains     ReviewChain[]
+  outgoingRequests OutgoingRequest[]
 }
 
 // ---------- Users ----------
@@ -147,9 +172,11 @@ model User {
   permissions          Permission[]
   assignedTasks        DocumentTask[] @relation("TaskAssignee")
   createdTasks         DocumentTask[] @relation("TaskAssigner")
-  changeRequests       ChangeRequest[] @relation("ChangeRequester")
-  reviewedRequests     ChangeRequest[] @relation("ChangeReviewer")
-  reviewChainsCreated  ReviewChain[]   @relation("ChainCreator")
+  changeRequests         ChangeRequest[]   @relation("ChangeRequester")
+  reviewedRequests       ChangeRequest[]   @relation("ChangeReviewer")
+  reviewChainsCreated    ReviewChain[]     @relation("ChainCreator")
+  outgoingRequestsCreated   OutgoingRequest[] @relation("OutgoingCreator")
+  outgoingRequestsReviewed  OutgoingRequest[] @relation("OutgoingFinalReviewer")
 
   // Email unique per company. SUPER_ADMIN has null companyId — uniqueness
   // for that role is enforced at the application layer.
@@ -215,6 +242,11 @@ model File {
   departamento         String?
   tipoDocumento        DocumentType?
 
+  // ── Version history (retains exactly one prior approved version) ────────────
+  previousStorageKey   String?
+  previousVersionStr   String?
+  previousVersion      Int?
+
   company              Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   folder               Folder?        @relation(fields: [folderId], references: [id], onDelete: SetNull)
   assignedTo           User?          @relation("AssignedReviewer", fields: [assignedToId], references: [id], onDelete: SetNull)
@@ -225,6 +257,7 @@ model File {
   tasks                DocumentTask[]
   changeRequests       ChangeRequest[]
   reviewChain          ReviewChain?
+  outgoingRequests     OutgoingRequest[]
 
   @@unique([companyId, codigo])
   @@index([companyId])
@@ -332,14 +365,18 @@ model DocumentTask {
   rejectionNote            String?
 
   // Review chain fields (for sequential document review workflow)
-  reviewChainId    String?
-  stepOrder        Int?
+  reviewChainId     String?
+  stepOrder         Int?
 
-  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  file        File         @relation(fields: [fileId], references: [id], onDelete: Cascade)
-  assignedTo  User         @relation("TaskAssignee", fields: [assignedToUserId], references: [id], onDelete: Cascade)
-  assignedBy  User         @relation("TaskAssigner", fields: [assignedByUserId], references: [id], onDelete: Cascade)
-  reviewChain ReviewChain? @relation(fields: [reviewChainId], references: [id], onDelete: SetNull)
+  // Outgoing request fields (admin-initiated work chain)
+  outgoingRequestId String?
+
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  file            File             @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  assignedTo      User             @relation("TaskAssignee", fields: [assignedToUserId], references: [id], onDelete: Cascade)
+  assignedBy      User             @relation("TaskAssigner", fields: [assignedByUserId], references: [id], onDelete: Cascade)
+  reviewChain     ReviewChain?     @relation(fields: [reviewChainId], references: [id], onDelete: SetNull)
+  outgoingRequest OutgoingRequest? @relation(fields: [outgoingRequestId], references: [id], onDelete: SetNull)
 
   @@index([companyId])
   @@index([fileId])
@@ -348,6 +385,7 @@ model DocumentTask {
   @@index([status])
   @@index([dueDate])
   @@index([reviewChainId])
+  @@index([outgoingRequestId])
 }
 
 // ---------- Review Chains (sequential document review workflow) ----------
@@ -397,4 +435,52 @@ model ChangeRequest {
   @@index([fileId])
   @@index([requestedByUserId])
   @@index([status])
+}
+
+// ---------- Outgoing Requests (admin-initiated work assigned to users) ----------
+model OutgoingRequest {
+  id                    String                @id @default(cuid())
+  companyId             String
+  fileId                String
+  type                  OutgoingRequestType
+  status                OutgoingRequestStatus @default(PENDING)
+
+  instructions          String?
+  correctionFields      Json?                 // { nombre: bool, contenido: bool, area: bool, carpeta: bool, otro: string|null }
+
+  currentStep           Int                   @default(1)
+  totalSteps            Int
+
+  createdByUserId       String
+  finalReviewedByUserId String?
+  finalNotes            String?
+  finalReviewedAt       DateTime?
+
+  // Pending submission from assignee(s), awaiting admin final approval
+  outcomeType           String?               // "no_changes" | "new_version" | "corrected"
+  pendingStorageKey     String?
+  pendingFileName       String?
+  pendingMimeType       String?
+  pendingSize           Int?
+  pendingVersionStr     String?
+  pendingMetadata       Json?                 // { nombreDocumento, departamento, folderId }
+
+  // Step 1 outcome (visible to step 2 assignee when totalSteps = 2)
+  step1OutcomeType      String?
+  step1StorageKey       String?
+  step1VersionStr       String?
+
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  file          File           @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  createdBy     User           @relation("OutgoingCreator",        fields: [createdByUserId],       references: [id])
+  finalReviewer User?          @relation("OutgoingFinalReviewer",  fields: [finalReviewedByUserId], references: [id], onDelete: SetNull)
+  tasks         DocumentTask[]
+
+  @@index([companyId])
+  @@index([fileId])
+  @@index([status])
+  @@index([createdByUserId])
 }

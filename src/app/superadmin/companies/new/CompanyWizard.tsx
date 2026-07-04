@@ -6,7 +6,7 @@ import FileIcon from "@/components/FileIcon";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Industry = "LEGAL" | "FINANCE" | "HEALTHCARE" | "REAL_ESTATE" | "TECH" | "OTHER";
+type Industry = "FARMACIA" | "ALIMENTOS" | "MATERIALES" | "SERVICIOS" | "OTRO";
 type Plan = "BASIC" | "PRO" | "ENTERPRISE";
 type Step = 1 | 2 | 3 | 4;
 
@@ -47,12 +47,11 @@ function toSlug(name: string): string {
 const FONTS = ["Inter", "Roboto", "Lato", "Montserrat", "Merriweather", "Playfair Display"];
 
 const INDUSTRIES: { value: Industry; label: string }[] = [
-  { value: "LEGAL", label: "Legal" },
-  { value: "FINANCE", label: "Finance" },
-  { value: "HEALTHCARE", label: "Healthcare" },
-  { value: "REAL_ESTATE", label: "Real Estate" },
-  { value: "TECH", label: "Technology" },
-  { value: "OTHER", label: "Other" },
+  { value: "FARMACIA", label: "Farmacia" },
+  { value: "ALIMENTOS", label: "Alimentos" },
+  { value: "MATERIALES", label: "Materiales" },
+  { value: "SERVICIOS", label: "Servicios" },
+  { value: "OTRO", label: "Otro" },
 ];
 
 const PLANS: { value: Plan; label: string; maxUsers: number }[] = [
@@ -62,7 +61,7 @@ const PLANS: { value: Plan; label: string; maxUsers: number }[] = [
 ];
 
 const DEFAULTS: WizardData = {
-  name: "", slug: "", industry: "OTHER", plan: "BASIC", maxUsers: 10,
+  name: "", slug: "", industry: "OTRO", plan: "BASIC", maxUsers: 10,
   primaryColor: "#2563eb", secondaryColor: "#1e40af", accentColor: "#7c3aed",
   fontFamily: "Inter", logoPreview: "", adminName: "", adminEmail: "",
 };
@@ -71,8 +70,8 @@ const DEFAULTS: WizardData = {
 
 function StepIndicator({ current, onGoTo }: { current: Step; onGoTo: (s: Step) => void }) {
   const steps: { n: Step; label: string }[] = [
-    { n: 1, label: "Info" }, { n: 2, label: "Branding" },
-    { n: 3, label: "Admin" }, { n: 4, label: "Review" },
+    { n: 1, label: "Información" }, { n: 2, label: "Marca" },
+    { n: 3, label: "Admin" }, { n: 4, label: "Revisión" },
   ];
   return (
     <div style={{ display: "flex", alignItems: "center", marginBottom: 32 }}>
@@ -111,7 +110,7 @@ function BrandingPreview({ d }: { d: WizardData }) {
   return (
     <div>
       <p style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1, margin: "0 0 10px" }}>
-        Live Preview
+        Vista previa
       </p>
       <div style={{ border: "2px solid #e2e8f0", borderRadius: 12, overflow: "hidden", background: "#f8fafc", fontSize: 13 }}>
         {/* Header */}
@@ -156,7 +155,7 @@ function BrandingPreview({ d }: { d: WizardData }) {
 
       {/* Font sample */}
       <p style={{ marginTop: 14, fontSize: 12, color: "#64748b" }}>
-        Font: <span style={{ fontFamily: d.fontFamily, fontWeight: 600 }}>{d.fontFamily} — Aa Bb Cc 123</span>
+        Fuente: <span style={{ fontFamily: d.fontFamily, fontWeight: 600 }}>{d.fontFamily} — Aa Bb Cc 123</span>
       </p>
     </div>
   );
@@ -233,7 +232,7 @@ export default function CompanyWizard() {
         emailSent: json.emailSent,
       });
     } catch {
-      setServerError("Network error — please try again");
+      setServerError("Error de red — intenta de nuevo");
     } finally {
       setSubmitting(false);
     }
@@ -251,37 +250,37 @@ export default function CompanyWizard() {
   if (result) {
     return (
       <div style={{ maxWidth: 560, margin: "0 auto", textAlign: "center" }}>
-        <h2 style={{ fontSize: 24, color: "#1e293b", margin: "0 0 8px" }}>{result.companyName} is live!</h2>
+        <h2 style={{ fontSize: 24, color: "#1e293b", margin: "0 0 8px" }}>¡{result.companyName} está activa!</h2>
         <p style={{ color: "#64748b", marginBottom: 28 }}>
-          Company slug: <code style={{ background: "#f1f5f9", padding: "2px 8px", borderRadius: 4 }}>{result.companySlug}</code>
+          Slug: <code style={{ background: "#f1f5f9", padding: "2px 8px", borderRadius: 4 }}>{result.companySlug}</code>
         </p>
 
         <div style={{ background: "#fef9c3", border: "1px solid #fde68a", borderRadius: 10, padding: "18px 20px", marginBottom: 20, textAlign: "left" }}>
           <p style={{ margin: "0 0 10px", fontWeight: 700, color: "#92400e", fontSize: 14 }}>
-            Temporary password — copy now, won't be shown again
+            Contraseña temporal — cópiala ahora, no se mostrará de nuevo
           </p>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <code style={{ flex: 1, background: "#fff", border: "1px solid #fcd34d", padding: "10px 14px", borderRadius: 6, fontSize: 16, letterSpacing: 2, fontFamily: "monospace" }}>
               {result.tempPassword}
             </code>
             <button onClick={copyPassword} style={{ background: "#d97706", color: "#fff", border: "none", padding: "10px 16px", borderRadius: 6, cursor: "pointer", fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
-              {copied ? "Copied" : "Copy"}
+              {copied ? "Copiado" : "Copiar"}
             </button>
           </div>
         </div>
 
         <div style={{ background: result.emailSent ? "#f0fdf4" : "#fff7ed", border: `1px solid ${result.emailSent ? "#bbf7d0" : "#fed7aa"}`, borderRadius: 8, padding: "10px 14px", marginBottom: 28, fontSize: 13, color: result.emailSent ? "#166534" : "#9a3412" }}>
           {result.emailSent
-            ? `Welcome email sent to ${data.adminEmail}`
-            : `Email not sent (set RESEND_API_KEY in .env) — share the password manually`}
+            ? `Correo de bienvenida enviado a ${data.adminEmail}`
+            : `Correo no enviado (configura RESEND_API_KEY) — comparte la contraseña manualmente`}
         </div>
 
         <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
           <button onClick={() => { setResult(null); setData(DEFAULTS); setStep(1); }} style={s.btn("#64748b")}>
-            Create Another
+            Crear otra empresa
           </button>
           <button onClick={() => router.push("/superadmin")} style={s.btn("#2563eb")}>
-            Dashboard →
+            Panel →
           </button>
         </div>
       </div>
@@ -305,29 +304,29 @@ export default function CompanyWizard() {
         {/* ── Left: form ── */}
         <div>
 
-          {/* Step 1 — Company info */}
+          {/* Paso 1 — Información de la empresa */}
           {step === 1 && (
             <div style={s.section}>
-              <h3 style={s.title}>Company Information</h3>
+              <h3 style={s.title}>Información de la empresa</h3>
 
               <label style={s.label}>
-                Company name *
-                <input style={s.input} value={data.name} placeholder="Acme Corp" onChange={(e) => handleNameChange(e.target.value)} />
+                Nombre de la empresa *
+                <input style={s.input} value={data.name} placeholder="Empresa S.A." onChange={(e) => handleNameChange(e.target.value)} />
               </label>
 
               <label style={s.label}>
-                URL slug * <span style={s.hint}>(lowercase letters, numbers, hyphens)</span>
+                Slug (URL) * <span style={s.hint}>(letras minúsculas, números, guiones)</span>
                 <input
                   style={s.input}
                   value={data.slug}
-                  placeholder="acme-corp"
+                  placeholder="empresa-sa"
                   onChange={(e) => set("slug", e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
                 />
-                {data.slug && <span style={s.hint}>Login page: /login?company={data.slug}</span>}
+                {data.slug && <span style={s.hint}>Página de ingreso: /login?company={data.slug}</span>}
               </label>
 
               <label style={s.label}>
-                Industry *
+                Industria *
                 <select style={s.select} value={data.industry} onChange={(e) => set("industry", e.target.value as Industry)}>
                   {INDUSTRIES.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
                 </select>
@@ -351,29 +350,31 @@ export default function CompanyWizard() {
                     <div>
                       <span style={{ fontWeight: 700, fontSize: 14 }}>{label}</span>
                       <span style={{ fontSize: 12, color: "#64748b", marginLeft: 8 }}>
-                        — up to {maxUsers} users
+                        {value === "BASIC" && "— hasta 10 usuarios / 5 GB"}
+                        {value === "PRO" && "— hasta 50 usuarios / 15 GB"}
+                        {value === "ENTERPRISE" && "— hasta 250 usuarios / 30 GB"}
                       </span>
                     </div>
                   </label>
                 ))}
                 <p style={{ ...s.hint, marginTop: 4 }}>
-                  User limit is set by the plan and cannot be overridden.
-                  Currently: <strong>{data.maxUsers} users</strong>
+                  El límite de usuarios lo define el plan y no puede modificarse manualmente.
+                  Actualmente: <strong>{data.maxUsers} usuarios</strong>
                 </p>
               </div>
             </div>
           )}
 
-          {/* Step 2 — Branding */}
+          {/* Paso 2 — Marca */}
           {step === 2 && (
             <div style={s.section}>
-              <h3 style={s.title}>Branding</h3>
+              <h3 style={s.title}>Marca y apariencia</h3>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                 {([
-                  ["primaryColor", "Primary color"],
-                  ["secondaryColor", "Secondary color"],
-                  ["accentColor", "Accent color"],
+                  ["primaryColor", "Color primario"],
+                  ["secondaryColor", "Color secundario"],
+                  ["accentColor", "Color de acento"],
                 ] as const).map(([key, label]) => (
                   <label key={key} style={s.label}>
                     {label}
@@ -395,7 +396,7 @@ export default function CompanyWizard() {
                 ))}
 
                 <label style={s.label}>
-                  Font family
+                  Fuente tipográfica
                   <select style={{ ...s.select, marginTop: 4 }} value={data.fontFamily} onChange={(e) => set("fontFamily", e.target.value)}>
                     {FONTS.map((f) => <option key={f} value={f}>{f}</option>)}
                   </select>
@@ -403,17 +404,17 @@ export default function CompanyWizard() {
               </div>
 
               <label style={{ ...s.label, marginTop: 8 }}>
-                Logo <span style={s.hint}>(optional · PNG/SVG/JPG · max 500 KB)</span>
+                Logo <span style={s.hint}>(opcional · PNG/SVG/JPG · máx. 500 KB)</span>
                 <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 6 }}>
                   {data.logoPreview && (
                     <img src={data.logoPreview} alt="logo" style={{ width: 48, height: 48, objectFit: "contain", border: "1px solid #e2e8f0", borderRadius: 6, background: "#fff", padding: 4 }} />
                   )}
                   <button type="button" onClick={() => logoRef.current?.click()} style={s.btn("#64748b", true)}>
-                    {data.logoPreview ? "Change" : "Upload logo"}
+                    {data.logoPreview ? "Cambiar" : "Subir logo"}
                   </button>
                   {data.logoPreview && (
                     <button type="button" onClick={() => { set("logoPreview", ""); if (logoRef.current) logoRef.current.value = ""; }} style={{ ...s.btn("#dc2626", true), background: "transparent", color: "#dc2626", border: "1px solid #fecaca" }}>
-                      Remove
+                      Quitar
                     </button>
                   )}
                 </div>
@@ -422,72 +423,72 @@ export default function CompanyWizard() {
             </div>
           )}
 
-          {/* Step 3 — Admin user */}
+          {/* Paso 3 — Administrador */}
           {step === 3 && (
             <div style={s.section}>
-              <h3 style={s.title}>Company Administrator</h3>
+              <h3 style={s.title}>Administrador de la empresa</h3>
               <p style={{ color: "#64748b", fontSize: 13, margin: "0 0 20px" }}>
-                This person will be the initial COMPANY_ADMIN. A secure temporary password will be generated and emailed to them.
+                Esta persona será el COMPANY_ADMIN inicial. Se generará una contraseña temporal segura y se le enviará por correo.
               </p>
 
               <label style={s.label}>
-                Full name *
-                <input style={s.input} value={data.adminName} placeholder="Jane Smith" onChange={(e) => set("adminName", e.target.value)} />
+                Nombre completo *
+                <input style={s.input} value={data.adminName} placeholder="María López" onChange={(e) => set("adminName", e.target.value)} />
               </label>
 
               <label style={s.label}>
-                Email address *
-                <input type="email" style={s.input} value={data.adminEmail} placeholder="admin@acme.com" onChange={(e) => set("adminEmail", e.target.value)} />
+                Correo electrónico *
+                <input type="email" style={s.input} value={data.adminEmail} placeholder="admin@empresa.com" onChange={(e) => set("adminEmail", e.target.value)} />
               </label>
 
               <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "14px 16px", fontSize: 13, color: "#166534", marginTop: 8 }}>
-                <strong>What happens next:</strong>
+                <strong>¿Qué ocurre después?</strong>
                 <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
-                  <li>A 16-character password is generated server-side.</li>
-                  <li>It's shown to you <em>once</em> after creation.</li>
-                  <li>A welcome email is sent (if RESEND_API_KEY is set).</li>
-                  <li>The admin must change it on first login.</li>
+                  <li>Se genera una contraseña de 16 caracteres en el servidor.</li>
+                  <li>Se muestra <em>una sola vez</em> después de crear la empresa.</li>
+                  <li>Se envía un correo de bienvenida (si RESEND_API_KEY está configurado).</li>
+                  <li>El administrador deberá cambiarla en su primer acceso.</li>
                 </ul>
               </div>
             </div>
           )}
 
-          {/* Step 4 — Review */}
+          {/* Paso 4 — Revisión */}
           {step === 4 && (
             <div style={s.section}>
-              <h3 style={s.title}>Review & Create</h3>
+              <h3 style={s.title}>Revisar y crear</h3>
 
               <div style={s.card}>
-                <p style={s.cardHead}>Company</p>
-                <div style={s.row}><span style={s.rowLabel}>Name</span><strong>{data.name}</strong></div>
+                <p style={s.cardHead}>Empresa</p>
+                <div style={s.row}><span style={s.rowLabel}>Nombre</span><strong>{data.name}</strong></div>
                 <div style={s.row}><span style={s.rowLabel}>Slug</span><code>{data.slug}</code></div>
-                <div style={s.row}><span style={s.rowLabel}>Industry</span><span>{INDUSTRIES.find(i => i.value === data.industry)?.label}</span></div>
+                <div style={s.row}><span style={s.rowLabel}>Industria</span><span>{INDUSTRIES.find(i => i.value === data.industry)?.label}</span></div>
                 <div style={s.row}>
                   <span style={s.rowLabel}>Plan</span>
-                  <span>{PLANS.find(p => p.value === data.plan)?.label} — up to {data.maxUsers} users</span>
+                  <span>{PLANS.find(p => p.value === data.plan)?.label} — hasta {data.maxUsers} usuarios</span>
                 </div>
               </div>
 
               <div style={s.card}>
-                <p style={s.cardHead}>Branding</p>
+                <p style={s.cardHead}>Marca</p>
                 <div style={s.row}>
-                  <span style={s.rowLabel}>Colors</span>
+                  <span style={s.rowLabel}>Colores</span>
                   <div style={{ display: "flex", gap: 6 }}>
                     {[data.primaryColor, data.secondaryColor, data.accentColor].map((c) => (
                       <div key={c} title={c} style={{ width: 20, height: 20, borderRadius: 4, background: c, border: "1px solid #e2e8f0" }} />
                     ))}
                   </div>
                 </div>
-                <div style={s.row}><span style={s.rowLabel}>Font</span><span style={{ fontFamily: data.fontFamily }}>{data.fontFamily}</span></div>
+                <div style={s.row}><span style={s.rowLabel}>Fuente</span><span style={{ fontFamily: data.fontFamily }}>{data.fontFamily}</span></div>
                 {data.logoPreview && (
                   <div style={s.row}><span style={s.rowLabel}>Logo</span><img src={data.logoPreview} alt="logo" style={{ height: 24, width: 24, objectFit: "contain" }} /></div>
                 )}
               </div>
 
               <div style={s.card}>
-                <p style={s.cardHead}>Administrator</p>
-                <div style={s.row}><span style={s.rowLabel}>Name</span><span>{data.adminName}</span></div>
-                <div style={s.row}><span style={s.rowLabel}>Email</span><span>{data.adminEmail}</span></div>
+                <p style={s.cardHead}>Administrador</p>
+                <div style={s.row}><span style={s.rowLabel}>Nombre</span><span>{data.adminName}</span></div>
+                <div style={s.row}><span style={s.rowLabel}>Correo</span><span>{data.adminEmail}</span></div>
               </div>
             </div>
           )}
@@ -507,7 +508,7 @@ export default function CompanyWizard() {
           onClick={() => step > 1 ? setStep((step - 1) as Step) : router.push("/superadmin")}
           style={s.btn("#64748b")}
         >
-          ← {step === 1 ? "Cancel" : "Back"}
+          ← {step === 1 ? "Cancelar" : "Atrás"}
         </button>
 
         {step < 4 ? (
@@ -516,7 +517,7 @@ export default function CompanyWizard() {
             onClick={() => setStep((step + 1) as Step)}
             style={{ ...s.btn("#2563eb"), opacity: canAdvance() ? 1 : 0.4, cursor: canAdvance() ? "pointer" : "not-allowed" }}
           >
-            Next →
+            Siguiente →
           </button>
         ) : (
           <button
@@ -524,7 +525,7 @@ export default function CompanyWizard() {
             onClick={handleCreate}
             style={{ ...s.btn("#16a34a"), opacity: submitting ? 0.6 : 1 }}
           >
-            {submitting ? "Creating…" : "Create Company"}
+            {submitting ? "Creando…" : "Crear empresa"}
           </button>
         )}
       </div>

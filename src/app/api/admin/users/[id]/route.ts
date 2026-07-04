@@ -5,10 +5,11 @@ import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/audit";
 
 const patchSchema = z.object({
-  role: z.enum(["COMPANY_ADMIN", "EDITOR", "VIEWER"]).optional(),
+  name:     z.string().min(1).max(100).optional(),
+  role:     z.enum(["COMPANY_ADMIN", "EDITOR", "VIEWER"]).optional(),
   isActive: z.boolean().optional(),
-}).refine((d) => d.role !== undefined || d.isActive !== undefined, {
-  message: "Provide at least one of role or isActive",
+}).refine((d) => d.name !== undefined || d.role !== undefined || d.isActive !== undefined, {
+  message: "Provide at least one field to update",
 });
 
 // PATCH /api/admin/users/[id] — update role or isActive (COMPANY_ADMIN only)
@@ -34,24 +35,27 @@ export async function PATCH(
 
   const target = await prisma.user.findFirst({
     where: { id: params.id, companyId },
+    select: { id: true, name: true, email: true, role: true, isActive: true },
   });
   if (!target) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const { role, isActive } = parsed.data;
+  const { name, role, isActive } = parsed.data;
 
   const updated = await prisma.user.update({
     where: { id: params.id },
     data: {
-      ...(role !== undefined ? { role } : {}),
+      ...(name     !== undefined ? { name }     : {}),
+      ...(role     !== undefined ? { role }     : {}),
       ...(isActive !== undefined ? { isActive } : {}),
     },
-    select: { id: true, name: true, email: true, role: true, isActive: true },
+    select: { id: true, name: true, email: true, role: true, isActive: true, forcePasswordChange: true, lastLoginAt: true, createdAt: true },
   });
 
   const changes: string[] = [];
-  if (role !== undefined && role !== target.role) changes.push(`role: ${target.role}→${role}`);
+  if (name     !== undefined && name     !== target.name)     changes.push(`name: ${name}`);
+  if (role     !== undefined && role     !== target.role)     changes.push(`role: ${target.role}→${role}`);
   if (isActive !== undefined && isActive !== target.isActive) changes.push(`isActive: ${target.isActive}→${isActive}`);
 
   await logAction({
@@ -63,7 +67,13 @@ export async function PATCH(
     detail: `${target.email} — ${changes.join(", ")}`,
   });
 
-  return NextResponse.json({ user: updated });
+  return NextResponse.json({
+    user: {
+      ...updated,
+      lastLoginAt: (updated as { lastLoginAt?: Date | null }).lastLoginAt?.toISOString() ?? null,
+      createdAt:   (updated as { createdAt?: Date }).createdAt?.toISOString() ?? new Date().toISOString(),
+    },
+  });
 }
 
 // DELETE /api/admin/users/[id] — revoke a pending invite by id

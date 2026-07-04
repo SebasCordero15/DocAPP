@@ -250,24 +250,12 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
   // ── render ────────────────────────────────────────────────────────────────
 
   return (
-    <main style={{ minHeight: "100vh", background: "#f5f7fa" }}>
+    <div style={{ flex: 1, overflowY: "auto", background: "#f5f7fa" }}>
 
-      {/* Header */}
-      <header style={{ background: brand, color: "#fff", padding: "16px 28px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {company.logoUrl ? (
-            <img src={company.logoUrl} alt="" style={{ width: 32, height: 32, objectFit: "contain", borderRadius: 4, background: "rgba(255,255,255,0.15)", padding: 3 }} />
-          ) : (
-            <div style={{ width: 32, height: 32, borderRadius: 4, background: "rgba(255,255,255,0.25)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 800 }}>
-              {company.name.charAt(0).toUpperCase()}
-            </div>
-          )}
-          <strong style={{ fontSize: 18 }}>{company.name} · Listado Maestro</strong>
-        </div>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={() => router.push("/dashboard")} style={headerBtn}>← Dashboard</button>
-        </div>
-      </header>
+      {/* Section header */}
+      <div style={{ background: brand, color: "#fff", padding: "12px 28px", position: "sticky", top: 0, zIndex: 10 }}>
+        <strong style={{ fontSize: 16 }}>Listado Maestro</strong>
+      </div>
 
       <div style={{ maxWidth: 1400, margin: "0 auto", padding: "28px 28px" }}>
 
@@ -483,7 +471,7 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
           )}
         </div>
       </div>
-    </main>
+    </div>
   );
 }
 

@@ -34,29 +34,34 @@ function jsonForbidden(message = "Forbidden") {
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
+  // Forward the pathname so server layouts can detect the current route reliably
+  // without depending on Vercel-specific headers like x-invoke-path.
+  const reqHeaders = new Headers(req.headers);
+  reqHeaders.set("x-pathname", pathname);
+
+  function next() {
+    return NextResponse.next({ request: { headers: reqHeaders } });
+  }
+
   // ── Super admin pages (/superadmin/*) ─────────────────────────────────────
-  // /superadmin/login now redirects to /login (handled by the page itself).
-  // All other /superadmin/* pages still require a SUPER_ADMIN JWT.
   if (pathname.startsWith("/superadmin")) {
     const session = await getJwtPayload(req);
     if (!session || session.role !== "SUPER_ADMIN") {
       return NextResponse.redirect(new URL("/login", req.url));
     }
-    return NextResponse.next();
+    return next();
   }
 
   // ── Dashboard (all roles) ──────────────────────────────────────────────────
-  // Every authenticated user lands here; the page itself renders the correct view.
   if (pathname.startsWith("/dashboard")) {
     const session = await getJwtPayload(req);
     if (!session) {
       return NextResponse.redirect(new URL("/login", req.url));
     }
-    return NextResponse.next();
+    return next();
   }
 
   // ── Super admin API ────────────────────────────────────────────────────────
-  // /api/superadmin/login is public; everything else requires SUPER_ADMIN JWT
   if (
     pathname.startsWith("/api/superadmin") &&
     pathname !== "/api/superadmin/login"
@@ -64,7 +69,7 @@ export async function middleware(req: NextRequest) {
     const session = await getJwtPayload(req);
     if (!session) return jsonUnauthorized();
     if (session.role !== "SUPER_ADMIN") return jsonForbidden();
-    return NextResponse.next();
+    return next();
   }
 
   // ── Company admin API ─────────────────────────────────────────────────────
@@ -72,22 +77,20 @@ export async function middleware(req: NextRequest) {
     const session = await getJwtPayload(req);
     if (!session) return jsonUnauthorized();
     if (!session.companyId) return jsonForbidden("Super admin cannot access company routes");
-    return NextResponse.next();
+    return next();
   }
 
   // ── Company data API (files, folders) ─────────────────────────────────────
-  // Require any authenticated session with a companyId
   if (pathname.startsWith("/api/files") || pathname.startsWith("/api/folders")) {
     const session = await getJwtPayload(req);
     if (!session) return jsonUnauthorized();
-    // SUPER_ADMIN is explicitly blocked from company data — metadata only
     if (session.role === "SUPER_ADMIN" || !session.companyId) {
       return jsonForbidden("Super admin cannot access company file data");
     }
-    return NextResponse.next();
+    return next();
   }
 
-  return NextResponse.next();
+  return next();
 }
 
 export const config = {

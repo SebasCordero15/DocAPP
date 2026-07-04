@@ -22,12 +22,12 @@ interface UserOption {
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60_000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m}m ago`;
+  if (m < 1) return "ahora";
+  if (m < 60) return `hace ${m}m`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
+  if (h < 24) return `hace ${h}h`;
   const d = Math.floor(h / 24);
-  return d < 30 ? `${d}d ago` : new Date(iso).toLocaleDateString('es-CR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return d < 30 ? `hace ${d}d` : new Date(iso).toLocaleDateString('es-CR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 const ACTION_COLORS: Record<string, string> = {
@@ -86,54 +86,47 @@ export default function AuditClient({ company }: Props) {
   }
 
   return (
-    <main style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: `'${company.fontFamily}', Inter, system-ui, sans-serif` }}>
-      <header style={{ background: brand, color: "#fff", padding: "14px 28px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <button
-            onClick={() => router.push("/dashboard")}
-            style={{ background: "rgba(255,255,255,0.1)", border: "none", color: "#94a3b8", padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontSize: 13 }}
-          >
-            ← Dashboard
-          </button>
-          <strong style={{ fontSize: 16 }}>Audit Log</strong>
-        </div>
-        <span style={{ fontSize: 12, color: "#64748b" }}>{total} total events</span>
-      </header>
+    <div style={{ flex: 1, overflowY: "auto", background: "#f1f5f9", fontFamily: `'${company.fontFamily}', Inter, system-ui, sans-serif` }}>
+      {/* Section header */}
+      <div style={{ background: brand, color: "#fff", padding: "12px 28px", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, zIndex: 10 }}>
+        <strong style={{ fontSize: 16 }}>Registro de Auditoría</strong>
+        <span style={{ fontSize: 12, opacity: 0.75 }}>{total} eventos</span>
+      </div>
 
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 24px" }}>
 
         {/* ── Filters ── */}
         <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "18px 20px", marginBottom: 20, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
           <div style={{ flex: "1 1 160px" }}>
-            <label style={labelStyle}>User</label>
+            <label style={labelStyle}>Usuario</label>
             <select value={filterUser} onChange={(e) => setFilterUser(e.target.value)} style={inputStyle}>
-              <option value="">All users</option>
+              <option value="">Todos los usuarios</option>
               {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
           </div>
           <div style={{ flex: "1 1 160px" }}>
-            <label style={labelStyle}>Action contains</label>
+            <label style={labelStyle}>Acción contiene</label>
             <input
-              type="text" placeholder="e.g. FILE_UPLOAD"
+              type="text" placeholder="ej. FILE_UPLOAD"
               value={filterAction} onChange={(e) => setFilterAction(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && applyFilters()}
               style={inputStyle}
             />
           </div>
           <div style={{ flex: "1 1 130px" }}>
-            <label style={labelStyle}>From</label>
+            <label style={labelStyle}>Desde</label>
             <input type="date" value={filterFrom} onChange={(e) => setFilterFrom(e.target.value)} style={inputStyle} />
           </div>
           <div style={{ flex: "1 1 130px" }}>
-            <label style={labelStyle}>To</label>
+            <label style={labelStyle}>Hasta</label>
             <input type="date" value={filterTo} onChange={(e) => setFilterTo(e.target.value)} style={inputStyle} />
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={applyFilters} style={{ background: "#2563eb", color: "#fff", border: "none", padding: "8px 16px", borderRadius: 7, cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
-              Filter
+            <button onClick={applyFilters} style={{ background: brand, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 7, cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
+              Buscar
             </button>
             <button onClick={clearFilters} style={{ background: "#f1f5f9", color: "#64748b", border: "1px solid #e2e8f0", padding: "8px 14px", borderRadius: 7, cursor: "pointer", fontSize: 13 }}>
-              Clear
+              Limpiar
             </button>
           </div>
         </div>
@@ -141,14 +134,14 @@ export default function AuditClient({ company }: Props) {
         {/* ── Table ── */}
         <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden" }}>
           {loading ? (
-            <p style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}>Loading…</p>
+            <p style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}>Cargando…</p>
           ) : logs.length === 0 ? (
-            <p style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}>No audit entries match these filters.</p>
+            <p style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}>No hay entradas para estos filtros.</p>
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid #f1f5f9" }}>
-                  {["When", "Action", "User", "Resource", "Detail"].map((h) => (
+                  {["Cuándo", "Acción", "Usuario", "Recurso", "Detalle"].map((h) => (
                     <th key={h} style={{ padding: "10px 18px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5, whiteSpace: "nowrap" }}>
                       {h}
                     </th>
@@ -174,7 +167,7 @@ export default function AuditClient({ company }: Props) {
                       {l.user ? (
                         <span title={l.user.email}>{l.user.name}</span>
                       ) : (
-                        <span style={{ color: "#d1d5db" }}>System</span>
+                        <span style={{ color: "#d1d5db" }}>Sistema</span>
                       )}
                     </td>
                     <td style={{ padding: "11px 18px", fontSize: 12, color: "#64748b" }}>
@@ -193,13 +186,13 @@ export default function AuditClient({ company }: Props) {
         {/* ── Pagination ── */}
         {pageCount > 1 && (
           <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 20 }}>
-            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} style={pageBtn(page === 1)}>← Prev</button>
-            <span style={{ padding: "6px 12px", fontSize: 13, color: "#64748b" }}>Page {page} of {pageCount}</span>
-            <button onClick={() => setPage((p) => Math.min(pageCount, p + 1))} disabled={page === pageCount} style={pageBtn(page === pageCount)}>Next →</button>
+            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} style={pageBtn(page === 1)}>← Ant</button>
+            <span style={{ padding: "6px 12px", fontSize: 13, color: "#64748b" }}>Pág. {page} de {pageCount}</span>
+            <button onClick={() => setPage((p) => Math.min(pageCount, p + 1))} disabled={page === pageCount} style={pageBtn(page === pageCount)}>Sig. →</button>
           </div>
         )}
       </div>
-    </main>
+    </div>
   );
 }
 

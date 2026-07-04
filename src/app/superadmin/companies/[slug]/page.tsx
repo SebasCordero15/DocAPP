@@ -17,7 +17,7 @@ export default async function CompanyDetailPage({ params }: { params: { slug: st
           isActive: true, lastLoginAt: true, createdAt: true,
           forcePasswordChange: true,
         },
-        orderBy: { createdAt: "asc" },
+        orderBy: { lastLoginAt: "desc" },
       },
     },
   });
@@ -57,7 +57,9 @@ export default async function CompanyDetailPage({ params }: { params: { slug: st
         accentColor: company.accentColor,
         fontFamily: company.fontFamily,
         maxUsers: company.maxUsers,
+        maxStorageMB: (company as { maxStorageMB?: number }).maxStorageMB ?? 2,
         customDomain: company.customDomain ?? null,
+        deletedAt: company.deletedAt?.toISOString() ?? null,
         createdAt: company.createdAt.toISOString(),
         updatedAt: company.updatedAt.toISOString(),
         fileCount: fileStats._count.id,
