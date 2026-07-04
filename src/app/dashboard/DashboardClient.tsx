@@ -6,7 +6,7 @@ import {
   Bell, Search, LayoutGrid, List as ListIcon, ChevronLeft, ChevronRight,
   LogOut, Files, Users, Shield, ClipboardList, ScrollText, Plus, Eye,
   Download, Pencil, Trash2, CheckCircle, Calendar, X, FolderOpen, ClipboardCheck, Inbox, Clock,
-  History, FilePlus, BarChart2,
+  History, FilePlus, BarChart2, UserCheck,
 } from "lucide-react";
 import FileIcon from "@/components/FileIcon";
 
@@ -119,6 +119,12 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
   const [moveFolderId, setMoveFolderId] = useState<string>("");
   const [allFolders, setAllFolders] = useState<{ id: string; name: string }[]>([]);
   const [movingSave, setMovingSave] = useState(false);
+
+  const [peerReviewFile,      setPeerReviewFile]      = useState<FileItem | null>(null);
+  const [peerReviewAssignee,  setPeerReviewAssignee]  = useState("");
+  const [peerReviewMessage,   setPeerReviewMessage]   = useState("");
+  const [submittingPeerReview, setSubmittingPeerReview] = useState(false);
+  const [peerReviewUsers,     setPeerReviewUsers]     = useState<UserOption[]>([]);
 
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -316,6 +322,35 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
     });
     if (res.ok) fetchContents(folderId);
     else alert("Failed to complete review");
+  }
+
+  async function openPeerReviewModal(file: FileItem) {
+    setPeerReviewFile(file);
+    setPeerReviewAssignee("");
+    setPeerReviewMessage("");
+    if (peerReviewUsers.length === 0) {
+      const d = await fetch("/api/listado-maestro").then((r) => r.json()).catch(() => ({}));
+      setPeerReviewUsers(d.users ?? []);
+    }
+  }
+
+  async function submitPeerReview() {
+    if (!peerReviewFile || !peerReviewAssignee) return;
+    setSubmittingPeerReview(true);
+    try {
+      const res = await fetch("/api/peer-review-requests", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileId: peerReviewFile.id, assigneeId: peerReviewAssignee, message: peerReviewMessage || null }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setPeerReviewFile(null);
+      } else {
+        alert(data.error ?? "Error al enviar la solicitud");
+      }
+    } finally {
+      setSubmittingPeerReview(false);
+    }
   }
 
   async function openPreview(file: FileItem) {
@@ -744,9 +779,14 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                         </button>
                       )}
                       <button className="ghost-btn" onClick={() => downloadFile(f.id)} style={ghostBtnStyle} title="Descargar"><Download size={13} /></button>
-                      {canEdit && <button className="ghost-btn" onClick={() => openReviewPanel(f)} style={{ ...ghostBtnStyle, display: "flex", alignItems: "center", gap: 4 }} title="Review"><Calendar size={13} /></button>}
-                      {canEdit && f.reviewDueDate && (
-                        <button className="ghost-btn" onClick={() => completeReview(f)} style={{ ...ghostBtnStyle, color: "#16a34a", borderColor: "#bbf7d0" }} title="Complete review"><CheckCircle size={13} /></button>
+                      {isAdmin && <button className="ghost-btn" onClick={() => openReviewPanel(f)} style={{ ...ghostBtnStyle, display: "flex", alignItems: "center", gap: 4 }} title="Programar revisión"><Calendar size={13} /></button>}
+                      {isAdmin && f.reviewDueDate && (
+                        <button className="ghost-btn" onClick={() => completeReview(f)} style={{ ...ghostBtnStyle, color: "#16a34a", borderColor: "#bbf7d0" }} title="Marcar revisión completa"><CheckCircle size={13} /></button>
+                      )}
+                      {!isAdmin && canEdit && (
+                        <button className="ghost-btn" onClick={() => openPeerReviewModal(f)} style={{ ...ghostBtnStyle, display: "flex", alignItems: "center", gap: 4 }} title="Solicitar revisión a colega">
+                          <UserCheck size={13} /> Solicitar
+                        </button>
                       )}
                       {canEdit && <button className="danger-btn" onClick={() => deleteFile(f.id, f.nombreDocumento || f.name)} style={dangerBtnStyle} title="Trash"><Trash2 size={13} /></button>}
                     </div>
@@ -1059,6 +1099,57 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
             ) : (
               <div style={{ height: "100%", display: "grid", placeItems: "center", color: "#94a3b8" }}>No se pudo cargar el PDF.</div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Peer review request modal ─────────────────────────────────────── */}
+      {peerReviewFile && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 9999, display: "grid", placeItems: "center" }}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 440, maxWidth: "92vw", boxShadow: "0 20px 60px rgba(0,0,0,0.18)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <UserCheck size={18} color={brand} />
+                <span style={{ fontWeight: 700, fontSize: 16, color: "#1e293b" }}>Solicitar revisión</span>
+              </div>
+              <button onClick={() => setPeerReviewFile(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8" }}><X size={18} /></button>
+            </div>
+            <p style={{ margin: "0 0 18px", fontSize: 13, color: "#64748b" }}>
+              Documento: <strong style={{ color: "#1e293b" }}>{peerReviewFile.nombreDocumento || peerReviewFile.name}</strong>
+            </p>
+            <div style={{ marginBottom: 14 }}>
+              <label style={labelStyle}>Asignar a</label>
+              <select
+                value={peerReviewAssignee}
+                onChange={(e) => setPeerReviewAssignee(e.target.value)}
+                style={{ ...inputStyle, width: "100%" }}
+              >
+                <option value="">Selecciona un colega…</option>
+                {peerReviewUsers.map((u) => (
+                  <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
+                ))}
+              </select>
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <label style={labelStyle}>Mensaje (opcional)</label>
+              <textarea
+                value={peerReviewMessage}
+                onChange={(e) => setPeerReviewMessage(e.target.value)}
+                placeholder="¿Qué debe revisar tu colega?"
+                rows={3}
+                style={{ ...inputStyle, width: "100%", resize: "vertical" }}
+              />
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button onClick={() => setPeerReviewFile(null)} style={cancelBtnStyle}>Cancelar</button>
+              <button
+                onClick={submitPeerReview}
+                disabled={!peerReviewAssignee || submittingPeerReview}
+                style={{ background: brand, color: "#fff", border: "none", padding: "10px 20px", borderRadius: 8, cursor: peerReviewAssignee ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13, opacity: !peerReviewAssignee ? 0.5 : 1 }}
+              >
+                {submittingPeerReview ? "Enviando…" : "Solicitar revisión"}
+              </button>
+            </div>
           </div>
         </div>
       )}
