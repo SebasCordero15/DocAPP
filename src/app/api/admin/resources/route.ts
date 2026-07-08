@@ -14,7 +14,7 @@ export async function GET() {
   const [folders, files] = await Promise.all([
     prisma.folder.findMany({
       where: { companyId: session.companyId!, deletedAt: null },
-      select: { id: true, name: true, parentId: true },
+      select: { id: true, name: true, parentId: true, isExternal: true },
       orderBy: { createdAt: "asc" },
     }),
     prisma.file.findMany({

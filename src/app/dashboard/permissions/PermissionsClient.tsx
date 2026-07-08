@@ -10,6 +10,7 @@ interface FolderFlat {
   id: string;
   name: string;
   parentId: string | null;
+  isExternal: boolean;
 }
 
 interface FileFlat {
@@ -154,6 +155,7 @@ export default function PermissionsClient({ company }: Props) {
   const [loadingResources, setLoadingResources] = useState(true);
   const [loadingEntries, setLoadingEntries] = useState(false);
   const [saving, setSaving] = useState<string | null>(null); // userId being saved
+  const [permTab, setPermTab] = useState<"normal" | "external">("normal");
 
   // ── fetch resource list on mount ─────────────────────────────────────────────
 
@@ -207,10 +209,18 @@ export default function PermissionsClient({ company }: Props) {
 
   // ── render ────────────────────────────────────────────────────────────────────
 
-  const tree = buildTree(folders);
+  const normalFolders  = folders.filter((f) => !f.isExternal);
+  const externalFolders = folders.filter((f) => f.isExternal);
 
-  // Files grouped by folder for the sidebar
-  const rootFiles = files.filter((f) => f.folderId === null);
+  const activeFolders  = permTab === "normal" ? normalFolders : externalFolders;
+  const tree           = buildTree(activeFolders);
+
+  // External folder IDs for filtering files
+  const externalFolderIds = new Set(externalFolders.map((f) => f.id));
+  const normalFiles   = files.filter((f) => !f.folderId || !externalFolderIds.has(f.folderId));
+  const externalFiles = files.filter((f) => f.folderId && externalFolderIds.has(f.folderId));
+  const activeFiles   = permTab === "normal" ? normalFiles : externalFiles;
+  const rootFiles     = activeFiles.filter((f) => f.folderId === null);
 
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "#f5f7fa" }}>
@@ -226,78 +236,99 @@ export default function PermissionsClient({ company }: Props) {
             width: 260,
             background: "#fff",
             borderRight: "1px solid #eee",
-            overflowY: "auto",
-            padding: 12,
+            display: "flex",
+            flexDirection: "column",
             flexShrink: 0,
           }}
         >
-          <p style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
-            Carpetas
-          </p>
-
-          {loadingResources ? (
-            <p style={{ fontSize: 13, color: "#aaa" }}>Cargando…</p>
-          ) : tree.length === 0 && rootFiles.length === 0 ? (
-            <p style={{ fontSize: 13, color: "#aaa" }}>Sin recursos aún.</p>
-          ) : (
-            <FolderTree
-              nodes={tree}
-              selected={selected}
-              onSelect={selectResource}
-              brand={brand}
-            />
-          )}
-
-          {files.length > 0 && (
-            <>
-              <p
+          {/* Tab toggle */}
+          <div style={{ display: "flex", borderBottom: "1px solid #eee", flexShrink: 0 }}>
+            {(["normal", "external"] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => { setPermTab(tab); setSelected(null); }}
                 style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: "#999",
-                  textTransform: "uppercase",
-                  letterSpacing: 1,
-                  marginTop: 14,
-                  marginBottom: 6,
+                  flex: 1, padding: "10px 6px", border: "none", background: "transparent",
+                  cursor: "pointer", fontSize: 12, fontWeight: permTab === tab ? 700 : 400,
+                  color: permTab === tab ? brand : "#94a3b8",
+                  borderBottom: `2px solid ${permTab === tab ? brand : "transparent"}`,
+                  transition: "all 0.15s",
                 }}
               >
-                Archivos
-              </p>
-              {files.map((file) => {
-                const isSelected = selected?.type === "file" && selected.id === file.id;
-                return (
-                  <div
-                    key={file.id}
-                    onClick={() =>
-                      selectResource({ type: "file", id: file.id, name: file.name })
-                    }
-                    style={{
-                      padding: "6px 10px",
-                      cursor: "pointer",
-                      borderRadius: 6,
-                      background: isSelected ? brand : "transparent",
-                      color: isSelected ? "#fff" : "#333",
-                      fontSize: 13,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                    }}
-                  >
-                    <FileIcon mimeType={file.mimeType} size={15} />
-                    <span
+                {tab === "normal" ? "Documentos" : "Externos"}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
+              Carpetas
+            </p>
+
+            {loadingResources ? (
+              <p style={{ fontSize: 13, color: "#aaa" }}>Cargando…</p>
+            ) : tree.length === 0 && rootFiles.length === 0 ? (
+              <p style={{ fontSize: 13, color: "#aaa" }}>Sin recursos aún.</p>
+            ) : (
+              <FolderTree
+                nodes={tree}
+                selected={selected}
+                onSelect={selectResource}
+                brand={brand}
+              />
+            )}
+
+            {activeFiles.length > 0 && (
+              <>
+                <p
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "#999",
+                    textTransform: "uppercase",
+                    letterSpacing: 1,
+                    marginTop: 14,
+                    marginBottom: 6,
+                  }}
+                >
+                  Archivos
+                </p>
+                {activeFiles.map((file) => {
+                  const isSelected = selected?.type === "file" && selected.id === file.id;
+                  return (
+                    <div
+                      key={file.id}
+                      onClick={() =>
+                        selectResource({ type: "file", id: file.id, name: file.name })
+                      }
                       style={{
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
+                        padding: "6px 10px",
+                        cursor: "pointer",
+                        borderRadius: 6,
+                        background: isSelected ? brand : "transparent",
+                        color: isSelected ? "#fff" : "#333",
+                        fontSize: 13,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
                       }}
                     >
-                      {file.name}
-                    </span>
-                  </div>
-                );
-              })}
-            </>
-          )}
+                      <FileIcon mimeType={file.mimeType} size={15} />
+                      <span
+                        style={{
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {file.name}
+                      </span>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+          </div>
         </aside>
 
         {/* ── Right panel: permissions table ──────────────────────────────── */}

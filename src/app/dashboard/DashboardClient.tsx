@@ -731,28 +731,9 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                       <span onClick={() => navigateTo(f.id)} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontWeight: 600, color: "#1e293b", fontSize: 14, flex: 1, minWidth: 0 }}>
                         <FileIcon isFolder size={18} />
                         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
-                        {f.isExternal && (
-                          <span style={{ background: "#e0f2fe", color: "#0369a1", fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 4, flexShrink: 0 }}>Externa</span>
-                        )}
                       </span>
                       {canEdit && (
                         <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                          {isAdmin && (
-                            <button
-                              className="ghost-btn"
-                              title={f.isExternal ? "Quitar carpeta externa" : "Marcar como carpeta externa"}
-                              onClick={() => {
-                                fetch(`/api/folders/${f.id}`, {
-                                  method: "PATCH",
-                                  headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({ isExternal: !f.isExternal }),
-                                }).then((r) => { if (r.ok) fetchContents(folderId); });
-                              }}
-                              style={{ ...ghostBtnStyle, color: f.isExternal ? "#0369a1" : "#64748b", borderColor: f.isExternal ? "#bae6fd" : undefined }}
-                            >
-                              {f.isExternal ? "Interna" : "Externa"}
-                            </button>
-                          )}
                           <button className="ghost-btn" onClick={() => { setRenamingId(f.id); setRenameValue(f.name); }} style={ghostBtnStyle} title="Rename"><Pencil size={13} /></button>
                           <button className="danger-btn" onClick={() => deleteFolder(f.id, f.name)} style={dangerBtnStyle} title="Trash"><Trash2 size={13} /></button>
                         </div>
@@ -891,12 +872,7 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                               </div>
                             </div>
                           ) : (
-                            <>
-                              <span style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", width: "100%", whiteSpace: "nowrap" }}>{f.name}</span>
-                              {f.isExternal && (
-                                <span style={{ background: "#e0f2fe", color: "#0369a1", fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 4 }}>Externa</span>
-                              )}
-                            </>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", width: "100%", whiteSpace: "nowrap" }}>{f.name}</span>
                           )}
                           {canEdit && !isRenaming && (
                             <div style={{ position: "absolute", top: 8, right: 8, display: "flex", gap: 4 }} onClick={(e) => e.stopPropagation()}>

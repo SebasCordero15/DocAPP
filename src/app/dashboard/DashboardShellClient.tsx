@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import {
   Files, ClipboardList, ClipboardCheck, History, FilePlus,
   Users, Shield, Inbox, ScrollText, BarChart2, LogOut,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Globe,
 } from "lucide-react";
 
 interface Props {
@@ -60,6 +60,7 @@ export default function DashboardShellClient({
 
   const navItems = [
     { label: "Documentos",      icon: <Files size={18} />,         href: "/dashboard",                        badge: 0 },
+    { label: "Externos",        icon: <Globe size={18} />,         href: "/dashboard/externos",               badge: 0 },
     { label: "Listado Maestro", icon: <ClipboardList size={18} />, href: "/dashboard/listado-maestro",        badge: 0 },
     { label: "Pendientes",      icon: <ClipboardCheck size={18} />, href: "/dashboard/pendientes",            badge: pendingTotal },
     { label: "Control Cambios", icon: <History size={18} />,       href: "/dashboard/control-cambios",        badge: 0 },
