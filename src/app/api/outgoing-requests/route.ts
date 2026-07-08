@@ -16,7 +16,7 @@ const createSchema = z.object({
     carpeta:  z.boolean().default(false),
     otro:     z.string().max(500).nullable().optional(),
   }).optional().nullable(),
-  assigneeIds: z.array(z.string().min(1)).min(1).max(2),
+  assigneeIds: z.array(z.string().min(1)).min(1).max(10),
   dueDate:     z.string().datetime().optional().nullable(),
 });
 

@@ -10,9 +10,10 @@ import { logAction } from "@/lib/audit";
 const DATE_FIELDS = new Set(["fechaEmision", "fechaRevision", "fechaActualizacion"]);
 
 const schema = z.object({
-  action:         z.enum(["APPROVE", "REJECT"]),
-  adminNotes:     z.string().max(2000).optional().nullable(),
-  assignedCodigo: z.string().max(50).optional().nullable(),
+  action:           z.enum(["APPROVE", "REJECT"]),
+  adminNotes:       z.string().max(2000).optional().nullable(),
+  assignedCodigo:   z.string().max(50).optional().nullable(),
+  adminVersionStr:  z.string().max(50).optional().nullable(),
 });
 
 // POST /api/change-requests/[id]/review — admin approve or reject a ChangeRequest
@@ -40,7 +41,7 @@ export async function POST(
   const parsed = schema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
-  const { action, adminNotes, assignedCodigo } = parsed.data;
+  const { action, adminNotes, assignedCodigo, adminVersionStr } = parsed.data;
 
   if (action === "REJECT" && !adminNotes?.trim()) {
     return NextResponse.json({ error: "adminNotes is required for rejection" }, { status: 400 });
@@ -65,7 +66,11 @@ export async function POST(
         }
         await prisma.file.update({
           where: { id: cr.fileId },
-          data: { status: "REVIEWED", ...(assignedCodigo ? { codigo: assignedCodigo } : {}) },
+          data: {
+            status: "REVIEWED",
+            ...(assignedCodigo ? { codigo: assignedCodigo } : {}),
+            ...(adminVersionStr?.trim() ? { versionStr: adminVersionStr.trim() } : {}),
+          },
         });
 
       } else if (cr.type === "EDIT_METADATA" || cr.type === "REVISION_DATE_CHANGE") {
@@ -75,7 +80,10 @@ export async function POST(
           for (const [k, v] of Object.entries(after)) {
             updateData[k] = DATE_FIELDS.has(k) && typeof v === "string" ? new Date(v) : v;
           }
+          if (adminVersionStr?.trim()) updateData.versionStr = adminVersionStr.trim();
           await prisma.file.update({ where: { id: cr.fileId }, data: updateData });
+        } else if (adminVersionStr?.trim()) {
+          await prisma.file.update({ where: { id: cr.fileId }, data: { versionStr: adminVersionStr.trim() } });
         }
 
       } else if (cr.type === "DELETE") {
@@ -83,11 +91,14 @@ export async function POST(
 
       } else if (cr.type === "OTHER") {
         const updates = pc.proposedFileUpdates as Record<string, unknown> | undefined;
-        if (updates) {
+        if (updates || adminVersionStr?.trim()) {
           const updateData: Record<string, unknown> = {};
-          for (const [k, v] of Object.entries(updates)) {
-            updateData[k] = DATE_FIELDS.has(k) && typeof v === "string" ? new Date(v) : v;
+          if (updates) {
+            for (const [k, v] of Object.entries(updates)) {
+              updateData[k] = DATE_FIELDS.has(k) && typeof v === "string" ? new Date(v) : v;
+            }
           }
+          if (adminVersionStr?.trim()) updateData.versionStr = adminVersionStr.trim();
           await prisma.file.update({ where: { id: cr.fileId }, data: updateData });
         }
       }

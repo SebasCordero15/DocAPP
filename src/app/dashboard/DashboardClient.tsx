@@ -266,10 +266,10 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
   }
 
   async function deleteFolder(id: string, name: string) {
-    if (!confirm(`Move folder "${name}" to trash?`)) return;
+    if (!confirm(`¿Mover la carpeta "${name}" a la papelera?`)) return;
     const res = await fetch(`/api/folders/${id}`, { method: "DELETE" });
     if (res.ok) fetchContents(folderId);
-    else alert("Failed to delete folder");
+    else alert("Error al eliminar la carpeta");
   }
 
   function openReviewPanel(file: FileItem) {
@@ -390,7 +390,7 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
   }
 
   async function deleteFile(id: string, name: string) {
-    if (!confirm(`Move "${name}" to trash?`)) return;
+    if (!confirm(`¿Mover "${name}" a la papelera?`)) return;
     const res = await fetch(`/api/files/${id}`, { method: "DELETE" });
     const data = await res.json().catch(() => ({}));
     if (res.status === 202 && data.requiresApproval) {
@@ -399,7 +399,7 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
       return;
     }
     if (res.ok) fetchContents(folderId);
-    else alert("Failed to delete file");
+    else alert("Error al eliminar el archivo");
   }
 
   // ── derived state ───────────────────────────────────────────────────────────

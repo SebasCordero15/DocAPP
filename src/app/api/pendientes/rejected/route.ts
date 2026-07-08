@@ -11,7 +11,7 @@ export async function GET() {
   if (!session.companyId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const { companyId, userId } = session;
 
-  const [rejectedCRs, rejectedChains] = await Promise.all([
+  const [rejectedCRs, rejectedOutgoing, rejectedChains] = await Promise.all([
     prisma.changeRequest.findMany({
       where: { companyId, requestedByUserId: userId, status: "REJECTED" },
       orderBy: { reviewedAt: "desc" },
@@ -26,6 +26,25 @@ export async function GET() {
           select: { id: true, name: true, nombreDocumento: true, codigo: true, mimeType: true },
         },
         reviewedBy: { select: { id: true, name: true } },
+      },
+    }),
+
+    prisma.outgoingRequest.findMany({
+      where: {
+        companyId,
+        status: "REJECTED",
+        tasks: { some: { assignedToUserId: userId } },
+      },
+      orderBy: { finalReviewedAt: "desc" },
+      select: {
+        id: true,
+        type: true,
+        finalNotes: true,
+        finalReviewedAt: true,
+        file: {
+          select: { id: true, name: true, nombreDocumento: true, codigo: true, mimeType: true },
+        },
+        finalReviewer: { select: { id: true, name: true } },
       },
     }),
 
@@ -63,6 +82,10 @@ export async function GET() {
       ...chain,
       updatedAt:     chain.updatedAt.toISOString(),
       rejectingStep: chain.steps[0] ?? null,
+    })),
+    rejectedOutgoing: rejectedOutgoing.map((o) => ({
+      ...o,
+      finalReviewedAt: o.finalReviewedAt?.toISOString() ?? null,
     })),
   });
 }

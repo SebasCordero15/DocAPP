@@ -92,6 +92,15 @@ interface RejectedChain {
   rejectingStep: { stepOrder: number; rejectionNote: string | null; assignedTo: { id: string; name: string } } | null;
 }
 
+interface RejectedOutgoing {
+  id: string;
+  type: "ACTUALIZACION" | "REVISION" | "CORRECCION";
+  finalNotes: string | null;
+  finalReviewedAt: string | null;
+  file: { id: string; name: string; nombreDocumento: string | null; codigo: string | null; mimeType: string } | null;
+  finalReviewer: { id: string; name: string } | null;
+}
+
 interface Props {
   company: { name: string; primaryColor: string; accentColor: string; fontFamily: string; logoUrl: string | null };
   userRole: string;
@@ -165,8 +174,20 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
   const [filterUser,   setFilterUser]   = useState("");
   const [filterType,   setFilterType]   = useState("");
 
-  // ── opening a document
+  // ── opening / previewing a document
   const [openingDoc, setOpeningDoc] = useState<string | null>(null);
+
+  const SPREADSHEET_TYPES = new Set([
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-excel", "text/csv", "application/csv",
+  ]);
+  const WORD_TYPES = new Set([
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/msword",
+  ]);
+  function isSpreadsheet(m: string) { return SPREADSHEET_TYPES.has(m); }
+  function isWord(m: string) { return WORD_TYPES.has(m); }
+  function isViewable(m: string) { return m === "application/pdf" || isSpreadsheet(m) || isWord(m); }
 
   async function openDoc(fileId: string) {
     setOpeningDoc(fileId);
@@ -177,6 +198,32 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
       window.open(url, "_blank");
     } finally {
       setOpeningDoc(null);
+    }
+  }
+
+  async function openPreview(file: { id: string; name: string; mimeType: string }) {
+    if (file.mimeType === "application/pdf") {
+      setPdfViewerFile({ id: file.id, name: file.name });
+      setPdfViewerUrl(null); setPdfLoading(true);
+      const res = await fetch(`/api/files/${file.id}/view-url`);
+      if (res.ok) { const { url } = await res.json(); setPdfViewerUrl(url); }
+      setPdfLoading(false);
+    } else if (isSpreadsheet(file.mimeType) || isWord(file.mimeType)) {
+      setOfficeViewerFile({ id: file.id, name: file.name, mimeType: file.mimeType });
+      setOfficeViewerSheets([]); setOfficeViewerTab(0); setOfficeViewerLoading(true); setOfficeDownloadUrl(null);
+      const endpoint = isWord(file.mimeType) ? "word-html" : "excel-html";
+      const [contentRes, dlRes] = await Promise.all([
+        fetch(`/api/files/${file.id}/${endpoint}`),
+        fetch(`/api/files/${file.id}/download-url`),
+      ]);
+      if (contentRes.ok) {
+        const data = await contentRes.json();
+        setOfficeViewerSheets(isWord(file.mimeType) ? [{ name: "Documento", html: data.html ?? "" }] : (data.sheets ?? []));
+      }
+      if (dlRes.ok) { const { url } = await dlRes.json(); setOfficeDownloadUrl(url); }
+      setOfficeViewerLoading(false);
+    } else {
+      openDoc(file.id);
     }
   }
 
@@ -287,9 +334,20 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
   const [loadingCR, setLoadingCR] = useState(true);
 
   // ── rechazados / devueltos
-  const [rejectedCRs,    setRejectedCRs]    = useState<RejectedCR[]>([]);
-  const [rejectedChains, setRejectedChains] = useState<RejectedChain[]>([]);
+  const [rejectedCRs,      setRejectedCRs]      = useState<RejectedCR[]>([]);
+  const [rejectedChains,   setRejectedChains]   = useState<RejectedChain[]>([]);
+  const [rejectedOutgoing, setRejectedOutgoing] = useState<RejectedOutgoing[]>([]);
   const [loadingRejected, setLoadingRejected] = useState(true);
+
+  // ── document inline viewer (Point 5)
+  const [pdfViewerFile,     setPdfViewerFile]     = useState<{ id: string; name: string } | null>(null);
+  const [pdfViewerUrl,      setPdfViewerUrl]      = useState<string | null>(null);
+  const [pdfLoading,        setPdfLoading]        = useState(false);
+  const [officeViewerFile,  setOfficeViewerFile]  = useState<{ id: string; name: string; mimeType: string } | null>(null);
+  const [officeViewerSheets, setOfficeViewerSheets] = useState<{ name: string; html: string }[]>([]);
+  const [officeViewerTab,   setOfficeViewerTab]   = useState(0);
+  const [officeViewerLoading, setOfficeViewerLoading] = useState(false);
+  const [officeDownloadUrl, setOfficeDownloadUrl] = useState<string | null>(null);
 
   // ── assign modal
   const [showAssign,   setShowAssign]   = useState(false);
@@ -346,6 +404,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
       const d = await r.json();
       setRejectedCRs(d.rejectedCRs ?? []);
       setRejectedChains(d.rejectedChains ?? []);
+      setRejectedOutgoing(d.rejectedOutgoing ?? []);
     }
     setLoadingRejected(false);
   }, []);
@@ -445,7 +504,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
 
   const tasksToShow = mainTab === "equipo" ? teamTasks : myTasks;
   const loadingTasksNow = loadingTasks && mainTab === "acciones";
-  const rejectedCount = rejectedCRs.length + rejectedChains.length;
+  const rejectedCount = rejectedCRs.length + rejectedChains.length + rejectedOutgoing.length;
   const pendingCRs = myChangeRequests.filter((cr) => cr.status === "PENDING");
 
   return (
@@ -623,14 +682,34 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
 
                       {/* Actions */}
                       <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
-                        <button
-                          className="action-btn"
-                          style={{ background: "#f1f5f9", color: "#475569", opacity: openingDoc === task.file.id ? 0.5 : 1 }}
-                          disabled={openingDoc === task.file.id}
-                          onClick={() => openDoc(task.file.id)}
-                        >
-                          {openingDoc === task.file.id ? "…" : "Ver doc"}
-                        </button>
+                        {isViewable(task.file.mimeType) ? (
+                          <>
+                            <button
+                              className="action-btn"
+                              style={{ background: "#f1f5f9", color: "#475569" }}
+                              onClick={() => openPreview({ id: task.file.id, name: task.file.nombreDocumento || task.file.name, mimeType: task.file.mimeType })}
+                            >
+                              Ver
+                            </button>
+                            <button
+                              className="action-btn"
+                              style={{ background: "#f1f5f9", color: "#475569", opacity: openingDoc === task.file.id ? 0.5 : 1 }}
+                              disabled={openingDoc === task.file.id}
+                              onClick={() => openDoc(task.file.id)}
+                            >
+                              {openingDoc === task.file.id ? "…" : "Descargar"}
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            className="action-btn"
+                            style={{ background: "#f1f5f9", color: "#475569", opacity: openingDoc === task.file.id ? 0.5 : 1 }}
+                            disabled={openingDoc === task.file.id}
+                            onClick={() => openDoc(task.file.id)}
+                          >
+                            {openingDoc === task.file.id ? "…" : "Ver doc"}
+                          </button>
+                        )}
 
                         {/* Review chain actions */}
                         {isMyChainTurn && task.status !== "COMPLETED" && (
@@ -784,7 +863,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
         )}
 
         {/* ── Section C: Rechazados / Devueltos ───────────────────────────────── */}
-        {mainTab === "acciones" && (rejectedCRs.length > 0 || rejectedChains.length > 0 || loadingRejected) && (
+        {mainTab === "acciones" && (rejectedCRs.length > 0 || rejectedChains.length > 0 || rejectedOutgoing.length > 0 || loadingRejected) && (
           <section style={{ marginBottom: 48 }}>
             <div style={{ marginBottom: 16 }}>
               <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#dc2626" }}>Rechazados / Devueltos</h2>
@@ -879,6 +958,52 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                               onClick={() => openDoc(f.id)}
                             >
                               {openingDoc === f.id ? "…" : "Ver documento"}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {rejectedOutgoing.map((o) => {
+                  const f = o.file;
+                  const docName = f?.nombreDocumento || f?.name || "Documento eliminado";
+                  const rejectedBy = o.finalReviewer?.name ?? "Administrador";
+                  const typeLabel = { ACTUALIZACION: "Actualización", REVISION: "Revisión", CORRECCION: "Corrección" }[o.type] ?? o.type;
+                  return (
+                    <div key={o.id} style={{ background: "#fff", border: "1px solid #fca5a5", borderLeft: "4px solid #8b5cf6", borderRadius: 10, padding: "14px 18px", marginBottom: 10 }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+                        {f && <FileIcon mimeType={f.mimeType} size={28} />}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+                            <span style={{ fontWeight: 700, fontSize: 14, color: "#1e293b" }}>{docName}</span>
+                            <span style={{ background: "#ede9fe", color: "#6d28d9", borderRadius: 5, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>
+                              Solicitud saliente rechazada
+                            </span>
+                            <span style={{ background: "#f1f5f9", color: "#475569", borderRadius: 5, padding: "1px 7px", fontSize: 11 }}>
+                              {typeLabel}
+                            </span>
+                          </div>
+                          <div style={{ display: "flex", gap: 12, fontSize: 12, color: "#64748b", flexWrap: "wrap" }}>
+                            {f?.codigo && <span>Código: <b>{f.codigo}</b></span>}
+                            <span>Rechazado por: <b>{rejectedBy}</b></span>
+                            {o.finalReviewedAt && <span>Fecha: <b>{new Date(o.finalReviewedAt).toLocaleDateString("es-MX")}</b></span>}
+                          </div>
+                          {o.finalNotes && (
+                            <div style={{ marginTop: 8, padding: "7px 12px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6, fontSize: 12, color: "#dc2626" }}>
+                              <b>Motivo:</b> {o.finalNotes}
+                            </div>
+                          )}
+                        </div>
+                        {f && isViewable(f.mimeType) && (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+                            <button
+                              className="action-btn"
+                              style={{ background: "#f1f5f9", color: "#475569" }}
+                              onClick={() => openPreview({ id: f.id, name: f.name, mimeType: f.mimeType })}
+                            >
+                              Ver
                             </button>
                           </div>
                         )}
@@ -1143,6 +1268,82 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                 Cancelar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Office viewer modal ─────────────────────────────────────────────── */}
+      {officeViewerFile && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 100, display: "flex", flexDirection: "column" }}>
+          <div style={{ background: "#1e293b", color: "#fff", padding: "10px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+            <span style={{ fontSize: 14, fontWeight: 600 }}>{officeViewerFile.name}</span>
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0 }}>
+              {officeDownloadUrl && (
+                <button onClick={() => window.open(officeDownloadUrl, "_blank")} style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>
+                  Descargar
+                </button>
+              )}
+              <button onClick={() => { setOfficeViewerFile(null); setOfficeViewerSheets([]); setOfficeDownloadUrl(null); }} style={{ background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", padding: "5px 10px", borderRadius: 6, cursor: "pointer", display: "flex" }}>
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+          {officeViewerSheets.length > 1 && !isWord(officeViewerFile.mimeType) && (
+            <div style={{ background: "#0f172a", display: "flex", gap: 2, padding: "0 20px", flexShrink: 0 }}>
+              {officeViewerSheets.map((s, i) => (
+                <button key={i} onClick={() => setOfficeViewerTab(i)} style={{ padding: "7px 14px", fontSize: 12, fontWeight: officeViewerTab === i ? 700 : 400, background: officeViewerTab === i ? "#fff" : "transparent", color: officeViewerTab === i ? "#1e293b" : "rgba(255,255,255,0.6)", border: "none", borderRadius: "6px 6px 0 0", cursor: "pointer" }}>
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          )}
+          <div style={{ flex: 1, overflow: "auto", background: "#f8fafc" }}>
+            {officeViewerLoading ? (
+              <div style={{ height: "100%", display: "grid", placeItems: "center", color: "#475569", fontSize: 14 }}>Cargando documento…</div>
+            ) : officeViewerSheets.length > 0 ? (
+              <div style={{ padding: isWord(officeViewerFile.mimeType) ? "32px 60px" : "16px 20px", maxWidth: isWord(officeViewerFile.mimeType) ? 860 : undefined, margin: "0 auto", background: "#fff", minHeight: "100%" }}>
+                <style>{`
+                  .xlsx-view table { border-collapse: collapse; font-size: 12.5px; white-space: nowrap; }
+                  .xlsx-view td, .xlsx-view th { border: 1px solid #d1d5db; padding: 5px 12px; }
+                  .xlsx-view tr:first-child td, .xlsx-view tr:first-child th { background: #f1f5f9; font-weight: 700; }
+                  .xlsx-view tr:nth-child(even) td { background: #f8fafc; }
+                  .word-view { font-family: 'Times New Roman', Times, serif; font-size: 14px; line-height: 1.8; color: #1e293b; }
+                  .word-view h1 { font-size: 22px; font-weight: 700; margin: 0 0 16px; }
+                  .word-view h2 { font-size: 17px; font-weight: 700; margin: 20px 0 8px; }
+                  .word-view p { margin: 0 0 10px; }
+                  .word-view table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+                  .word-view td, .word-view th { border: 1px solid #d1d5db; padding: 6px 10px; }
+                  .word-view ul, .word-view ol { margin: 0 0 10px; padding-left: 24px; }
+                `}</style>
+                <div className={isWord(officeViewerFile.mimeType) ? "word-view" : "xlsx-view"} dangerouslySetInnerHTML={{ __html: officeViewerSheets[officeViewerTab]?.html ?? "" }} />
+              </div>
+            ) : (
+              <div style={{ padding: "60px 40px", textAlign: "center", color: "#475569" }}>
+                <p style={{ margin: "0 0 8px", fontWeight: 600 }}>No se puede previsualizar</p>
+                {officeDownloadUrl && <button onClick={() => window.open(officeDownloadUrl, "_blank")} style={{ background: p, color: "#fff", border: "none", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 14 }}>Descargar</button>}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── PDF viewer modal ─────────────────────────────────────────────────── */}
+      {pdfViewerFile && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 100, display: "flex", flexDirection: "column" }}>
+          <div style={{ background: "#1e293b", color: "#fff", padding: "10px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+            <span style={{ fontSize: 14, fontWeight: 600 }}>{pdfViewerFile.name}</span>
+            <button onClick={() => { setPdfViewerFile(null); setPdfViewerUrl(null); }} style={{ background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", padding: "5px 10px", borderRadius: 6, cursor: "pointer" }}>
+              <X size={16} />
+            </button>
+          </div>
+          <div style={{ flex: 1, overflow: "hidden" }}>
+            {pdfLoading ? (
+              <div style={{ height: "100%", display: "grid", placeItems: "center", color: "#fff" }}>Cargando PDF…</div>
+            ) : pdfViewerUrl ? (
+              <iframe src={pdfViewerUrl} style={{ width: "100%", height: "100%", border: "none" }} title={pdfViewerFile.name} />
+            ) : (
+              <div style={{ height: "100%", display: "grid", placeItems: "center", color: "#94a3b8" }}>No se pudo cargar el PDF.</div>
+            )}
           </div>
         </div>
       )}

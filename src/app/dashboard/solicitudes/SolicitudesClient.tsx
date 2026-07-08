@@ -8,7 +8,7 @@ import FileIcon from "@/components/FileIcon";
 
 interface CRFile {
   id: string; name: string; nombreDocumento: string | null;
-  codigo: string | null; storageKey: string; mimeType?: string;
+  codigo: string | null; storageKey: string; mimeType?: string; versionStr?: string | null;
 }
 interface CRUser { id: string; name: string; email: string; }
 
@@ -130,6 +130,7 @@ export default function SolicitudesClient({ company, userRole }: Props) {
   const [processing,   setProcessing]   = useState<string | null>(null);
   const [approvingId,  setApprovingId]  = useState<string | null>(null);
   const [approveCodigo, setApproveCodigo] = useState<Record<string, string>>({});
+  const [approveVersionStr, setApproveVersionStr] = useState<Record<string, string>>({});
 
   // ── Salientes state ──────────────────────────────────────────────────────────
   const [outgoing,    setOutgoing]    = useState<OutgoingRequest[]>([]);
@@ -149,8 +150,7 @@ export default function SolicitudesClient({ company, userRole }: Props) {
   const [outType, setOutType] = useState<"ACTUALIZACION" | "REVISION" | "CORRECCION">("ACTUALIZACION");
   const [instructions, setInstructions] = useState("");
   const [corrFields, setCorrFields] = useState({ nombre: false, contenido: false, area: false, carpeta: false, otro: "" });
-  const [assignee1, setAssignee1] = useState<string>("");
-  const [assignee2, setAssignee2] = useState<string>("");
+  const [assignees, setAssignees] = useState<string[]>([""]);
   const [dueDate,   setDueDate]   = useState<string>("");
   const [creating,  setCreating]  = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -179,7 +179,7 @@ export default function SolicitudesClient({ company, userRole }: Props) {
     setCreateError(null);
     setSelectedFile(null); setFileSearch(""); setOutType("ACTUALIZACION");
     setInstructions(""); setCorrFields({ nombre: false, contenido: false, area: false, carpeta: false, otro: "" });
-    setAssignee1(""); setAssignee2(""); setDueDate("");
+    setAssignees([""]); setDueDate("");
 
     if (allFiles.length === 0) {
       const r = await fetch("/api/listado-maestro");
@@ -198,14 +198,19 @@ export default function SolicitudesClient({ company, userRole }: Props) {
   }
 
   // ── Entrantes actions ────────────────────────────────────────────────────────
-  async function submitCrReview(id: string, action: "APPROVE" | "REJECT", assignedCodigo?: string) {
+  async function submitCrReview(id: string, action: "APPROVE" | "REJECT", assignedCodigo?: string, adminVersionStr?: string) {
     const note = rejectNote[id]?.trim();
     if (action === "REJECT" && !note) return;
     setProcessing(id);
     const res = await fetch(`/api/change-requests/${id}/review`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, adminNotes: note ?? null, assignedCodigo: assignedCodigo ?? null }),
+      body: JSON.stringify({
+        action,
+        adminNotes: note ?? null,
+        assignedCodigo: assignedCodigo ?? null,
+        adminVersionStr: adminVersionStr ?? null,
+      }),
     });
     setProcessing(null);
     if (res.ok) {
@@ -217,11 +222,15 @@ export default function SolicitudesClient({ company, userRole }: Props) {
     }
   }
 
-  async function startApproveNewUpload(cr: ChangeRequest) {
-    if (cr.type !== "NEW_UPLOAD") { submitCrReview(cr.id, "APPROVE"); return; }
-    const r = await fetch("/api/files/next-codigo");
-    const suggested = r.ok ? (await r.json()).codigo : "";
-    setApproveCodigo((prev) => ({ ...prev, [cr.id]: suggested }));
+  async function startApproveCr(cr: ChangeRequest) {
+    if (cr.type === "DELETE") { submitCrReview(cr.id, "APPROVE"); return; }
+    if (cr.type === "NEW_UPLOAD") {
+      const r = await fetch("/api/files/next-codigo");
+      const suggested = r.ok ? (await r.json()).codigo : "";
+      setApproveCodigo((prev) => ({ ...prev, [cr.id]: suggested }));
+    }
+    const currentVersion = cr.file?.versionStr ?? "";
+    setApproveVersionStr((prev) => ({ ...prev, [cr.id]: currentVersion ?? "" }));
     setApprovingId(cr.id);
   }
 
@@ -269,7 +278,8 @@ export default function SolicitudesClient({ company, userRole }: Props) {
   // ── Create outgoing request ──────────────────────────────────────────────────
   async function submitCreate() {
     if (!selectedFile) { setCreateError("Selecciona un documento"); return; }
-    if (!assignee1) { setCreateError("Selecciona al menos un asignado"); return; }
+    const assigneeIds = assignees.map((a) => a.trim()).filter(Boolean);
+    if (assigneeIds.length === 0) { setCreateError("Selecciona al menos un asignado"); return; }
     if (outType === "CORRECCION" && !instructions.trim()) {
       setCreateError("Las instrucciones son obligatorias para una corrección"); return;
     }
@@ -277,7 +287,6 @@ export default function SolicitudesClient({ company, userRole }: Props) {
       const anyChecked = corrFields.nombre || corrFields.contenido || corrFields.area || corrFields.carpeta || corrFields.otro.trim();
       if (!anyChecked) { setCreateError("Especifica qué corregir"); return; }
     }
-    const assigneeIds = [assignee1, ...(assignee2 && assignee2 !== assignee1 ? [assignee2] : [])];
     setCreating(true); setCreateError(null);
     const res = await fetch("/api/outgoing-requests", {
       method: "POST",
@@ -453,7 +462,7 @@ export default function SolicitudesClient({ company, userRole }: Props) {
                     </div>
                     {!isRejecting && !isApproving ? (
                       <div style={{ display: "flex", gap: 8 }}>
-                        <button className="btn" disabled={isProcessing} onClick={() => startApproveNewUpload(cr)} style={{ background: "#dcfce7", color: "#166534" }}>
+                        <button className="btn" disabled={isProcessing} onClick={() => startApproveCr(cr)} style={{ background: "#dcfce7", color: "#166534" }}>
                           {isProcessing ? "Procesando…" : <><Check size={13} style={{ marginRight: 4 }} />Aceptar</>}
                         </button>
                         <button className="btn" disabled={isProcessing} onClick={() => { setRejectingId(cr.id); setRejectNote((n) => ({ ...n, [cr.id]: "" })); }} style={{ background: "#fee2e2", color: "#dc2626" }}>
@@ -462,15 +471,46 @@ export default function SolicitudesClient({ company, userRole }: Props) {
                       </div>
                     ) : isApproving ? (
                       <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: 14 }}>
-                        <label className="form-label">Asignar código de documento</label>
-                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                          <input autoFocus value={approveCodigo[cr.id] ?? ""} onChange={(e) => setApproveCodigo((n) => ({ ...n, [cr.id]: e.target.value }))} placeholder="DOC-001" className="form-input" style={{ width: 140 }} />
-                          <button className="btn" disabled={isProcessing} onClick={() => submitCrReview(cr.id, "APPROVE", approveCodigo[cr.id] || undefined)} style={{ background: "#dcfce7", color: "#166534" }}>
+                        {cr.type === "NEW_UPLOAD" && (
+                          <div style={{ marginBottom: 12 }}>
+                            <label className="form-label">Asignar código de documento</label>
+                            <input
+                              autoFocus
+                              value={approveCodigo[cr.id] ?? ""}
+                              onChange={(e) => setApproveCodigo((n) => ({ ...n, [cr.id]: e.target.value }))}
+                              placeholder="DOC-001"
+                              className="form-input"
+                              style={{ width: 160 }}
+                            />
+                            <p style={{ margin: "4px 0 0", fontSize: 11, color: "#94a3b8" }}>Deja vacío para aprobar sin código.</p>
+                          </div>
+                        )}
+                        <div style={{ marginBottom: 12 }}>
+                          <label className="form-label">Versión del documento</label>
+                          <input
+                            value={approveVersionStr[cr.id] ?? ""}
+                            onChange={(e) => setApproveVersionStr((n) => ({ ...n, [cr.id]: e.target.value }))}
+                            placeholder="v1.0"
+                            className="form-input"
+                            style={{ width: 160 }}
+                          />
+                          <p style={{ margin: "4px 0 0", fontSize: 11, color: "#94a3b8" }}>Deja vacío para mantener la versión actual.</p>
+                        </div>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button
+                            className="btn"
+                            disabled={isProcessing}
+                            onClick={() => submitCrReview(
+                              cr.id, "APPROVE",
+                              cr.type === "NEW_UPLOAD" ? (approveCodigo[cr.id] || undefined) : undefined,
+                              approveVersionStr[cr.id]?.trim() || undefined,
+                            )}
+                            style={{ background: "#dcfce7", color: "#166534" }}
+                          >
                             {isProcessing ? "Procesando…" : <><Check size={13} style={{ marginRight: 4 }} />Confirmar</>}
                           </button>
                           <button className="btn" disabled={isProcessing} onClick={() => setApprovingId(null)} style={{ background: "#f1f5f9", color: "#64748b" }}>Cancelar</button>
                         </div>
-                        <p style={{ margin: "6px 0 0", fontSize: 11, color: "#94a3b8" }}>Deja vacío para aprobar sin código.</p>
                       </div>
                     ) : (
                       <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: 14 }}>
@@ -753,21 +793,39 @@ export default function SolicitudesClient({ company, userRole }: Props) {
             {/* Assignees */}
             <div style={{ marginBottom: 18 }}>
               <label className="form-label">Asignado(s) <span style={{ color: "#dc2626" }}>*</span></label>
-              <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 4 }}>Paso 1</div>
-                  <select value={assignee1} onChange={(e) => setAssignee1(e.target.value)} className="form-select">
-                    <option value="">Seleccionar usuario…</option>
-                    {allUsers.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.email})</option>)}
-                  </select>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 4 }}>Paso 2 (opcional)</div>
-                  <select value={assignee2} onChange={(e) => setAssignee2(e.target.value)} className="form-select">
-                    <option value="">Sin segundo paso</option>
-                    {allUsers.filter((u) => u.id !== assignee1).map((u) => <option key={u.id} value={u.id}>{u.name} ({u.email})</option>)}
-                  </select>
-                </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {assignees.map((val, idx) => (
+                  <div key={idx} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <div style={{ fontSize: 11, color: "#94a3b8", width: 46, flexShrink: 0 }}>Paso {idx + 1}</div>
+                    <select
+                      value={val}
+                      onChange={(e) => setAssignees((prev) => prev.map((v, i) => i === idx ? e.target.value : v))}
+                      className="form-select"
+                      style={{ flex: 1 }}
+                    >
+                      <option value="">Seleccionar usuario…</option>
+                      {allUsers.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.email})</option>)}
+                    </select>
+                    {assignees.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setAssignees((prev) => prev.filter((_, i) => i !== idx))}
+                        style={{ background: "#fee2e2", border: "none", borderRadius: 6, padding: "5px 8px", cursor: "pointer", color: "#dc2626", flexShrink: 0 }}
+                      >
+                        <XIcon size={13} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {assignees.length < 10 && (
+                  <button
+                    type="button"
+                    onClick={() => setAssignees((prev) => [...prev, ""])}
+                    style={{ background: "none", border: "1px dashed #d1d5db", borderRadius: 8, padding: "7px 12px", cursor: "pointer", color: "#64748b", fontSize: 13, display: "flex", alignItems: "center", gap: 6, alignSelf: "flex-start" }}
+                  >
+                    <Plus size={13} /> Agregar usuario
+                  </button>
+                )}
               </div>
             </div>
 

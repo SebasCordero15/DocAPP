@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
       where: { companyId, status: "PENDING" },
       orderBy: { createdAt: "asc" },
       include: {
-        file:        { select: { id: true, name: true, nombreDocumento: true, codigo: true, storageKey: true } },
+        file:        { select: { id: true, name: true, nombreDocumento: true, codigo: true, storageKey: true, versionStr: true } },
         requestedBy: { select: { id: true, name: true, email: true } },
       },
     });
