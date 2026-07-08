@@ -40,6 +40,7 @@ enum FileStatus {
   IN_REVIEW
   REVIEWED
   PENDING_APPROVAL
+  OBSOLETE
 }
 
 enum ChangeRequestType {
@@ -270,6 +271,10 @@ model File {
   lastAccessedByUserId String?
   lastEditedAt         DateTime?
   lastEditedByUserId   String?
+
+  // ── Comparison (redline) document ─────────────────────────────────────────
+  comparisonStorageKey String?
+  comparisonName       String?
 
   company              Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   folder               Folder?        @relation(fields: [folderId], references: [id], onDelete: SetNull)

@@ -20,7 +20,7 @@ const patchSchema = z.object({
   assignedToId:       z.string().optional().nullable(),
   completeReview:     z.boolean().optional(),
   // Content — require approval when user has only EDIT
-  status:               z.enum(["DRAFT", "IN_REVIEW", "REVIEWED"]).optional(),
+  status:               z.enum(["DRAFT", "IN_REVIEW", "REVIEWED", "OBSOLETE"]).optional(),
   codigo:               z.string().max(100).optional().nullable(),
   nombreDocumento:      z.string().max(300).optional().nullable(),
   versionStr:           z.string().max(50).optional().nullable(),
@@ -78,6 +78,11 @@ export async function PATCH(
   if (encargadoDocumentoId) {
     const exists = await prisma.user.findFirst({ where: { id: encargadoDocumentoId, companyId, isActive: true } });
     if (!exists) return NextResponse.json({ error: "Encargado user not found" }, { status: 400 });
+  }
+
+  // OBSOLETE is admin-only — cannot be requested via ChangeRequest
+  if (status === "OBSOLETE" && session.role !== "COMPANY_ADMIN") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const bypass = canBypassApproval(level, session.role);
@@ -184,8 +189,9 @@ export async function PATCH(
     },
   });
 
-  const action = completeReview ? "FILE_REVIEW_COMPLETE" : "FILE_REVIEW_UPDATE";
-  await logAction({ companyId, userId: session.userId, action, resourceType: "FILE", resourceId: file.id, detail: file.name });
+  const action = completeReview ? "FILE_REVIEW_COMPLETE" : status === "OBSOLETE" ? "FILE_OBSOLETE" : "FILE_REVIEW_UPDATE";
+  const detail = status === "OBSOLETE" ? `Archivado como obsoleto: ${file.nombreDocumento || file.name}` : file.name;
+  await logAction({ companyId, userId: session.userId, action, resourceType: "FILE", resourceId: file.id, detail });
 
   return NextResponse.json({ ...updated, reviewDueDate: updated.reviewDueDate?.toISOString() ?? null });
 }

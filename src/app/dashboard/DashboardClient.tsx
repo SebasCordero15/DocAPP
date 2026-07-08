@@ -6,7 +6,7 @@ import {
   Bell, Search, LayoutGrid, List as ListIcon, ChevronLeft, ChevronRight,
   LogOut, Files, Users, Shield, ClipboardList, ScrollText, Plus, Eye,
   Download, Pencil, Trash2, CheckCircle, Calendar, X, FolderOpen, ClipboardCheck, Inbox, Clock,
-  History, FilePlus, BarChart2, UserCheck,
+  History, FilePlus, BarChart2, UserCheck, Archive, Paperclip, Loader2,
 } from "lucide-react";
 import FileIcon from "@/components/FileIcon";
 
@@ -20,6 +20,7 @@ interface FileItem {
   assignedToId?: string | null; assignedToName?: string | null;
   status?: string | null; uploadedByUserId?: string | null;
   nombreDocumento?: string | null; codigo?: string | null;
+  comparisonStorageKey?: string | null; comparisonName?: string | null;
 }
 
 interface Notification {
@@ -149,6 +150,13 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [searchQuery, setSearchQuery] = useState("");
   const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
+
+  // ── comparison doc modal ─────────────────────────────────────────────────────
+  const [compModalFile,   setCompModalFile]   = useState<FileItem | null>(null);
+  const [compPickedFile,  setCompPickedFile]  = useState<File | null>(null);
+  const [compUploading,   setCompUploading]   = useState(false);
+  const [compError,       setCompError]       = useState<string | null>(null);
+  const compFileInputRef = useRef<HTMLInputElement>(null);
 
   // ── data fetching ───────────────────────────────────────────────────────────
 
@@ -402,15 +410,69 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
     else alert("Error al eliminar el archivo");
   }
 
+  async function markObsolete(file: FileItem) {
+    const docName = file.nombreDocumento || file.name;
+    if (!confirm(`¿Archivar "${docName}" como obsoleto?\nDesaparecerá del dashboard pero podrás restaurarlo desde "Archivo Histórico".`)) return;
+    const res = await fetch(`/api/files/${file.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "OBSOLETE" }),
+    });
+    if (res.ok) fetchContents(folderId);
+    else alert("Error al archivar el documento.");
+  }
+
+  async function viewComparison(fileId: string) {
+    const res = await fetch(`/api/files/${fileId}/comparison`);
+    if (!res.ok) { alert("No se pudo obtener el documento comparativo."); return; }
+    const { url } = await res.json();
+    window.open(url, "_blank");
+  }
+
+  async function handleComparisonUpload() {
+    if (!compModalFile || !compPickedFile) { setCompError("Selecciona un archivo."); return; }
+    setCompUploading(true);
+    setCompError(null);
+    try {
+      const urlRes = await fetch(`/api/files/${compModalFile.id}/comparison`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: compPickedFile.name, mimeType: compPickedFile.type || "application/octet-stream", size: compPickedFile.size }),
+      });
+      if (!urlRes.ok) { const e = await urlRes.json().catch(() => ({})); throw new Error(e.error ?? "Error al obtener URL."); }
+      const { uploadUrl, storageKey } = await urlRes.json();
+
+      const putRes = await fetch(uploadUrl, { method: "PUT", body: compPickedFile, headers: { "Content-Type": compPickedFile.type || "application/octet-stream" } });
+      if (!putRes.ok) throw new Error("Error al subir el archivo.");
+
+      const saveRes = await fetch(`/api/files/${compModalFile.id}/comparison`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storageKey, name: compPickedFile.name }),
+      });
+      if (!saveRes.ok) throw new Error("Error al guardar la comparativa.");
+
+      // update local state
+      setFiles((prev) => prev.map((f) => f.id === compModalFile.id ? { ...f, comparisonStorageKey: storageKey, comparisonName: compPickedFile.name } : f));
+      setCompModalFile(null);
+      setCompPickedFile(null);
+    } catch (err) {
+      setCompError(err instanceof Error ? err.message : "Error inesperado.");
+    } finally {
+      setCompUploading(false);
+    }
+  }
+
   // ── derived state ───────────────────────────────────────────────────────────
 
   const q = searchQuery.toLowerCase();
   const visibleFolders = q ? subfolders.filter((f) => f.name.toLowerCase().includes(q)) : subfolders;
-  const visibleFiles   = q ? files.filter((f) =>
+  const activeFiles    = files.filter((f) => f.status !== "OBSOLETE");
+  const visibleFiles   = q ? activeFiles.filter((f) =>
     f.name.toLowerCase().includes(q) ||
     (f.nombreDocumento?.toLowerCase().includes(q) ?? false) ||
     (f.codigo?.toLowerCase().includes(q) ?? false)
-  ) : files;
+  ) : activeFiles;
 
   const pendingReviews = files.filter((f) => f.reviewDueDate && new Date(f.reviewDueDate).getTime() > Date.now() && (new Date(f.reviewDueDate).getTime() - Date.now()) / 86_400_000 <= 7).length;
   const overdueCount   = files.filter((f) => f.reviewDueDate && new Date(f.reviewDueDate).getTime() < Date.now()).length;
@@ -787,6 +849,14 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                           <UserCheck size={13} /> Solicitar
                         </button>
                       )}
+                      {(isAdmin || canEdit) && f.comparisonStorageKey ? (
+                        <button className="ghost-btn" onClick={() => viewComparison(f.id)} style={{ ...ghostBtnStyle, color: "#15803d", borderColor: "#bbf7d0" }} title="Ver documento comparativo"><Paperclip size={13} /></button>
+                      ) : canEdit ? (
+                        <button className="ghost-btn" onClick={() => { setCompModalFile(f); setCompPickedFile(null); setCompError(null); }} style={ghostBtnStyle} title="Adjuntar comparativa"><Paperclip size={13} /></button>
+                      ) : null}
+                      {isAdmin && f.status === "REVIEWED" && (
+                        <button className="ghost-btn" onClick={() => markObsolete(f)} style={{ ...ghostBtnStyle, color: "#92400e", borderColor: "#fde68a" }} title="Archivar como obsoleto"><Archive size={13} /></button>
+                      )}
                       {canEdit && <button className="danger-btn" onClick={() => deleteFile(f.id, f.nombreDocumento || f.name)} style={dangerBtnStyle} title="Trash"><Trash2 size={13} /></button>}
                     </div>
                   </div>
@@ -1147,6 +1217,46 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                 style={{ background: brand, color: "#fff", border: "none", padding: "10px 20px", borderRadius: 8, cursor: peerReviewAssignee ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13, opacity: !peerReviewAssignee ? 0.5 : 1 }}
               >
                 {submittingPeerReview ? "Enviando…" : "Solicitar revisión"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Comparison doc upload modal ────────────────────────────────────── */}
+      {compModalFile && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100 }} onClick={() => !compUploading && setCompModalFile(null)}>
+          <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: "100%", maxWidth: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+              <h3 style={{ margin: 0, fontSize: 15, color: "#1e293b", display: "flex", alignItems: "center", gap: 8 }}>
+                <Paperclip size={16} color={brand} />
+                {compModalFile.comparisonStorageKey ? "Reemplazar comparativa" : "Adjuntar comparativa"}
+              </h3>
+              {!compUploading && <button onClick={() => setCompModalFile(null)} style={{ border: "none", background: "transparent", cursor: "pointer", color: "#94a3b8" }}><X size={18} /></button>}
+            </div>
+            <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 6px" }}>Documento: <strong>{compModalFile.nombreDocumento || compModalFile.name}</strong></p>
+            <p style={{ fontSize: 12, color: "#94a3b8", margin: "0 0 14px" }}>Adjunta el .docx con control de cambios (marcas rojas) o cualquier versión comparativa.</p>
+            <div
+              onClick={() => !compUploading && compFileInputRef.current?.click()}
+              style={{ border: `2px dashed ${compPickedFile ? brand : "#cbd5e1"}`, borderRadius: 8, padding: "14px", cursor: compUploading ? "default" : "pointer", textAlign: "center", background: compPickedFile ? "#f0fdf4" : "#f8fafc", marginBottom: 14 }}
+            >
+              {compPickedFile ? (
+                <div style={{ fontSize: 13, color: "#15803d" }}><strong>{compPickedFile.name}</strong><br /><span style={{ fontSize: 11, color: "#64748b" }}>{(compPickedFile.size / 1024).toFixed(1)} KB</span></div>
+              ) : (
+                <div style={{ fontSize: 13, color: "#94a3b8" }}>Haz clic para seleccionar (.docx, .pdf, etc.)</div>
+              )}
+            </div>
+            <input ref={compFileInputRef} type="file" style={{ display: "none" }} onChange={(e) => setCompPickedFile(e.target.files?.[0] ?? null)} />
+            {compError && <p style={{ margin: "0 0 12px", padding: "8px 12px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6, fontSize: 12, color: "#dc2626" }}>{compError}</p>}
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              {!compUploading && <button onClick={() => setCompModalFile(null)} style={{ border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancelar</button>}
+              <button
+                onClick={handleComparisonUpload}
+                disabled={compUploading || !compPickedFile}
+                style={{ background: brand, color: "#fff", border: "none", padding: "7px 18px", borderRadius: 8, cursor: (compUploading || !compPickedFile) ? "default" : "pointer", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, opacity: (!compPickedFile || compUploading) ? 0.6 : 1 }}
+              >
+                {compUploading ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Paperclip size={14} />}
+                {compUploading ? "Subiendo…" : "Adjuntar"}
               </button>
             </div>
           </div>
