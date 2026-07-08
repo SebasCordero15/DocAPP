@@ -1,10 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { requireActiveSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/audit";
 import { downloadBytes } from "@/lib/storage";
 import { isSpreadsheet, parsePreview } from "@/lib/parseSpreadsheet";
+
+const PREFIX: Record<string, string> = {
+  PROCEDIMIENTO: "PR", MANUAL: "MA", INSTRUCTIVO: "IN",
+  FORMATO: "FO", POLITICA: "PO", OTRO: "OT",
+};
+
+async function suggestNextCode(companyId: string, tipoDocumento: string): Promise<string> {
+  const prefix = PREFIX[tipoDocumento] ?? "OT";
+  const existing = await prisma.file.findMany({
+    where: { companyId, codigo: { startsWith: `${prefix}-` } },
+    select: { codigo: true },
+  });
+  let max = 0;
+  for (const f of existing) {
+    const n = parseInt((f.codigo ?? "").split("-").pop() ?? "0", 10);
+    if (!isNaN(n) && n > max) max = n;
+  }
+  return `${prefix}-${String(max + 1).padStart(3, "0")}`;
+}
 
 const schema = z.object({
   // File storage (uploaded first via /api/files/upload-url)
@@ -45,29 +65,6 @@ export async function POST(req: NextRequest) {
 
   const { storageKey, name, mimeType, size, nombreDocumento, departamento, tipoDocumento, versionStr, folderId, reviewerIds, codigo } = parsed.data;
 
-  // Validate codigo uniqueness within company if provided
-  if (codigo?.trim()) {
-    const codeExists = await prisma.file.findFirst({
-      where: { companyId, codigo: codigo.trim(), deletedAt: null },
-    });
-    if (codeExists) {
-      // Suggest next available
-      const PREFIX: Record<string, string> = { PROCEDIMIENTO: "PR", MANUAL: "MA", INSTRUCTIVO: "IN", FORMATO: "FO", POLITICA: "PO", OTRO: "OT" };
-      const prefix = PREFIX[tipoDocumento] ?? "OT";
-      const existing = await prisma.file.findMany({
-        where: { companyId, codigo: { startsWith: `${prefix}-` }, deletedAt: null },
-        select: { codigo: true },
-      });
-      let max = 0;
-      for (const f of existing) {
-        const n = parseInt((f.codigo ?? "").split("-").pop() ?? "0", 10);
-        if (!isNaN(n) && n > max) max = n;
-      }
-      const suggested = `${prefix}-${String(max + 1).padStart(3, "0")}`;
-      return NextResponse.json({ error: `El código "${codigo}" ya está en uso. Siguiente disponible: ${suggested}` }, { status: 409 });
-    }
-  }
-
   // Validate storage key belongs to this company
   if (!storageKey.startsWith(`${companyId}/`)) {
     return NextResponse.json({ error: "Invalid storage key" }, { status: 400 });
@@ -95,70 +92,83 @@ export async function POST(req: NextRequest) {
   }
 
   // Create everything in a transaction
-  const result = await prisma.$transaction(async (tx) => {
-    // Create file record in IN_REVIEW status
-    const file = await tx.file.create({
-      data: {
-        companyId,
-        folderId:        folderId ?? null,
-        name,
-        storageKey,
-        mimeType,
-        size,
-        nombreDocumento,
-        departamento,
-        tipoDocumento,
-        versionStr,
-        codigo:          codigo?.trim() || null,
-        status:          "IN_REVIEW",
-        uploadedByUserId: userId,
-        previewRows:     previewRows ?? undefined,
-      },
+  // eslint-disable-next-line prefer-const
+  let result!: { file: { id: string }; chain: { id: string }; tasks: { id: string }[] };
+  try {
+    result = await prisma.$transaction(async (tx) => {
+      // Create file record in IN_REVIEW status
+      const file = await tx.file.create({
+        data: {
+          companyId,
+          folderId:        folderId ?? null,
+          name,
+          storageKey,
+          mimeType,
+          size,
+          nombreDocumento,
+          departamento,
+          tipoDocumento,
+          versionStr,
+          codigo:          codigo?.trim() || null,
+          status:          "IN_REVIEW",
+          uploadedByUserId: userId,
+          previewRows:     previewRows ?? undefined,
+        },
+      });
+
+      // Create review chain
+      const chain = await tx.reviewChain.create({
+        data: {
+          companyId,
+          fileId:          file.id,
+          status:          "IN_REVIEW",
+          currentStep:     1,
+          totalSteps:      orderedReviewers.length,
+          createdByUserId: userId,
+        },
+      });
+
+      // Create a DocumentTask for each reviewer (in order)
+      const tasks = await Promise.all(
+        orderedReviewers.map((reviewer, idx) =>
+          tx.documentTask.create({
+            data: {
+              companyId,
+              fileId:          file.id,
+              assignedToUserId: reviewer.id,
+              assignedByUserId: userId,
+              type:            "REVIEW",
+              status:          "PENDING",
+              reviewChainId:   chain.id,
+              stepOrder:       idx + 1,
+            },
+          })
+        )
+      );
+
+      // Notify the first reviewer
+      await tx.notification.create({
+        data: {
+          companyId,
+          userId:  orderedReviewers[0].id,
+          type:    "REVIEW_ASSIGNED",
+          message: `Tienes un documento pendiente de revisión: "${nombreDocumento}"`,
+          fileId:  file.id,
+        },
+      });
+
+      return { file, chain, tasks };
     });
-
-    // Create review chain
-    const chain = await tx.reviewChain.create({
-      data: {
-        companyId,
-        fileId:          file.id,
-        status:          "IN_REVIEW",
-        currentStep:     1,
-        totalSteps:      orderedReviewers.length,
-        createdByUserId: userId,
-      },
-    });
-
-    // Create a DocumentTask for each reviewer (in order)
-    const tasks = await Promise.all(
-      orderedReviewers.map((reviewer, idx) =>
-        tx.documentTask.create({
-          data: {
-            companyId,
-            fileId:          file.id,
-            assignedToUserId: reviewer.id,
-            assignedByUserId: userId,
-            type:            "REVIEW",
-            status:          idx === 0 ? "PENDING" : "PENDING",  // all start PENDING; only step 1 is active
-            reviewChainId:   chain.id,
-            stepOrder:       idx + 1,
-          },
-        })
-      )
-    );
-
-    // Notify the first reviewer
-    await tx.notification.create({
-      data: {
-        companyId,
-        userId:  orderedReviewers[0].id,
-        type:    "REVIEW_ASSIGNED",
-        message: `Tienes un documento pendiente de revisión: "${nombreDocumento}"`,
-        fileId:  file.id,
-      },
-    });
-
-    return { file, chain, tasks };
-  });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      const suggested = await suggestNextCode(companyId, tipoDocumento);
+      return NextResponse.json(
+        { error: `El código "${codigo?.trim()}" ya está en uso. Siguiente disponible: ${suggested}` },
+        { status: 409 }
+      );
+    }
+    throw err;
+  }
 
   await logAction({
     companyId,
