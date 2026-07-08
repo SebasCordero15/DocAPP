@@ -166,6 +166,15 @@ export async function PATCH(
   // folderId move is admin-only — bypass check already confirmed above for this path
   if (folderId !== undefined && bypass)  updateData.folderId             = folderId;
 
+  // Track last edit and auto-set fechaActualizacion when content fields change
+  if (bypass && hasContentChanges) {
+    updateData.lastEditedAt       = new Date();
+    updateData.lastEditedByUserId = session.userId;
+    if (fechaActualizacion === undefined) {
+      updateData.fechaActualizacion = new Date();
+    }
+  }
+
   const updated = await prisma.file.update({
     where: { id: file.id },
     data: updateData,

@@ -41,8 +41,8 @@ const schema = z.object({
   folderId:        z.string().optional(),
   codigo:          z.string().max(50).optional().nullable(),
 
-  // Ordered list of reviewer user IDs
-  reviewerIds: z.array(z.string()).min(1).max(10),
+  // Ordered list of reviewer user IDs (empty = external folder direct upload)
+  reviewerIds: z.array(z.string()).max(10).default([]),
 });
 
 // POST /api/crear-documento — create a new document with a sequential review chain
@@ -70,13 +70,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid storage key" }, { status: 400 });
   }
 
-  // Validate all reviewers belong to this company and are active
-  const reviewers = await prisma.user.findMany({
-    where: { id: { in: reviewerIds }, companyId, isActive: true, role: { not: "SUPER_ADMIN" } },
-    select: { id: true, name: true, email: true },
-  });
-  if (reviewers.length !== reviewerIds.length) {
-    return NextResponse.json({ error: "Uno o más revisores no son válidos" }, { status: 400 });
+  // Check if target folder is external (bypasses review chain)
+  let isExternalFolder = false;
+  if (folderId) {
+    const folder = await prisma.folder.findFirst({
+      where: { id: folderId, companyId, deletedAt: null },
+      select: { isExternal: true },
+    });
+    if (!folder) return NextResponse.json({ error: "Carpeta no encontrada" }, { status: 404 });
+    isExternalFolder = folder.isExternal;
+  }
+
+  // Validate reviewers (required unless external folder)
+  if (!isExternalFolder && reviewerIds.length === 0) {
+    return NextResponse.json({ error: "Se requiere al menos un revisor" }, { status: 400 });
+  }
+
+  let reviewers: { id: string; name: string; email: string }[] = [];
+  if (!isExternalFolder && reviewerIds.length > 0) {
+    reviewers = await prisma.user.findMany({
+      where: { id: { in: reviewerIds }, companyId, isActive: true, role: { not: "SUPER_ADMIN" } },
+      select: { id: true, name: true, email: true },
+    });
+    if (reviewers.length !== reviewerIds.length) {
+      return NextResponse.json({ error: "Uno o más revisores no son válidos" }, { status: 400 });
+    }
   }
 
   // Build the ordered reviewer list preserving client order
@@ -93,9 +111,32 @@ export async function POST(req: NextRequest) {
 
   // Create everything in a transaction
   // eslint-disable-next-line prefer-const
-  let result!: { file: { id: string }; chain: { id: string }; tasks: { id: string }[] };
+  let result!: { file: { id: string }; chain: { id: string } | null; tasks: { id: string }[] };
   try {
     result = await prisma.$transaction(async (tx) => {
+      if (isExternalFolder) {
+        // External folder: skip review chain, go directly to REVIEWED
+        const file = await tx.file.create({
+          data: {
+            companyId,
+            folderId:         folderId ?? null,
+            name,
+            storageKey,
+            mimeType,
+            size,
+            nombreDocumento,
+            departamento,
+            tipoDocumento,
+            versionStr,
+            codigo:           codigo?.trim() || null,
+            status:           "REVIEWED",
+            uploadedByUserId: userId,
+            previewRows:      previewRows ?? undefined,
+          },
+        });
+        return { file, chain: null, tasks: [] };
+      }
+
       // Create file record in IN_REVIEW status
       const file = await tx.file.create({
         data: {
@@ -176,7 +217,9 @@ export async function POST(req: NextRequest) {
     action: "FILE_UPLOAD",
     resourceType: "FILE",
     resourceId: result.file.id,
-    detail: `Creación de documento: ${nombreDocumento} — ${orderedReviewers.length} revisor(es)`,
+    detail: isExternalFolder
+      ? `Subida directa (carpeta externa): ${nombreDocumento}`
+      : `Creación de documento: ${nombreDocumento} — ${orderedReviewers.length} revisor(es)`,
   });
 
   return NextResponse.json({ ok: true, fileId: result.file.id });

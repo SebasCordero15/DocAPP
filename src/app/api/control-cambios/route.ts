@@ -59,6 +59,7 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "desc" },
       select: {
         id: true, type: true, status: true, adminNotes: true,
+        proposedChanges: true,
         createdAt: true, reviewedAt: true,
         file: { select: { id: true, name: true, nombreDocumento: true, codigo: true } },
         requestedBy: { select: { id: true, name: true } },
@@ -133,6 +134,37 @@ export async function GET(req: NextRequest) {
     return base;
   }
 
+  const FIELD_LABELS_CC: Record<string, string> = {
+    nombreDocumento: "Nombre", versionStr: "Versión", codigo: "Código",
+    fechaEmision: "Fecha emisión", fechaRevision: "Fecha revisión",
+    fechaActualizacion: "Fecha actualización", controlCambios: "Control de cambios",
+    encargadoDocumentoId: "Encargado", status: "Estado",
+  };
+
+  function fmtVal(val: unknown): string {
+    if (val == null) return "—";
+    if (typeof val === "string" && val.match(/^\d{4}-\d{2}-\d{2}/)) {
+      return new Date(val).toLocaleDateString("es-CR", { day: "2-digit", month: "2-digit", year: "numeric" });
+    }
+    return String(val);
+  }
+
+  function buildCRDetail(cr: { type: string; proposedChanges: unknown; adminNotes: string | null }): string | null {
+    const pc = cr.proposedChanges as Record<string, unknown> | null;
+    if (pc && (cr.type === "EDIT_METADATA" || cr.type === "REVISION_DATE_CHANGE")) {
+      const before = pc.before as Record<string, unknown> | undefined;
+      const after  = pc.after  as Record<string, unknown> | undefined;
+      if (before && after) {
+        const parts = Object.entries(after).map(([k, v]) => {
+          const label = FIELD_LABELS_CC[k] ?? k;
+          return `${label}: "${fmtVal(before[k])}" → "${fmtVal(v)}"`;
+        });
+        if (parts.length > 0) return parts.join(" | ");
+      }
+    }
+    return cr.adminNotes;
+  }
+
   const CR_TYPE_LABELS: Record<string, string> = {
     NEW_UPLOAD:           "Nueva subida",
     EDIT_METADATA:        "Edición de metadatos",
@@ -192,7 +224,7 @@ export async function GET(req: NextRequest) {
       fileId: cr.file?.id ?? null,
       quien: cr.requestedBy.name,
       fecha: cr.createdAt.toISOString(),
-      detalle: cr.adminNotes,
+      detalle: buildCRDetail(cr),
       estado: cr.status,
     });
   }

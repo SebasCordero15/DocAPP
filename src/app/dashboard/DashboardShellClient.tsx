@@ -71,7 +71,7 @@ export default function DashboardShellClient({
       { label: "Permisos",     icon: <Shield size={18} />,     href: "/dashboard/permissions", badge: 0 },
       { label: "Solicitudes",  icon: <Inbox size={18} />,      href: "/dashboard/solicitudes", badge: pendingCRCount },
       { label: "Reportes",     icon: <BarChart2 size={18} />,  href: "/dashboard/reportes",   badge: 0 },
-      { label: "Auditoría",    icon: <ScrollText size={18} />, href: "/dashboard/audit",      badge: 0 },
+      { label: "Historial",    icon: <ScrollText size={18} />, href: "/dashboard/audit",      badge: 0 },
     ] : []),
   ];
 

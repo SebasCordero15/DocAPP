@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { GripVertical, X, UserPlus, CheckCircle, FilePlus } from "lucide-react";
 
-interface Folder { id: string; name: string; parentId: string | null; }
+interface Folder { id: string; name: string; parentId: string | null; isExternal: boolean; }
 interface UserOption { id: string; name: string; email: string; role: string; }
 interface Props {
   company: { name: string; primaryColor: string; accentColor: string; fontFamily: string };
@@ -22,7 +22,8 @@ const TIPO_OPTIONS = [
   { value: "OTRO",          label: "Otro" },
 ];
 
-const STEPS = ["Información", "Archivo", "Revisores", "Confirmar"];
+const STEPS_NORMAL   = ["Información", "Archivo", "Revisores", "Confirmar"];
+const STEPS_EXTERNAL = ["Información", "Archivo", "Confirmar"];
 
 // Build a flat ordered list with depth for hierarchical display
 function buildFolderTree(folders: Folder[]): { id: string; label: string; depth: number }[] {
@@ -145,8 +146,15 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
     }
   }
 
+  const isExternalFolder = folderId
+    ? (folders.find((f) => f.id === folderId)?.isExternal ?? false)
+    : false;
+
+  const STEPS = isExternalFolder ? STEPS_EXTERNAL : STEPS_NORMAL;
+
   async function submit() {
-    if (!file || !storageKey || reviewers.length === 0) return;
+    if (!file || !storageKey) return;
+    if (!isExternalFolder && reviewers.length === 0) return;
     setSubmitting(true); setError("");
     try {
       const res = await fetch("/api/crear-documento", {
@@ -175,7 +183,7 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
 
   const canStep0 = nombre.trim() && departamento.trim() && tipo && version.trim();
   const canStep1 = !!file;
-  const canStep2 = reviewers.length > 0;
+  const canStep2 = isExternalFolder || reviewers.length > 0;
 
   const selectedFolderLabel = folderId
     ? folderTree.find((f) => f.id === folderId)?.label ?? "—"
@@ -345,8 +353,8 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
               <div style={{ display: "flex", gap: 12, marginTop: 28 }}>
                 <button onClick={() => setStep(0)} style={backBtn}>← Atrás</button>
                 {storageKey ? (
-                  <button onClick={() => setStep(2)} style={btnStyle(brand)}>
-                    Siguiente: Revisores →
+                  <button onClick={() => setStep(isExternalFolder ? 3 : 2)} style={btnStyle(brand)}>
+                    {isExternalFolder ? "Siguiente: Confirmar →" : "Siguiente: Revisores →"}
                   </button>
                 ) : (
                   <button
@@ -453,14 +461,23 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
                 {codigo.trim() && <Row label="Código" value={codigo.trim()} />}
                 <Row label="Carpeta" value={selectedFolderLabel} />
                 <Row label="Archivo" value={file?.name ?? "—"} />
-                <div style={{ marginTop: 14, borderTop: "1px solid #e2e8f0", paddingTop: 14 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", marginBottom: 10 }}>Cadena de revisores</div>
-                  {reviewers.map((r, i) => (
-                    <div key={r.id} style={{ fontSize: 14, color: "#374151", marginBottom: 6 }}>
-                      <span style={{ fontWeight: 700, color: brand }}>Paso {i + 1}:</span> {r.name}
+                {!isExternalFolder && (
+                  <div style={{ marginTop: 14, borderTop: "1px solid #e2e8f0", paddingTop: 14 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", marginBottom: 10 }}>Cadena de revisores</div>
+                    {reviewers.map((r, i) => (
+                      <div key={r.id} style={{ fontSize: 14, color: "#374151", marginBottom: 6 }}>
+                        <span style={{ fontWeight: 700, color: brand }}>Paso {i + 1}:</span> {r.name}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {isExternalFolder && (
+                  <div style={{ marginTop: 14, borderTop: "1px solid #e2e8f0", paddingTop: 14 }}>
+                    <div style={{ background: "#e0f2fe", border: "1px solid #bae6fd", borderRadius: 7, padding: "10px 14px", fontSize: 13, color: "#0369a1" }}>
+                      Carpeta externa: el documento quedará aprobado directamente sin revisores.
                     </div>
-                  ))}
-                </div>
+                  </div>
+                )}
               </div>
 
               {error && (
@@ -470,7 +487,7 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
               )}
 
               <div style={{ display: "flex", gap: 12 }}>
-                <button onClick={() => setStep(2)} style={backBtn}>← Atrás</button>
+                <button onClick={() => setStep(isExternalFolder ? 1 : 2)} style={backBtn}>← Atrás</button>
                 <button
                   disabled={submitting}
                   onClick={submit}

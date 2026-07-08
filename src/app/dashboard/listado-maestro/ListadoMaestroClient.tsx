@@ -19,6 +19,11 @@ interface LMFile {
   fechaEmision: string | null;
   fechaRevision: string | null;
   fechaActualizacion: string | null;
+  lastReviewedAt: string | null;
+  lastAccessedAt: string | null;
+  lastAccessedBy: { id: string; name: string } | null;
+  lastEditedAt: string | null;
+  lastEditedBy: { id: string; name: string } | null;
   controlCambios: string | null;
   encargadoDocumentoId: string | null;
   encargadoDocumento: { id: string; name: string; email: string } | null;
@@ -363,7 +368,7 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
                         <td style={td}>
                           <span style={{ fontWeight: 600, color: "#374151" }}>{f.codigo ?? <span style={{ color: "#d1d5db" }}>—</span>}</span>
                         </td>
-                        <td style={{ ...td, maxWidth: 220 }}>
+                        <td style={{ ...td, maxWidth: 240 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                             <FileIcon mimeType={f.mimeType} size={15} />
                             <span style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -371,6 +376,21 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
                             </span>
                           </div>
                           {f.folder && <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>{f.folder.name}</div>}
+                          {f.lastReviewedAt && (
+                            <div style={{ fontSize: 10, color: "#7c3aed", marginTop: 2 }}>
+                              Última rev.: {fmtDate(f.lastReviewedAt)}
+                            </div>
+                          )}
+                          {f.lastAccessedAt && (
+                            <div style={{ fontSize: 10, color: "#0891b2", marginTop: 1 }}>
+                              Último acceso: {fmtDate(f.lastAccessedAt)}{f.lastAccessedBy ? ` · ${f.lastAccessedBy.name}` : ""}
+                            </div>
+                          )}
+                          {f.lastEditedAt && (
+                            <div style={{ fontSize: 10, color: "#d97706", marginTop: 1 }}>
+                              Último editor: {f.lastEditedBy?.name ?? "—"} · {fmtDate(f.lastEditedAt)}
+                            </div>
+                          )}
                         </td>
                         <td style={td}>{f.versionStr ?? <span style={{ color: "#d1d5db" }}>—</span>}</td>
                         <td style={td}>{fmtDate(f.fechaEmision)}</td>

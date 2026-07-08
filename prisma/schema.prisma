@@ -183,6 +183,8 @@ model User {
   assignedFiles        File[]     @relation("AssignedReviewer")
   encargadoFiles       File[]     @relation("EncargadoDocumento")
   uploadedFiles        File[]     @relation("FileUploader")
+  lastAccessedFiles    File[]     @relation("FileLastAccessedBy")
+  lastEditedFiles      File[]     @relation("FileLastEditedBy")
   permissions          Permission[]
   assignedTasks        DocumentTask[] @relation("TaskAssignee")
   createdTasks         DocumentTask[] @relation("TaskAssigner")
@@ -200,12 +202,13 @@ model User {
 
 // ---------- Folder hierarchy ----------
 model Folder {
-  id        String    @id @default(cuid())
-  companyId String
-  name      String
-  parentId  String?   // null = root folder
-  deletedAt DateTime?
-  createdAt DateTime  @default(now())
+  id         String    @id @default(cuid())
+  companyId  String
+  name       String
+  parentId   String?   // null = root folder
+  isExternal Boolean   @default(false)
+  deletedAt  DateTime?
+  createdAt  DateTime  @default(now())
 
   company        Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   parent         Folder?        @relation("FolderChildren", fields: [parentId], references: [id], onDelete: Cascade)
@@ -261,11 +264,20 @@ model File {
   previousVersionStr   String?
   previousVersion      Int?
 
+  // ── Access & edit tracking ────────────────────────────────────────────────
+  lastReviewedAt       DateTime?
+  lastAccessedAt       DateTime?
+  lastAccessedByUserId String?
+  lastEditedAt         DateTime?
+  lastEditedByUserId   String?
+
   company              Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   folder               Folder?        @relation(fields: [folderId], references: [id], onDelete: SetNull)
   assignedTo           User?          @relation("AssignedReviewer", fields: [assignedToId], references: [id], onDelete: SetNull)
   encargadoDocumento   User?          @relation("EncargadoDocumento", fields: [encargadoDocumentoId], references: [id], onDelete: SetNull)
   uploadedBy           User?          @relation("FileUploader", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  lastAccessedBy       User?          @relation("FileLastAccessedBy", fields: [lastAccessedByUserId], references: [id], onDelete: SetNull)
+  lastEditedBy         User?          @relation("FileLastEditedBy", fields: [lastEditedByUserId], references: [id], onDelete: SetNull)
   permissions          Permission[]
   notifications        Notification[]
   tasks                DocumentTask[]

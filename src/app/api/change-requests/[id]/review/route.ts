@@ -9,6 +9,35 @@ import { logAction } from "@/lib/audit";
 
 const DATE_FIELDS = new Set(["fechaEmision", "fechaRevision", "fechaActualizacion"]);
 
+const FIELD_LABELS: Record<string, string> = {
+  nombreDocumento:      "Nombre",
+  versionStr:           "Versión",
+  codigo:               "Código",
+  fechaEmision:         "Fecha emisión",
+  fechaRevision:        "Fecha revisión",
+  fechaActualizacion:   "Fecha actualización",
+  controlCambios:       "Control de cambios",
+  encargadoDocumentoId: "Encargado",
+  status:               "Estado",
+};
+
+function buildDiff(before: Record<string, unknown>, after: Record<string, unknown>): string {
+  return Object.entries(after)
+    .map(([k, v]) => {
+      const label = FIELD_LABELS[k] ?? k;
+      const oldVal = before[k];
+      const fmtVal = (val: unknown) => {
+        if (val == null) return "—";
+        if (typeof val === "string" && val.match(/^\d{4}-\d{2}-\d{2}/)) {
+          return new Date(val).toLocaleDateString("es-CR", { day: "2-digit", month: "2-digit", year: "numeric" });
+        }
+        return String(val);
+      };
+      return `${label}: "${fmtVal(oldVal)}" → "${fmtVal(v)}"`;
+    })
+    .join(" | ");
+}
+
 const schema = z.object({
   action:           z.enum(["APPROVE", "REJECT"]),
   adminNotes:       z.string().max(2000).optional().nullable(),
@@ -81,9 +110,15 @@ export async function POST(
             updateData[k] = DATE_FIELDS.has(k) && typeof v === "string" ? new Date(v) : v;
           }
           if (adminVersionStr?.trim()) updateData.versionStr = adminVersionStr.trim();
+          if (!updateData.fechaActualizacion) updateData.fechaActualizacion = now;
+          updateData.lastEditedAt       = now;
+          updateData.lastEditedByUserId = userId;
           await prisma.file.update({ where: { id: cr.fileId }, data: updateData });
         } else if (adminVersionStr?.trim()) {
-          await prisma.file.update({ where: { id: cr.fileId }, data: { versionStr: adminVersionStr.trim() } });
+          await prisma.file.update({
+            where: { id: cr.fileId },
+            data: { versionStr: adminVersionStr.trim(), fechaActualizacion: now, lastEditedAt: now, lastEditedByUserId: userId },
+          });
         }
 
       } else if (cr.type === "DELETE") {
@@ -99,6 +134,9 @@ export async function POST(
             }
           }
           if (adminVersionStr?.trim()) updateData.versionStr = adminVersionStr.trim();
+          if (!updateData.fechaActualizacion) updateData.fechaActualizacion = now;
+          updateData.lastEditedAt       = now;
+          updateData.lastEditedByUserId = userId;
           await prisma.file.update({ where: { id: cr.fileId }, data: updateData });
         }
       }
@@ -114,10 +152,16 @@ export async function POST(
       fileId: cr.fileId, docName, type: cr.type, approved: true, adminNotes,
     });
 
+    const before = pc.before as Record<string, unknown> | undefined;
+    const after  = pc.after  as Record<string, unknown> | undefined;
+    const diffDetail = (before && after && Object.keys(after).length > 0)
+      ? buildDiff(before, after)
+      : `${cr.type} | ${docName}`;
+
     await logAction({
       companyId, userId, action: "CHANGE_REQUEST_APPROVED",
       resourceType: "FILE", resourceId: cr.fileId ?? cr.id,
-      detail: `${cr.type} | ${docName}`,
+      detail: diffDetail,
     });
 
     return NextResponse.json({ ok: true, action: "APPROVED" });

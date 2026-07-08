@@ -95,8 +95,9 @@ export async function GET(
 }
 
 const patchSchema = z.object({
-  name: z.string().min(1).max(255).optional(),
-  parentId: z.string().nullable().optional(),
+  name:       z.string().min(1).max(255).optional(),
+  parentId:   z.string().nullable().optional(),
+  isExternal: z.boolean().optional(),
 });
 
 // PATCH /api/folders/[id] — rename or move (requires MANAGE on this folder).
@@ -125,7 +126,12 @@ export async function PATCH(
   const parsed = patchSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
-  const { name, parentId } = parsed.data;
+  const { name, parentId, isExternal } = parsed.data;
+
+  // isExternal toggle is admin-only
+  if (isExternal !== undefined && session.role !== "COMPANY_ADMIN") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   if (parentId !== undefined && parentId !== null) {
     if (parentId === folder.id) {
@@ -142,16 +148,24 @@ export async function PATCH(
     data: {
       ...(name !== undefined ? { name } : {}),
       ...(parentId !== undefined ? { parentId } : {}),
+      ...(isExternal !== undefined ? { isExternal } : {}),
     },
   });
+
+  const auditAction = name !== undefined ? "FOLDER_RENAME" : isExternal !== undefined ? "FOLDER_UPDATE" : "FOLDER_MOVE";
+  const auditDetail = name !== undefined
+    ? `"${folder.name}" → "${name}"`
+    : isExternal !== undefined
+      ? `${folder.name}: carpeta externa = ${isExternal}`
+      : `Movida a ${parentId ?? "raíz"}`;
 
   await logAction({
     companyId,
     userId: session.userId,
-    action: name !== undefined ? "FOLDER_RENAME" : "FOLDER_MOVE",
+    action: auditAction,
     resourceType: "FOLDER",
     resourceId: folder.id,
-    detail: name ?? `moved to ${parentId ?? "root"}`,
+    detail: auditDetail,
   });
 
   return NextResponse.json({ folder: updated });

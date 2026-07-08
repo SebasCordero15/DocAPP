@@ -522,6 +522,25 @@ export default function TeamClient({ currentUserId, company }: Props) {
           </div>
         )}
 
+        {/* ── Leyenda de roles ── */}
+        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "16px 24px", marginBottom: 20, display: "flex", gap: 20, flexWrap: "wrap", alignItems: "flex-start" }}>
+          {([
+            { role: "COMPANY_ADMIN" as Role, desc: "Acceso completo: gestiona usuarios, permisos, carpetas, aprueba solicitudes y ve todos los documentos." },
+            { role: "EDITOR" as Role,        desc: "Puede subir y editar documentos en carpetas con permiso. Los cambios de metadatos requieren aprobación del Admin." },
+            { role: "VIEWER" as Role,        desc: "Solo lectura en las carpetas o archivos que tenga asignados." },
+          ] as const).map(({ role, desc }) => {
+            const rc = ROLE_COLORS[role];
+            return (
+              <div key={role} style={{ flex: "1 1 200px", display: "flex", gap: 10, alignItems: "flex-start" }}>
+                <span style={{ background: rc.bg, color: rc.fg, padding: "3px 10px", borderRadius: 5, fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                  {ROLE_LABELS[role]}
+                </span>
+                <span style={{ fontSize: 12, color: "#64748b", lineHeight: 1.5 }}>{desc}</span>
+              </div>
+            );
+          })}
+        </div>
+
         {/* ── Users table ── */}
         <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden", marginBottom: 24 }}>
           <div style={{ padding: "16px 24px", borderBottom: "1px solid #f1f5f9" }}>

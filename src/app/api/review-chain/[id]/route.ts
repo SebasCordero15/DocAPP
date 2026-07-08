@@ -94,7 +94,7 @@ export async function POST(
         });
         await tx.file.update({
           where: { id: file.id },
-          data: { status: "PENDING_APPROVAL" },
+          data: { status: "PENDING_APPROVAL", lastReviewedAt: now },
         });
         // Create a ChangeRequest for admin final approval
         await tx.changeRequest.create({

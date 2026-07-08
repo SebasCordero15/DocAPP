@@ -33,14 +33,20 @@ export async function GET(
 
   const url = await presignDownload(file.storageKey, file.name);
 
-  await logAction({
-    companyId,
-    userId: session.userId,
-    action: "FILE_DOWNLOAD",
-    resourceType: "FILE",
-    resourceId: file.id,
-    detail: file.name,
-  });
+  await Promise.all([
+    logAction({
+      companyId,
+      userId: session.userId,
+      action: "FILE_DOWNLOAD",
+      resourceType: "FILE",
+      resourceId: file.id,
+      detail: file.name,
+    }),
+    prisma.file.update({
+      where: { id: file.id },
+      data: { lastAccessedAt: new Date(), lastAccessedByUserId: session.userId },
+    }),
+  ]);
 
   return NextResponse.json({ url });
 }

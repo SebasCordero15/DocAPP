@@ -16,7 +16,7 @@ export default async function CrearDocumentoPage() {
     prisma.folder.findMany({
       where: { companyId: session.companyId, deletedAt: null },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, parentId: true },
+      select: { id: true, name: true, parentId: true, isExternal: true },
     }),
     prisma.user.findMany({
       where: { companyId: session.companyId, isActive: true, role: { not: "SUPER_ADMIN" } },

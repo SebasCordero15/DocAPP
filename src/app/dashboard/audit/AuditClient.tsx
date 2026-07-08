@@ -89,7 +89,7 @@ export default function AuditClient({ company }: Props) {
     <div style={{ flex: 1, overflowY: "auto", background: "#f1f5f9", fontFamily: `'${company.fontFamily}', Inter, system-ui, sans-serif` }}>
       {/* Section header */}
       <div style={{ background: brand, color: "#fff", padding: "12px 28px", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, zIndex: 10 }}>
-        <strong style={{ fontSize: 16 }}>Registro de Auditoría</strong>
+        <strong style={{ fontSize: 16 }}>Historial de Accesos</strong>
         <span style={{ fontSize: 12, opacity: 0.75 }}>{total} eventos</span>
       </div>
 
