@@ -19,6 +19,7 @@ const schema = z.object({
   tipoDocumento:   z.enum(["PROCEDIMIENTO", "MANUAL", "INSTRUCTIVO", "FORMATO", "POLITICA", "OTRO"]),
   versionStr:      z.string().max(50).default("v1.0"),
   folderId:        z.string().optional(),
+  codigo:          z.string().max(50).optional().nullable(),
 
   // Ordered list of reviewer user IDs
   reviewerIds: z.array(z.string()).min(1).max(10),
@@ -42,7 +43,30 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid input", details: parsed.error.issues }, { status: 400 });
   }
 
-  const { storageKey, name, mimeType, size, nombreDocumento, departamento, tipoDocumento, versionStr, folderId, reviewerIds } = parsed.data;
+  const { storageKey, name, mimeType, size, nombreDocumento, departamento, tipoDocumento, versionStr, folderId, reviewerIds, codigo } = parsed.data;
+
+  // Validate codigo uniqueness within company if provided
+  if (codigo?.trim()) {
+    const codeExists = await prisma.file.findFirst({
+      where: { companyId, codigo: codigo.trim(), deletedAt: null },
+    });
+    if (codeExists) {
+      // Suggest next available
+      const PREFIX: Record<string, string> = { PROCEDIMIENTO: "PR", MANUAL: "MA", INSTRUCTIVO: "IN", FORMATO: "FO", POLITICA: "PO", OTRO: "OT" };
+      const prefix = PREFIX[tipoDocumento] ?? "OT";
+      const existing = await prisma.file.findMany({
+        where: { companyId, codigo: { startsWith: `${prefix}-` }, deletedAt: null },
+        select: { codigo: true },
+      });
+      let max = 0;
+      for (const f of existing) {
+        const n = parseInt((f.codigo ?? "").split("-").pop() ?? "0", 10);
+        if (!isNaN(n) && n > max) max = n;
+      }
+      const suggested = `${prefix}-${String(max + 1).padStart(3, "0")}`;
+      return NextResponse.json({ error: `El código "${codigo}" ya está en uso. Siguiente disponible: ${suggested}` }, { status: 409 });
+    }
+  }
 
   // Validate storage key belongs to this company
   if (!storageKey.startsWith(`${companyId}/`)) {
@@ -85,6 +109,7 @@ export async function POST(req: NextRequest) {
         departamento,
         tipoDocumento,
         versionStr,
+        codigo:          codigo?.trim() || null,
         status:          "IN_REVIEW",
         uploadedByUserId: userId,
         previewRows:     previewRows ?? undefined,

@@ -126,7 +126,7 @@ function AccessBadge({ level }: { level: string | null }) {
         fontWeight: 600,
       }}
     >
-      {level}
+      {{ MANAGE: "Gestión total", EDIT: "Editar", READ: "Solo lectura", NONE: "Sin acceso" }[level] ?? level}
     </span>
   );
 }
@@ -449,10 +449,10 @@ export default function PermissionsClient({ company }: Props) {
                                 }}
                               >
                                 <option value="INHERIT">— Heredar del rol base</option>
-                                <option value="NONE">NONE (sin acceso)</option>
-                                <option value="READ">READ (solo lectura)</option>
-                                <option value="EDIT">EDIT (editar)</option>
-                                <option value="MANAGE">MANAGE (gestión total)</option>
+                                <option value="NONE">Sin acceso</option>
+                                <option value="READ">Solo lectura</option>
+                                <option value="EDIT">Editar</option>
+                                <option value="MANAGE">Gestión total</option>
                               </select>
                             )}
                           </td>

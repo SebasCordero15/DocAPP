@@ -148,6 +148,20 @@ model Company {
   changeRequests   ChangeRequest[]
   reviewChains     ReviewChain[]
   outgoingRequests OutgoingRequest[]
+  departments      Department[]
+}
+
+// ---------- Departments (admin-managed list per company) ----------
+model Department {
+  id        String   @id @default(cuid())
+  companyId String
+  name      String
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, name])
+  @@index([companyId])
 }
 
 // ---------- Users ----------

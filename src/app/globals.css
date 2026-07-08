@@ -12,6 +12,28 @@ html, body {
   padding: 0;
   margin: 0;
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
   background: #f5f7fa;
   color: #1a1a1a;
+}
+
+/* ── Table rows ──────────────────────────────────────────────────────── */
+table td, table th {
+  font-size: 14px;
+}
+
+/* ── Breathing room on card sections ────────────────────────────────── */
+.file-card {
+  padding: 18px 22px !important;
+}
+
+/* ── Form inputs readable size ───────────────────────────────────────── */
+input, select, textarea {
+  font-size: 14px;
+}
+
+/* ── Notification / badge text ───────────────────────────────────────── */
+button {
+  font-size: 14px;
 }

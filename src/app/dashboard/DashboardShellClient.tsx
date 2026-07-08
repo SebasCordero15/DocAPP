@@ -138,11 +138,11 @@ export default function DashboardShellClient({
                 title={!sidebarOpen ? item.label : undefined}
                 style={{
                   width: "100%", display: "flex", alignItems: "center",
-                  gap: 10, padding: sidebarOpen ? "9px 12px" : "9px 0",
+                  gap: 10, padding: sidebarOpen ? "11px 14px" : "11px 0",
                   justifyContent: sidebarOpen ? "flex-start" : "center",
                   border: "none", background: active ? "rgba(255,255,255,0.2)" : "transparent",
-                  color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: active ? 600 : 400,
-                  marginBottom: 2,
+                  color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: active ? 600 : 400,
+                  marginBottom: 3,
                 }}
               >
                 <span style={{ flexShrink: 0, position: "relative" }}>

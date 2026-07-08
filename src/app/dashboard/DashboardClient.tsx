@@ -679,7 +679,7 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                 onKeyDown={(e) => { if (e.key === "Enter") createFolder(); if (e.key === "Escape") { setShowNewFolder(false); setNewFolderName(""); } }}
                 style={inputStyle}
               />
-              <button onClick={createFolder} disabled={creatingFolder} style={{ background: brand, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}>Create</button>
+              <button onClick={createFolder} disabled={creatingFolder} style={{ background: brand, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}>Crear</button>
               <button onClick={() => { setShowNewFolder(false); setNewFolderName(""); }} style={cancelBtnStyle}>Cancel</button>
             </div>
           )}
