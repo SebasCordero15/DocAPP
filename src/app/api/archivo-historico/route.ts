@@ -2,15 +2,22 @@ import { NextResponse } from "next/server";
 import { requireActiveSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-// GET /api/archivo-historico — returns all OBSOLETE files for this company. Admin-only.
+// GET /api/archivo-historico — returns OBSOLETE files.
+// Admins see all. Encargados see only docs where they are the encargado.
 export async function GET() {
   const session = await requireActiveSession();
-  if (!session || !session.companyId || session.role !== "COMPANY_ADMIN") {
+  if (!session || !session.companyId) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const isAdmin = session.role === "COMPANY_ADMIN";
+  // Non-admin users only see docs where they are the encargado
+  const visibilityFilter = isAdmin
+    ? {}
+    : { encargadoDocumentoId: session.userId };
+
   const files = await prisma.file.findMany({
-    where: { companyId: session.companyId, status: "OBSOLETE", deletedAt: null },
+    where: { companyId: session.companyId, status: "OBSOLETE", deletedAt: null, ...visibilityFilter },
     orderBy: { updatedAt: "desc" },
     select: {
       id: true, name: true, nombreDocumento: true, codigo: true,

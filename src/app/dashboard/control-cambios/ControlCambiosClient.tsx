@@ -275,9 +275,9 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
         {/* Tabs */}
         <div style={{ display: "flex", borderTop: "1px solid rgba(255,255,255,0.15)", paddingLeft: 16 }}>
           {([
-            { key: "cambios"    as const, label: "Registro de Cambios", badge: 0 },
-            { key: "revisiones" as const, label: "Próximas Revisiones", badge: revFiles.length + revAsignadas.length },
-            ...(isAdmin ? [{ key: "archivo" as const, label: "Archivo Histórico", badge: 0 }] : []),
+            { key: "cambios"  as const, label: "Registro de Cambios", badge: 0 },
+            ...(isAdmin ? [{ key: "revisiones" as const, label: "Próximas Revisiones", badge: revFiles.length + revAsignadas.length }] : []),
+            { key: "archivo" as const, label: "Archivo Histórico", badge: 0 },
           ]).map((tab) => {
             const isActive = activeTab === tab.key;
             return (

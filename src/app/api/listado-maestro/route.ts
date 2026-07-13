@@ -26,17 +26,23 @@ export async function GET(req: NextRequest) {
 
   // Build Prisma where for filters that can be pushed to the DB
   // Permission filtering happens after fetch.
-  const where: Record<string, unknown> = {
-    companyId,
-    deletedAt: null,
+  const andFilters: Record<string, unknown>[] = [
+    // Exclude documents in external folders from Listado Maestro
+    { OR: [{ folderId: null }, { folder: { isExternal: false } }] },
     // Non-admins: only show fully approved files, own uploads, or active task assignments
-    ...(!isAdminRole(role) ? {
+    ...(!isAdminRole(role) ? [{
       OR: [
         { status: "REVIEWED" },
         { uploadedByUserId: userId },
         { tasks: { some: { assignedToUserId: userId, status: { not: "COMPLETED" } } } },
       ],
-    } : {}),
+    }] : []),
+  ];
+
+  const where: Record<string, unknown> = {
+    companyId,
+    deletedAt: null,
+    AND: andFilters,
     ...(codigo    ? { codigo:    { contains: codigo,    mode: "insensitive" } } : {}),
     ...(nombre    ? { OR: [
         { nombreDocumento: { contains: nombre, mode: "insensitive" } },

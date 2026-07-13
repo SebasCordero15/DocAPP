@@ -70,8 +70,6 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
     nombreDocumento: "",
     departamento:    "",
     tipoDocumento:   "PROCEDIMIENTO",
-    versionStr:      "v1.0",
-    codigo:          "",
   });
   const [pickedFile, setPickedFile] = useState<File | null>(null);
 
@@ -156,10 +154,10 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
           nombreDocumento: form.nombreDocumento.trim(),
           departamento: form.departamento.trim(),
           tipoDocumento: form.tipoDocumento,
-          versionStr: form.versionStr.trim() || "v1.0",
+          versionStr: "v1.0",
           folderId: form.folderId,
           reviewerIds: [],
-          codigo: form.codigo.trim() || null,
+          codigo: null,
         }),
       });
       if (!createRes.ok) {
@@ -455,18 +453,6 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
               <div>
                 <label style={labelStyle}>Departamento *</label>
                 <input value={form.departamento} onChange={(e) => setForm((p) => ({ ...p, departamento: e.target.value }))} placeholder="Ej: Operaciones" style={inputStyle} disabled={uploading} />
-              </div>
-            </div>
-
-            {/* Versión + Código row */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-              <div>
-                <label style={labelStyle}>Versión</label>
-                <input value={form.versionStr} onChange={(e) => setForm((p) => ({ ...p, versionStr: e.target.value }))} placeholder="v1.0" style={inputStyle} disabled={uploading} />
-              </div>
-              <div>
-                <label style={labelStyle}>Código (opcional)</label>
-                <input value={form.codigo} onChange={(e) => setForm((p) => ({ ...p, codigo: e.target.value }))} placeholder="EX-001" style={inputStyle} disabled={uploading} />
               </div>
             </div>
 
