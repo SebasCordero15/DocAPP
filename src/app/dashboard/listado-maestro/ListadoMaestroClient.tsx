@@ -35,6 +35,21 @@ interface UserOption {
   email: string;
 }
 
+interface FlowRequest {
+  id: string;
+  type: "ACTUALIZACION" | "REVISION" | "CORRECCION";
+  status: string;
+  instructions: string | null;
+  outcomeType: string | null;
+  pendingVersionStr: string | null;
+  finalNotes: string | null;
+  createdAt: string;
+  finalReviewedAt: string | null;
+  tasks: { id: string; stepOrder: number; status: string; assignedTo: { id: string; name: string; email: string } }[];
+  createdBy: { id: string; name: string };
+  finalReviewer: { id: string; name: string } | null;
+}
+
 interface Props {
   company: { name: string; primaryColor: string; logoUrl?: string | null };
   userRole: string;
@@ -97,6 +112,11 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<EditForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+
+  // ── review-flow modal ─────────────────────────────────────────────────────
+  const [flowFile, setFlowFile] = useState<LMFile | null>(null);
+  const [flowRequests, setFlowRequests] = useState<FlowRequest[]>([]);
+  const [flowLoading, setFlowLoading] = useState(false);
 
   // ── sort ──────────────────────────────────────────────────────────────────
   type SortKey = "codigo" | "nombre" | "version" | "fechaEmision" | "fechaRevision" | "fechaActualizacion" | "encargado";
@@ -193,7 +213,21 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
     }
   }
 
-  // ── download ──────────────────────────────────────────────────────────────
+  // ── flow modal ────────────────────────────────────────────
+
+  async function openFlowModal(f: LMFile) {
+    setFlowFile(f);
+    setFlowRequests([]);
+    setFlowLoading(true);
+    const res = await fetch(`/api/outgoing-requests?fileId=${f.id}`);
+    if (res.ok) {
+      const d = await res.json();
+      setFlowRequests(d.outgoingRequests ?? []);
+    }
+    setFlowLoading(false);
+  }
+
+    // ── download ──────────────────────────────────────────────────────────────
 
   async function downloadFile(id: string) {
     const res = await fetch(`/api/files/${id}/download-url`);
@@ -255,6 +289,7 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
   // ── render ────────────────────────────────────────────────────────────────
 
   return (
+    <>
     <div style={{ flex: 1, overflowY: "auto", background: "#f5f7fa" }}>
 
       {/* Section header */}
@@ -411,6 +446,7 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
                         <td style={td}>
                           <div style={{ display: "flex", gap: 6, flexWrap: "nowrap" }}>
                             <button onClick={() => downloadFile(f.id)} style={{ ...ghostBtn, fontSize: 11, padding: "3px 8px" }}>↓ Ver</button>
+                            <button onClick={() => openFlowModal(f)} style={{ ...ghostBtn, fontSize: 11, padding: "3px 8px", color: "#5b21b6" }}>Flujo</button>
                             {canEdit && (
                               <button
                                 onClick={() => editingId === f.id ? setEditingId(null) : startEdit(f)}
@@ -492,6 +528,111 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
         </div>
       </div>
     </div>
+
+    {/* ── Review-flow modal ── */}
+    {flowFile && (
+      <div
+        style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}
+        onClick={(e) => { if (e.target === e.currentTarget) setFlowFile(null); }}
+      >
+        <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 680, maxHeight: "88vh", overflowY: "auto", padding: 28, position: "relative" }}>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#1e293b" }}>Flujo de revisión</h2>
+              <p style={{ margin: "4px 0 0", fontSize: 13, color: "#64748b" }}>
+                {flowFile.nombreDocumento ?? flowFile.name}{flowFile.codigo ? ` · ${flowFile.codigo}` : ""}
+              </p>
+            </div>
+            <button onClick={() => setFlowFile(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 20, lineHeight: 1 }}>✕</button>
+          </div>
+
+          {flowLoading ? (
+            <p style={{ textAlign: "center", color: "#94a3b8", padding: "40px 0" }}>Cargando…</p>
+          ) : flowRequests.length === 0 ? (
+            <p style={{ textAlign: "center", color: "#94a3b8", padding: "40px 0", fontSize: 14 }}>No hay solicitudes de cambio registradas para este documento.</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {[...flowRequests].reverse().map((r) => {
+                const TYPE_COLORS: Record<string, { bg: string; color: string }> = {
+                  ACTUALIZACION: { bg: "#dbeafe", color: "#1e40af" },
+                  REVISION:      { bg: "#ede9fe", color: "#5b21b6" },
+                  CORRECCION:    { bg: "#fef3c7", color: "#92400e" },
+                };
+                const STATUS_LABELS: Record<string, string> = {
+                  PENDING: "Pendiente", IN_PROGRESS: "En progreso",
+                  PENDING_APPROVAL: "Pend. aprobación", APPROVED: "Aprobada",
+                  REJECTED: "Rechazada", CANCELLED: "Cancelada",
+                };
+                const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
+                  PENDING:          { bg: "#f1f5f9", color: "#64748b" },
+                  IN_PROGRESS:      { bg: "#fef3c7", color: "#92400e" },
+                  PENDING_APPROVAL: { bg: "#ede9fe", color: "#5b21b6" },
+                  APPROVED:         { bg: "#dcfce7", color: "#166534" },
+                  REJECTED:         { bg: "#fee2e2", color: "#dc2626" },
+                  CANCELLED:        { bg: "#f3f4f6", color: "#94a3b8" },
+                };
+                const TYPE_LABELS: Record<string, string> = {
+                  ACTUALIZACION: "Actualización", REVISION: "Revisión", CORRECCION: "Corrección",
+                };
+                const OUTCOME_LABELS: Record<string, string> = {
+                  no_changes: "Sin cambios necesarios",
+                  new_version: "Nueva versión subida",
+                  corrected: "Corrección aplicada",
+                };
+                const tc = TYPE_COLORS[r.type] ?? { bg: "#f3f4f6", color: "#374151" };
+                const sc = STATUS_COLORS[r.status] ?? { bg: "#f3f4f6", color: "#374151" };
+                return (
+                  <div key={r.id} style={{ border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px 18px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+                      <span style={{ background: tc.bg, color: tc.color, borderRadius: 5, padding: "2px 9px", fontSize: 11, fontWeight: 700 }}>{TYPE_LABELS[r.type] ?? r.type}</span>
+                      <span style={{ background: sc.bg, color: sc.color, borderRadius: 5, padding: "2px 9px", fontSize: 11, fontWeight: 700 }}>{STATUS_LABELS[r.status] ?? r.status}</span>
+                      {r.pendingVersionStr && r.status === "APPROVED" && (
+                        <code style={{ background: "#f0fdf4", color: "#166534", padding: "1px 7px", borderRadius: 4, fontSize: 11 }}>{r.pendingVersionStr}</code>
+                      )}
+                      <span style={{ fontSize: 11, color: "#94a3b8", marginLeft: "auto" }}>{fmtDate(r.createdAt)}</span>
+                    </div>
+
+                    {r.instructions && (
+                      <div style={{ marginBottom: 10 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", marginBottom: 3 }}>Cambio a realizar</div>
+                        <div style={{ fontSize: 13, color: "#374151", whiteSpace: "pre-wrap", background: "#f8fafc", borderRadius: 6, padding: "8px 10px" }}>{r.instructions}</div>
+                      </div>
+                    )}
+
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: r.finalNotes ? 8 : 0 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase" }}>Asignados:</span>
+                      {r.tasks.map((t) => (
+                        <span key={t.id} style={{
+                          background: t.status === "COMPLETED" ? "#dcfce7" : "#f1f5f9",
+                          color: t.status === "COMPLETED" ? "#166534" : "#475569",
+                          borderRadius: 4, padding: "2px 8px", fontSize: 12,
+                        }}>
+                          {t.stepOrder}. {t.assignedTo.name}
+                        </span>
+                      ))}
+                    </div>
+
+                    {r.outcomeType && r.status === "APPROVED" && (
+                      <div style={{ fontSize: 12, color: "#166534", marginTop: 6 }}>
+                        Resultado: <b>{OUTCOME_LABELS[r.outcomeType] ?? r.outcomeType}</b>
+                        {r.finalReviewedAt && <span style={{ color: "#94a3b8", marginLeft: 8 }}>· aprobado {fmtDate(r.finalReviewedAt)}</span>}
+                      </div>
+                    )}
+
+                    {r.finalNotes && (
+                      <div style={{ fontSize: 12, color: "#64748b", marginTop: 6, background: "#f8fafc", borderRadius: 6, padding: "6px 10px" }}>
+                        <b>Nota final:</b> {r.finalNotes}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 

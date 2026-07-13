@@ -33,7 +33,7 @@ export async function POST(
           id: true, name: true, nombreDocumento: true,
           storageKey: true, versionStr: true, version: true, mimeType: true, size: true,
           previousStorageKey: true, previousVersionStr: true, previousVersion: true,
-          folderId: true, departamento: true,
+          folderId: true, departamento: true, reviewIntervalDays: true,
         },
       },
       tasks: {
@@ -100,6 +100,18 @@ export async function POST(
     updatedAt: now,
     fechaActualizacion: now,
   };
+
+  // Auto-update controlCambios from the "cambio a realizar" description
+  if (outgoing.instructions) {
+    fileUpdateData.controlCambios = outgoing.instructions;
+  }
+
+  // Recompute next review date from interval (base = now = last update date)
+  if (file.reviewIntervalDays) {
+    const reviewDate = new Date(now.getTime() + file.reviewIntervalDays * 24 * 60 * 60 * 1000);
+    fileUpdateData.fechaRevision = reviewDate;
+    fileUpdateData.reviewDueDate = reviewDate;
+  }
 
   let oldStorageKeyToDelete: string | null = null;
 

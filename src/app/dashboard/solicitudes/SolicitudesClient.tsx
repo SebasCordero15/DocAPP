@@ -57,6 +57,7 @@ const CR_TYPE_LABELS: Record<string, string> = {
   NEW_UPLOAD: "Nueva subida", EDIT_METADATA: "Edición de metadatos",
   REPLACE_FILE: "Reemplazo de archivo", DELETE: "Eliminación",
   REVISION_DATE_CHANGE: "Cambio de fecha de revisión", OTHER: "Cambio de documento",
+  REVISION_REQUEST: "Propuesta de revisión",
 };
 const CR_TYPE_COLORS: Record<string, { bg: string; color: string }> = {
   NEW_UPLOAD: { bg: "#dbeafe", color: "#1e40af" },
@@ -65,6 +66,7 @@ const CR_TYPE_COLORS: Record<string, { bg: string; color: string }> = {
   DELETE: { bg: "#fee2e2", color: "#dc2626" },
   REVISION_DATE_CHANGE: { bg: "#e0f2fe", color: "#0369a1" },
   OTHER: { bg: "#f3f4f6", color: "#374151" },
+  REVISION_REQUEST: { bg: "#fdf4ff", color: "#7c3aed" },
 };
 const FIELD_LABELS: Record<string, string> = {
   status: "Estado", codigo: "Código", nombreDocumento: "Nombre del documento",
@@ -155,6 +157,13 @@ export default function SolicitudesClient({ company, userRole }: Props) {
   const [creating,  setCreating]  = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
+  // ── NEW_UPLOAD approval extra fields ────────────────────────────────────────
+  const [approveEncargadoId,     setApproveEncargadoId]     = useState<Record<string, string>>({});
+  const [approveInterval,        setApproveInterval]        = useState<Record<string, string>>({});   // "365" | "730" | "custom"
+  const [approveIntervalCustom,  setApproveIntervalCustom]  = useState<Record<string, string>>({});
+  const [approveUsers,           setApproveUsers]           = useState<CompanyUser[]>([]);
+  const [approveUsersLoading,    setApproveUsersLoading]    = useState(false);
+
   // ── Fetch data ───────────────────────────────────────────────────────────────
   const fetchCrs = useCallback(async () => {
     setLoadingCrs(true);
@@ -201,6 +210,22 @@ export default function SolicitudesClient({ company, userRole }: Props) {
   async function submitCrReview(id: string, action: "APPROVE" | "REJECT", assignedCodigo?: string, adminVersionStr?: string) {
     const note = rejectNote[id]?.trim();
     if (action === "REJECT" && !note) return;
+
+    let reviewIntervalDays: number | null = null;
+    let encargadoDocumentoId: string | null = null;
+
+    if (action === "APPROVE") {
+      const cr = crs.find((c) => c.id === id);
+      if (cr?.type === "NEW_UPLOAD") {
+        if (!approveEncargadoId[id]) { alert("Debes asignar un encargado de documento."); return; }
+        encargadoDocumentoId = approveEncargadoId[id];
+        const opt = approveInterval[id] ?? "365";
+        reviewIntervalDays = opt === "custom"
+          ? (parseInt(approveIntervalCustom[id] ?? "365", 10) || 365)
+          : parseInt(opt, 10);
+      }
+    }
+
     setProcessing(id);
     const res = await fetch(`/api/change-requests/${id}/review`, {
       method: "POST",
@@ -210,6 +235,8 @@ export default function SolicitudesClient({ company, userRole }: Props) {
         adminNotes: note ?? null,
         assignedCodigo: assignedCodigo ?? null,
         adminVersionStr: adminVersionStr ?? null,
+        encargadoDocumentoId,
+        reviewIntervalDays,
       }),
     });
     setProcessing(null);
@@ -228,6 +255,19 @@ export default function SolicitudesClient({ company, userRole }: Props) {
       const r = await fetch("/api/files/next-codigo");
       const suggested = r.ok ? (await r.json()).codigo : "";
       setApproveCodigo((prev) => ({ ...prev, [cr.id]: suggested }));
+      setApproveEncargadoId((prev) => ({ ...prev, [cr.id]: "" }));
+      setApproveInterval((prev) => ({ ...prev, [cr.id]: "365" }));
+      setApproveIntervalCustom((prev) => ({ ...prev, [cr.id]: "" }));
+      // Fetch company users if not loaded yet
+      if (approveUsers.length === 0) {
+        setApproveUsersLoading(true);
+        const ur = await fetch("/api/admin/users");
+        if (ur.ok) {
+          const d = await ur.json();
+          setApproveUsers((d.users ?? []).filter((u: CompanyUser) => u.isActive));
+        }
+        setApproveUsersLoading(false);
+      }
     }
     const currentVersion = cr.file?.versionStr ?? "";
     setApproveVersionStr((prev) => ({ ...prev, [cr.id]: currentVersion ?? "" }));
@@ -280,8 +320,8 @@ export default function SolicitudesClient({ company, userRole }: Props) {
     if (!selectedFile) { setCreateError("Selecciona un documento"); return; }
     const assigneeIds = assignees.map((a) => a.trim()).filter(Boolean);
     if (assigneeIds.length === 0) { setCreateError("Selecciona al menos un asignado"); return; }
-    if (outType === "CORRECCION" && !instructions.trim()) {
-      setCreateError("Las instrucciones son obligatorias para una corrección"); return;
+    if (!instructions.trim()) {
+      setCreateError("El campo 'Cambio a realizar' es obligatorio"); return;
     }
     if (outType === "CORRECCION") {
       const anyChecked = corrFields.nombre || corrFields.contenido || corrFields.area || corrFields.carpeta || corrFields.otro.trim();
@@ -349,6 +389,60 @@ export default function SolicitudesClient({ company, userRole }: Props) {
       );
     }
     if (cr.type === "DELETE") return <span style={{ fontSize: 13, color: "#dc2626", fontWeight: 600 }}>Eliminar permanentemente este documento del sistema</span>;
+    if (cr.type === "REVISION_REQUEST") {
+      const tipo   = pc.tipo   as string | undefined;
+      const motivo = pc.motivo as string | undefined;
+      const hasProposal = !!(pc.proposalStorageKey);
+      const tipoLabels: Record<string, string> = { REVISION: "Revisión", ACTUALIZACION: "Actualización", CORRECCION: "Corrección" };
+      const tipoColors: Record<string, { bg: string; color: string }> = {
+        REVISION:     { bg: "#fef3c7", color: "#92400e" },
+        ACTUALIZACION: { bg: "#dbeafe", color: "#1e40af" },
+        CORRECCION:   { bg: "#ede9fe", color: "#5b21b6" },
+      };
+      const tc2 = tipo ? tipoColors[tipo] : { bg: "#f3f4f6", color: "#374151" };
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {tipo && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase" }}>Tipo:</span>
+              <span style={{ background: tc2.bg, color: tc2.color, borderRadius: 5, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>{tipoLabels[tipo] ?? tipo}</span>
+            </div>
+          )}
+          {motivo && (
+            <div>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase" }}>Motivo:</span>
+              <p style={{ margin: "3px 0 0", fontSize: 13, color: "#374151", whiteSpace: "pre-wrap" }}>{motivo}</p>
+            </div>
+          )}
+          {hasProposal && (
+            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+              <button
+                onClick={async () => {
+                  const res = await fetch(`/api/change-requests/${cr.id}/proposal-url`);
+                  if (!res.ok) { alert("No se pudo obtener el archivo"); return; }
+                  const { url } = await res.json();
+                  window.open(url, "_blank");
+                }}
+                style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 6, padding: "4px 12px", fontSize: 12, cursor: "pointer", color: "#475569", fontWeight: 600 }}
+              >
+                Ver propuesta adjunta
+              </button>
+              <button
+                onClick={async () => {
+                  const res = await fetch(`/api/change-requests/${cr.id}/proposal-url`);
+                  if (!res.ok) { alert("No se pudo obtener el archivo"); return; }
+                  const { url, fileName } = await res.json();
+                  const a = document.createElement("a"); a.href = url; a.download = fileName ?? "propuesta"; a.click();
+                }}
+                style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 6, padding: "4px 12px", fontSize: 12, cursor: "pointer", color: "#475569", fontWeight: 600 }}
+              >
+                Descargar propuesta
+              </button>
+            </div>
+          )}
+        </div>
+      );
+    }
     if (cr.type === "REPLACE_FILE") return <div style={{ fontSize: 13, color: "#475569" }}>Reemplazar archivo con una nueva versión{cr.file && <button onClick={() => downloadFile(cr.file!.id)} style={{ marginLeft: 12, background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 6, padding: "3px 10px", fontSize: 12, cursor: "pointer" }}>Descargar versión actual</button>}</div>;
     if (cr.type === "OTHER") {
       const updates = pc.proposedFileUpdates as Record<string, unknown> | undefined;
@@ -496,10 +590,71 @@ export default function SolicitudesClient({ company, userRole }: Props) {
                           />
                           <p style={{ margin: "4px 0 0", fontSize: 11, color: "#94a3b8" }}>Deja vacío para mantener la versión actual.</p>
                         </div>
+                        {cr.type === "NEW_UPLOAD" && (
+                          <>
+                            <div style={{ marginBottom: 12 }}>
+                              <label className="form-label">Encargado de documento <span style={{ color: "#dc2626" }}>*</span></label>
+                              {approveUsersLoading ? (
+                                <div style={{ fontSize: 12, color: "#94a3b8", padding: "6px 0" }}>Cargando usuarios…</div>
+                              ) : (
+                                <select
+                                  value={approveEncargadoId[cr.id] ?? ""}
+                                  onChange={(e) => setApproveEncargadoId((n) => ({ ...n, [cr.id]: e.target.value }))}
+                                  className="form-input"
+                                >
+                                  <option value="">Seleccionar encargado…</option>
+                                  {approveUsers.map((u) => (
+                                    <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
+                                  ))}
+                                </select>
+                              )}
+                            </div>
+                            <div style={{ marginBottom: 12 }}>
+                              <label className="form-label">Intervalo de revisión <span style={{ color: "#dc2626" }}>*</span></label>
+                              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                                {([{ value: "365", label: "1 año" }, { value: "730", label: "2 años" }, { value: "custom", label: "Personalizado" }] as const).map((opt) => (
+                                  <button
+                                    key={opt.value}
+                                    type="button"
+                                    onClick={() => setApproveInterval((n) => ({ ...n, [cr.id]: opt.value }))}
+                                    className="type-pill"
+                                    style={{
+                                      borderColor: (approveInterval[cr.id] ?? "365") === opt.value ? p : "#e2e8f0",
+                                      background: (approveInterval[cr.id] ?? "365") === opt.value ? "#eff6ff" : "#fff",
+                                      color: (approveInterval[cr.id] ?? "365") === opt.value ? p : "#374151",
+                                      padding: "5px 12px", fontSize: 12,
+                                    }}
+                                  >
+                                    {opt.label}
+                                  </button>
+                                ))}
+                              </div>
+                              {(approveInterval[cr.id] ?? "365") === "custom" && (
+                                <div style={{ marginTop: 8 }}>
+                                  <input
+                                    type="number" min="1" max="3650"
+                                    value={approveIntervalCustom[cr.id] ?? ""}
+                                    onChange={(e) => setApproveIntervalCustom((n) => ({ ...n, [cr.id]: e.target.value }))}
+                                    placeholder="Días (ej. 180)"
+                                    className="form-input"
+                                    style={{ width: 160 }}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        )}
                         <div style={{ display: "flex", gap: 8 }}>
                           <button
                             className="btn"
-                            disabled={isProcessing}
+                            disabled={
+                              isProcessing || (
+                                cr.type === "NEW_UPLOAD" && (
+                                  !approveEncargadoId[cr.id] ||
+                                  ((approveInterval[cr.id] ?? "365") === "custom" && !parseInt(approveIntervalCustom[cr.id] ?? ""))
+                                )
+                              )
+                            }
                             onClick={() => submitCrReview(
                               cr.id, "APPROVE",
                               cr.type === "NEW_UPLOAD" ? (approveCodigo[cr.id] || undefined) : undefined,
@@ -780,12 +935,12 @@ export default function SolicitudesClient({ company, userRole }: Props) {
               </div>
             )}
 
-            {/* Instructions */}
+            {/* Cambio a realizar */}
             <div style={{ marginBottom: 18 }}>
-              <label className="form-label">Instrucciones{outType === "CORRECCION" ? <span style={{ color: "#dc2626" }}> *</span> : " (opcional)"}</label>
+              <label className="form-label">Cambio a realizar <span style={{ color: "#dc2626" }}>*</span></label>
               <textarea rows={3} value={instructions} onChange={(e) => setInstructions(e.target.value)} className="form-input" style={{ resize: "vertical" }} placeholder={
-                outType === "ACTUALIZACION" ? "Describe qué versión se necesita…"
-                : outType === "REVISION" ? "Describe el alcance de la revisión…"
+                outType === "ACTUALIZACION" ? "Describe el cambio o actualización que se requiere…"
+                : outType === "REVISION" ? "Describe el alcance y motivo de la revisión…"
                 : "Explica detalladamente qué debe corregirse…"
               } />
             </div>

@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { Archive, RotateCcw, Eye, Paperclip, Trash2, X, Upload, Loader2, FileText } from "lucide-react";
+import FileIcon from "@/components/FileIcon";
 
 interface ChangeEntry {
   id: string;
@@ -13,6 +15,7 @@ interface ChangeEntry {
   quien: string | null;
   fecha: string;
   detalle: string | null;
+  version?: string | null;
   estado?: string;
 }
 
@@ -28,6 +31,7 @@ interface RevFile {
 
 interface RevAsignada {
   id: string;
+  type: string;
   status: string;
   instructions: string | null;
   currentStep: number;
@@ -46,9 +50,36 @@ interface RevAsignada {
   createdBy: { id: string; name: string };
 }
 
+const OUT_TYPE_LABELS: Record<string, string> = {
+  REVISION:     "Revisión",
+  ACTUALIZACION: "Actualización",
+  CORRECCION:   "Corrección",
+};
+const OUT_TYPE_COLORS: Record<string, { bg: string; color: string }> = {
+  REVISION:     { bg: "#ede9fe", color: "#5b21b6" },
+  ACTUALIZACION: { bg: "#dbeafe", color: "#1e40af" },
+  CORRECCION:   { bg: "#fef3c7", color: "#92400e" },
+};
+
+interface ObsoleteFile {
+  id: string; name: string; nombreDocumento: string | null; codigo: string | null;
+  mimeType: string; size: number; tipoDocumento: string | null; versionStr: string | null;
+  departamento: string | null; createdAt: string; updatedAt: string;
+  comparisonStorageKey: string | null; comparisonName: string | null;
+  folder: { id: string; name: string } | null;
+  uploadedBy: { id: string; name: string } | null;
+  lastEditedBy: { id: string; name: string } | null;
+}
+
 interface Props {
   company: { name: string; primaryColor: string; accentColor: string; fontFamily: string; logoUrl: string | null };
   userRole: string;
+}
+
+function fmtSize(b: number): string {
+  if (b < 1024) return `${b} B`;
+  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+  return `${(b / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 const TIPO_COLORS: Record<string, string> = {
@@ -58,16 +89,16 @@ const TIPO_COLORS: Record<string, string> = {
   FILE_REVIEW_UPDATE:       "#d97706",
   FILE_METADATA_UPDATE:     "#0891b2",
   FILE_STATUS_UPDATE:       "#16a34a",
-  FOLDER_CREATE:            "#0891b2",
-  FOLDER_DELETE:            "#dc2626",
-  FOLDER_RENAME:            "#d97706",
-  FOLDER_MOVE:              "#64748b",
+  FILE_OBSOLETE:            "#64748b",
   CHANGE_REQUEST_APPROVED:  "#16a34a",
   CHANGE_REQUEST_REJECTED:  "#dc2626",
   CR_NEW_UPLOAD:            "#2563eb",
   CR_EDIT_METADATA:         "#d97706",
   CR_REPLACE_FILE:          "#7c3aed",
   CR_DELETE:                "#dc2626",
+  OR_ACTUALIZACION:         "#2563eb",
+  OR_REVISION:              "#7c3aed",
+  OR_CORRECCION:            "#d97706",
   CR_REVISION_DATE_CHANGE:  "#0891b2",
   CR_OTHER:                 "#64748b",
 };
@@ -75,8 +106,9 @@ const TIPO_COLORS: Record<string, string> = {
 export default function ControlCambiosClient({ company, userRole }: Props) {
   const router = useRouter();
   const brand  = company.primaryColor;
+  const isAdmin = userRole === "COMPANY_ADMIN";
 
-  const [activeTab, setActiveTab] = useState<"cambios" | "revisiones">("cambios");
+  const [activeTab, setActiveTab] = useState<"cambios" | "revisiones" | "archivo">("cambios");
 
   // ── Registro de Cambios state ──
   const [entries, setEntries]   = useState<ChangeEntry[]>([]);
@@ -87,6 +119,8 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
   const [q,        setQ]        = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo,   setDateTo]   = useState("");
+  const [fCodigo,  setFCodigo]  = useState("");
+  const [fNombre,  setFNombre]  = useState("");
   const [page,     setPage]     = useState(1);
 
   // ── Próximas Revisiones state ──
@@ -95,12 +129,26 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
   const [revLoading,  setRevLoading]  = useState(false);
   const [revLoaded,   setRevLoaded]   = useState(false);
 
+  // ── Archivo Histórico state ──
+  const [archFiles,    setArchFiles]    = useState<ObsoleteFile[]>([]);
+  const [archLoading,  setArchLoading]  = useState(false);
+  const [archLoaded,   setArchLoaded]   = useState(false);
+  const [archSearch,   setArchSearch]   = useState("");
+  const [archRestoring, setArchRestoring] = useState<string | null>(null);
+  const [compModal,    setCompModal]    = useState<ObsoleteFile | null>(null);
+  const [compFile,     setCompFile]     = useState<File | null>(null);
+  const [compUploading, setCompUploading] = useState(false);
+  const [compError,    setCompError]    = useState<string | null>(null);
+  const compInputRef = useRef<HTMLInputElement>(null);
+
   const fetchEntries = useCallback(async () => {
     setLoading(true);
     const p = new URLSearchParams();
-    if (q)        p.set("q", q);
+    if (q)       p.set("q", q);
     if (dateFrom) p.set("dateFrom", dateFrom);
     if (dateTo)   p.set("dateTo", dateTo);
+    if (fCodigo)  p.set("codigo", fCodigo);
+    if (fNombre)  p.set("nombre", fNombre);
     p.set("page", String(page));
     const res = await fetch(`/api/control-cambios?${p}`);
     if (res.ok) {
@@ -110,12 +158,13 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
       setPageCount(data.pageCount);
     }
     setLoading(false);
-  }, [q, dateFrom, dateTo, page]);
+  }, [q, dateFrom, dateTo, fCodigo, fNombre, page]);
 
   useEffect(() => { fetchEntries(); }, [fetchEntries]);
+  useEffect(() => { fetchRevisiones(); }, []);
 
   function applySearch() { setPage(1); fetchEntries(); }
-  function clearFilters() { setQ(""); setDateFrom(""); setDateTo(""); setPage(1); }
+  function clearFilters() { setQ(""); setDateFrom(""); setDateTo(""); setFCodigo(""); setFNombre(""); setPage(1); }
 
   async function fetchRevisiones() {
     setRevLoading(true);
@@ -131,9 +180,68 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
     setRevLoaded(true);
   }
 
-  function handleTabChange(tab: "cambios" | "revisiones") {
+  async function fetchArchivo() {
+    setArchLoading(true);
+    const res = await fetch("/api/archivo-historico");
+    if (res.ok) setArchFiles((await res.json()).files ?? []);
+    setArchLoading(false);
+    setArchLoaded(true);
+  }
+
+  async function archRestore(fileId: string, docName: string) {
+    if (!confirm(`¿Restaurar "${docName}" como documento activo?`)) return;
+    setArchRestoring(fileId);
+    await fetch(`/api/files/${fileId}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "REVIEWED" }),
+    });
+    setArchFiles((prev) => prev.filter((f) => f.id !== fileId));
+    setArchRestoring(null);
+  }
+
+  async function viewComparison(fileId: string) {
+    const res = await fetch(`/api/files/${fileId}/comparison`);
+    if (!res.ok) { alert("Error al obtener el documento comparativo."); return; }
+    const { url } = await res.json();
+    window.open(url, "_blank");
+  }
+
+  async function deleteComparison(fileId: string) {
+    if (!confirm("¿Quitar el documento comparativo?")) return;
+    await fetch(`/api/files/${fileId}/comparison`, { method: "DELETE" });
+    setArchFiles((prev) => prev.map((f) => f.id === fileId ? { ...f, comparisonStorageKey: null, comparisonName: null } : f));
+  }
+
+  async function handleCompUpload() {
+    if (!compModal || !compFile) { setCompError("Selecciona un archivo."); return; }
+    setCompUploading(true); setCompError(null);
+    try {
+      const urlRes = await fetch(`/api/files/${compModal.id}/comparison`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: compFile.name, mimeType: compFile.type || "application/octet-stream", size: compFile.size }),
+      });
+      if (!urlRes.ok) throw new Error((await urlRes.json().catch(() => ({}))).error ?? "Error al obtener URL.");
+      const { uploadUrl, storageKey } = await urlRes.json();
+      const putRes = await fetch(uploadUrl, { method: "PUT", body: compFile, headers: { "Content-Type": compFile.type || "application/octet-stream" } });
+      if (!putRes.ok) throw new Error("Error al subir el archivo.");
+      const saveRes = await fetch(`/api/files/${compModal.id}/comparison`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storageKey, name: compFile.name }),
+      });
+      if (!saveRes.ok) throw new Error("Error al guardar la comparativa.");
+      setArchFiles((prev) => prev.map((f) => f.id === compModal.id ? { ...f, comparisonStorageKey: storageKey, comparisonName: compFile!.name } : f));
+      setCompModal(null); setCompFile(null);
+    } catch (err) {
+      setCompError(err instanceof Error ? err.message : "Error inesperado.");
+    } finally {
+      setCompUploading(false);
+    }
+  }
+
+  function handleTabChange(tab: "cambios" | "revisiones" | "archivo") {
     setActiveTab(tab);
     if (tab === "revisiones" && !revLoaded) fetchRevisiones();
+    if (tab === "archivo" && !archLoaded) fetchArchivo();
   }
 
   function groupByMonth(files: RevFile[]): { label: string; docs: RevFile[] }[] {
@@ -162,17 +270,20 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
         <div style={{ padding: "12px 28px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <strong style={{ fontSize: 16 }}>Control de Cambios</strong>
           {activeTab === "cambios" && <span style={{ fontSize: 12, opacity: 0.75 }}>{total} registros</span>}
-          {activeTab === "revisiones" && !revLoading && <span style={{ fontSize: 12, opacity: 0.75 }}>{revFiles.length + revAsignadas.length} pendientes</span>}
+          {activeTab === "archivo" && !archLoading && <span style={{ fontSize: 12, opacity: 0.75 }}>{archFiles.length} documento{archFiles.length !== 1 ? "s" : ""} obsoleto{archFiles.length !== 1 ? "s" : ""}</span>}
         </div>
         {/* Tabs */}
         <div style={{ display: "flex", borderTop: "1px solid rgba(255,255,255,0.15)", paddingLeft: 16 }}>
-          {(["cambios", "revisiones"] as const).map((tab) => {
-            const labels = { cambios: "Registro de Cambios", revisiones: "Próximas Revisiones" };
-            const isActive = activeTab === tab;
+          {([
+            { key: "cambios"    as const, label: "Registro de Cambios", badge: 0 },
+            { key: "revisiones" as const, label: "Próximas Revisiones", badge: revFiles.length + revAsignadas.length },
+            ...(isAdmin ? [{ key: "archivo" as const, label: "Archivo Histórico", badge: 0 }] : []),
+          ]).map((tab) => {
+            const isActive = activeTab === tab.key;
             return (
               <button
-                key={tab}
-                onClick={() => handleTabChange(tab)}
+                key={tab.key}
+                onClick={() => handleTabChange(tab.key)}
                 style={{
                   background: isActive ? "rgba(255,255,255,0.15)" : "transparent",
                   color: "#fff",
@@ -184,9 +295,15 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
                   fontWeight: isActive ? 700 : 400,
                   opacity: isActive ? 1 : 0.75,
                   transition: "all 0.15s",
+                  display: "flex", alignItems: "center", gap: 7,
                 }}
               >
-                {labels[tab]}
+                {tab.label}
+                {tab.badge > 0 && (
+                  <span style={{ background: "rgba(255,255,255,0.25)", color: "#fff", borderRadius: 10, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>
+                    {tab.badge}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -198,32 +315,44 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
         <div style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 24px" }}>
 
           {/* Filters */}
-          <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px 20px", marginBottom: 20, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
-            <div style={{ flex: "2 1 200px" }}>
-              <label style={labelStyle}>Buscar documento / código / tipo</label>
-              <input
-                type="text" value={q}
-                onChange={(e) => setQ(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && applySearch()}
-                placeholder="ej. Contrato, DOC-001, subida…"
-                style={inputStyle}
-              />
+          <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px 20px", marginBottom: 20 }}>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 10 }}>
+              <div style={{ flex: "2 1 200px" }}>
+                <label style={labelStyle}>Buscar (descripción / tipo / quién)</label>
+                <input
+                  type="text" value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && applySearch()}
+                  placeholder="ej. actualización, aprobada…"
+                  style={inputStyle}
+                />
+              </div>
+              <div style={{ flex: "1 1 140px" }}>
+                <label style={labelStyle}>Código</label>
+                <input type="text" value={fCodigo} onChange={(e) => setFCodigo(e.target.value)} onKeyDown={(e) => e.key === "Enter" && applySearch()} placeholder="DOC-001" style={inputStyle} />
+              </div>
+              <div style={{ flex: "2 1 180px" }}>
+                <label style={labelStyle}>Nombre del documento</label>
+                <input type="text" value={fNombre} onChange={(e) => setFNombre(e.target.value)} onKeyDown={(e) => e.key === "Enter" && applySearch()} placeholder="Buscar nombre…" style={inputStyle} />
+              </div>
             </div>
-            <div style={{ flex: "1 1 130px" }}>
-              <label style={labelStyle}>Desde</label>
-              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={inputStyle} />
-            </div>
-            <div style={{ flex: "1 1 130px" }}>
-              <label style={labelStyle}>Hasta</label>
-              <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={inputStyle} />
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={applySearch} style={{ background: brand, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 7, cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
-                Buscar
-              </button>
-              <button onClick={clearFilters} style={{ background: "#f1f5f9", color: "#64748b", border: "1px solid #e2e8f0", padding: "8px 14px", borderRadius: 7, cursor: "pointer", fontSize: 13 }}>
-                Limpiar
-              </button>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
+              <div style={{ flex: "1 1 130px" }}>
+                <label style={labelStyle}>Desde</label>
+                <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={inputStyle} />
+              </div>
+              <div style={{ flex: "1 1 130px" }}>
+                <label style={labelStyle}>Hasta</label>
+                <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={inputStyle} />
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={applySearch} style={{ background: brand, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 7, cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
+                  Buscar
+                </button>
+                <button onClick={clearFilters} style={{ background: "#f1f5f9", color: "#64748b", border: "1px solid #e2e8f0", padding: "8px 14px", borderRadius: 7, cursor: "pointer", fontSize: 13 }}>
+                  Limpiar
+                </button>
+              </div>
             </div>
           </div>
 
@@ -237,7 +366,7 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ borderBottom: "1px solid #f1f5f9" }}>
-                    {["Fecha", "Tipo de Cambio", "Documento", "Código", "Quién", "Detalle"].map((h) => (
+                    {["Fecha", "Tipo de cambio", "Documento", "Código", "Versión", "Quién", "Descripción del cambio"].map((h) => (
                       <th key={h} style={{ padding: "10px 18px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5, whiteSpace: "nowrap" }}>
                         {h}
                       </th>
@@ -283,16 +412,35 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
                             <span style={{ color: "#d1d5db" }}>—</span>
                           )}
                         </td>
+                        <td style={{ padding: "11px 18px" }}>
+                          {e.version ? (
+                            <code style={{ background: "#f0fdf4", color: "#166534", padding: "2px 7px", borderRadius: 4, fontSize: 12 }}>
+                              {e.version}
+                            </code>
+                          ) : (
+                            <span style={{ color: "#d1d5db" }}>—</span>
+                          )}
+                        </td>
                         <td style={{ padding: "11px 18px", fontSize: 13, color: "#374151" }}>
                           {e.quien ?? <span style={{ color: "#d1d5db" }}>Sistema</span>}
                         </td>
-                        <td style={{ padding: "11px 18px", fontSize: 12, color: "#64748b", maxWidth: 320 }}>
-                          {e.detalle
-                            ? e.detalle.split(" | ").map((part, i) => (
-                                <div key={i} style={{ lineHeight: 1.5 }}>{part}</div>
-                              ))
-                            : <span style={{ color: "#d1d5db" }}>—</span>
-                          }
+                        <td style={{ padding: "10px 18px", maxWidth: 300 }}>
+                          {e.detalle ? (
+                            <span style={{
+                              fontSize: 12,
+                              color: "#475569",
+                              lineHeight: 1.55,
+                              display: "-webkit-box",
+                              WebkitLineClamp: 3,
+                              WebkitBoxOrient: "vertical",
+                              overflow: "hidden",
+                              wordBreak: "break-word",
+                            }} title={e.detalle}>
+                              {e.detalle}
+                            </span>
+                          ) : (
+                            <span style={{ color: "#d1d5db", fontSize: 12 }}>—</span>
+                          )}
                         </td>
                       </tr>
                     );
@@ -334,7 +482,7 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
                     <table style={{ width: "100%", borderCollapse: "collapse" }}>
                       <thead>
                         <tr style={{ borderBottom: "1px solid #f1f5f9", background: "#f8fafc" }}>
-                          {["Documento", "Código", "Asignado a", "Paso", "Instrucciones"].map((h) => (
+                          {["Documento", "Código", "Tipo", "Asignado a", "Paso", "Instrucciones"].map((h) => (
                             <th key={h} style={{ padding: "9px 16px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5, whiteSpace: "nowrap" }}>
                               {h}
                             </th>
@@ -344,6 +492,7 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
                       <tbody>
                         {revAsignadas.map((r) => {
                           const currentTask = r.tasks.find((t) => t.stepOrder === r.currentStep);
+                          const tc = OUT_TYPE_COLORS[r.type] ?? { bg: "#f3f4f6", color: "#374151" };
                           return (
                             <tr key={r.id} style={{ borderBottom: "1px solid #f8fafc" }}>
                               <td style={{ padding: "11px 16px", fontSize: 13, color: "#1e293b", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -355,6 +504,11 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
                                   ? <code style={{ background: "#f1f5f9", padding: "2px 7px", borderRadius: 4, fontSize: 12 }}>{r.file.codigo}</code>
                                   : <span style={{ color: "#d1d5db" }}>—</span>
                                 }
+                              </td>
+                              <td style={{ padding: "11px 16px" }}>
+                                <span style={{ background: tc.bg, color: tc.color, padding: "2px 8px", borderRadius: 5, fontSize: 11, fontWeight: 700 }}>
+                                  {OUT_TYPE_LABELS[r.type] ?? r.type}
+                                </span>
                               </td>
                               <td style={{ padding: "11px 16px", fontSize: 13, color: "#374151" }}>
                                 {currentTask?.assignedTo.name ?? <span style={{ color: "#d1d5db" }}>—</span>}
@@ -463,6 +617,139 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
 
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Archivo Histórico tab ── */}
+      {activeTab === "archivo" && isAdmin && (
+        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 24px" }}>
+          {/* Notice */}
+          <div style={{ marginBottom: 16, background: "#fefce8", border: "1px solid #fde68a", borderRadius: 8, padding: "9px 14px", fontSize: 12, color: "#92400e" }}>
+            Los documentos obsoletos no aparecen en el dashboard principal ni en el Listado Maestro. Se pueden restaurar en cualquier momento.
+          </div>
+
+          {/* Search */}
+          <div style={{ marginBottom: 16 }}>
+            <input
+              value={archSearch}
+              onChange={(e) => setArchSearch(e.target.value)}
+              placeholder="Buscar por nombre, código, carpeta, departamento…"
+              style={{ width: "100%", maxWidth: 440, padding: "8px 14px", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 13, outline: "none", boxSizing: "border-box" }}
+            />
+          </div>
+
+          {archLoading ? (
+            <p style={{ textAlign: "center", color: "#94a3b8", padding: 40 }}>Cargando…</p>
+          ) : (() => {
+            const filtered = archFiles.filter((f) => {
+              if (!archSearch) return true;
+              const q = archSearch.toLowerCase();
+              return (f.nombreDocumento ?? "").toLowerCase().includes(q) || (f.codigo ?? "").toLowerCase().includes(q) || (f.folder?.name ?? "").toLowerCase().includes(q) || (f.departamento ?? "").toLowerCase().includes(q);
+            });
+            if (filtered.length === 0) return (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 280, color: "#94a3b8", gap: 12 }}>
+                <Archive size={40} strokeWidth={1} />
+                <p style={{ margin: 0, fontSize: 14 }}>{archFiles.length === 0 ? "No hay documentos obsoletos." : "Sin resultados para esa búsqueda."}</p>
+              </div>
+            );
+            return (
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ borderBottom: "2px solid #f1f5f9", background: "#f8fafc" }}>
+                      {["Documento", "Carpeta", "Tipo", "Versión", "Archivado el", "Comparativa", ""].map((h) => (
+                        <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5 }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map((f) => (
+                      <tr key={f.id} style={{ borderBottom: "1px solid #f8fafc" }}>
+                        <td style={{ padding: "11px 14px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <FileIcon mimeType={f.mimeType} size={16} />
+                            <div>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>{f.nombreDocumento || f.name}</div>
+                              {f.codigo && <div style={{ fontSize: 11, color: "#0369a1", fontWeight: 600 }}>{f.codigo}</div>}
+                              <div style={{ fontSize: 11, color: "#94a3b8" }}>{fmtSize(f.size)}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding: "11px 14px", fontSize: 12, color: "#64748b" }}>{f.folder?.name ?? <span style={{ color: "#cbd5e1" }}>Sin carpeta</span>}</td>
+                        <td style={{ padding: "11px 14px", fontSize: 12, color: "#64748b" }}>{f.tipoDocumento ?? "—"}</td>
+                        <td style={{ padding: "11px 14px" }}>
+                          <span style={{ background: "#f1f5f9", color: "#475569", fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 4 }}>{f.versionStr ?? "—"}</span>
+                        </td>
+                        <td style={{ padding: "11px 14px", fontSize: 12, color: "#94a3b8" }}>{new Date(f.updatedAt).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })}</td>
+                        <td style={{ padding: "11px 14px" }}>
+                          {f.comparisonStorageKey ? (
+                            <div style={{ display: "flex", gap: 5 }}>
+                              <button onClick={() => viewComparison(f.id)} style={{ display: "flex", alignItems: "center", gap: 4, background: "#f0fdf4", color: "#15803d", border: "1px solid #bbf7d0", borderRadius: 6, padding: "4px 9px", cursor: "pointer", fontSize: 11, fontWeight: 600 }}>
+                                <Eye size={12} /> Ver
+                              </button>
+                              <button onClick={() => { setCompModal(f); setCompFile(null); setCompError(null); }} style={{ background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0", borderRadius: 6, padding: "4px 9px", cursor: "pointer", fontSize: 11 }} title="Reemplazar">
+                                <Upload size={12} />
+                              </button>
+                              <button onClick={() => deleteComparison(f.id)} style={{ background: "#fff0f0", color: "#ef4444", border: "1px solid #fecaca", borderRadius: 6, padding: "4px 7px", cursor: "pointer" }} title="Quitar">
+                                <X size={12} />
+                              </button>
+                            </div>
+                          ) : (
+                            <button onClick={() => { setCompModal(f); setCompFile(null); setCompError(null); }} style={{ display: "flex", alignItems: "center", gap: 5, background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0", borderRadius: 6, padding: "5px 10px", cursor: "pointer", fontSize: 12 }}>
+                              <Paperclip size={12} /> Adjuntar
+                            </button>
+                          )}
+                        </td>
+                        <td style={{ padding: "11px 14px" }}>
+                          <button
+                            onClick={() => archRestore(f.id, f.nombreDocumento || f.name)}
+                            disabled={archRestoring === f.id}
+                            style={{ display: "flex", alignItems: "center", gap: 5, background: brand, color: "#fff", border: "none", borderRadius: 7, padding: "6px 12px", cursor: archRestoring === f.id ? "default" : "pointer", fontSize: 12, fontWeight: 600, opacity: archRestoring === f.id ? 0.6 : 1 }}
+                          >
+                            {archRestoring === f.id ? <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} /> : <RotateCcw size={13} />}
+                            Restaurar
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
+
+          {/* Comparison modal */}
+          {compModal && (
+            <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => !compUploading && setCompModal(null)}>
+              <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: "100%", maxWidth: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }} onClick={(e) => e.stopPropagation()}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                  <h3 style={{ margin: 0, fontSize: 15, color: "#1e293b", display: "flex", alignItems: "center", gap: 8 }}>
+                    <Paperclip size={16} color={brand} />
+                    {compModal.comparisonStorageKey ? "Reemplazar comparativa" : "Adjuntar comparativa"}
+                  </h3>
+                  {!compUploading && <button onClick={() => setCompModal(null)} style={{ border: "none", background: "transparent", cursor: "pointer", color: "#94a3b8" }}><X size={18} /></button>}
+                </div>
+                <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 14px" }}>Documento: <strong>{compModal.nombreDocumento || compModal.name}</strong></p>
+                <div onClick={() => !compUploading && compInputRef.current?.click()} style={{ border: `2px dashed ${compFile ? brand : "#cbd5e1"}`, borderRadius: 8, padding: 16, cursor: compUploading ? "default" : "pointer", textAlign: "center", background: compFile ? "#f0fdf4" : "#f8fafc", marginBottom: 14 }}>
+                  {compFile ? (
+                    <div style={{ fontSize: 13, color: "#15803d" }}><strong>{compFile.name}</strong><br /><span style={{ fontSize: 11, color: "#64748b" }}>{(compFile.size / 1024).toFixed(1)} KB</span></div>
+                  ) : (
+                    <div style={{ fontSize: 13, color: "#94a3b8" }}><FileText size={20} style={{ marginBottom: 6 }} /><br />Haz clic para seleccionar archivo</div>
+                  )}
+                </div>
+                <input ref={compInputRef} type="file" style={{ display: "none" }} onChange={(e) => setCompFile(e.target.files?.[0] ?? null)} />
+                {compError && <p style={{ margin: "0 0 12px", padding: "8px 12px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6, fontSize: 12, color: "#dc2626" }}>{compError}</p>}
+                <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                  {!compUploading && <button onClick={() => setCompModal(null)} style={{ border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancelar</button>}
+                  <button onClick={handleCompUpload} disabled={compUploading || !compFile} style={{ background: brand, color: "#fff", border: "none", padding: "7px 18px", borderRadius: 8, cursor: (compUploading || !compFile) ? "default" : "pointer", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, opacity: (!compFile || compUploading) ? 0.6 : 1 }}>
+                    {compUploading ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Upload size={14} />}
+                    {compUploading ? "Subiendo…" : "Adjuntar"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
       )}
     </div>

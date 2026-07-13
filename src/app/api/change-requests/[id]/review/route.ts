@@ -39,10 +39,12 @@ function buildDiff(before: Record<string, unknown>, after: Record<string, unknow
 }
 
 const schema = z.object({
-  action:           z.enum(["APPROVE", "REJECT"]),
-  adminNotes:       z.string().max(2000).optional().nullable(),
-  assignedCodigo:   z.string().max(50).optional().nullable(),
-  adminVersionStr:  z.string().max(50).optional().nullable(),
+  action:                z.enum(["APPROVE", "REJECT"]),
+  adminNotes:            z.string().max(2000).optional().nullable(),
+  assignedCodigo:        z.string().max(50).optional().nullable(),
+  adminVersionStr:       z.string().max(50).optional().nullable(),
+  reviewIntervalDays:    z.number().int().min(1).max(3650).optional().nullable(),
+  encargadoDocumentoId:  z.string().optional().nullable(),
 });
 
 // POST /api/change-requests/[id]/review — admin approve or reject a ChangeRequest
@@ -70,7 +72,7 @@ export async function POST(
   const parsed = schema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
-  const { action, adminNotes, assignedCodigo, adminVersionStr } = parsed.data;
+  const { action, adminNotes, assignedCodigo, adminVersionStr, reviewIntervalDays, encargadoDocumentoId } = parsed.data;
 
   if (action === "REJECT" && !adminNotes?.trim()) {
     return NextResponse.json({ error: "adminNotes is required for rejection" }, { status: 400 });
@@ -84,6 +86,23 @@ export async function POST(
   if (action === "APPROVE") {
     if (cr.fileId) {
       if (cr.type === "NEW_UPLOAD") {
+        // Encargado is mandatory for new documents
+        if (!encargadoDocumentoId) {
+          return NextResponse.json({ error: "Se requiere asignar un encargado de documento para aprobarlo." }, { status: 400 });
+        }
+        if (!reviewIntervalDays || reviewIntervalDays < 1) {
+          return NextResponse.json({ error: "Se requiere definir el intervalo de revisión." }, { status: 400 });
+        }
+
+        // Validate encargado belongs to this company
+        const encargado = await prisma.user.findFirst({
+          where: { id: encargadoDocumentoId, companyId, isActive: true },
+          select: { id: true },
+        });
+        if (!encargado) {
+          return NextResponse.json({ error: "El encargado seleccionado no es válido." }, { status: 400 });
+        }
+
         // If admin assigns a código, validate uniqueness first
         if (assignedCodigo) {
           const existing = await prisma.file.findFirst({
@@ -93,10 +112,19 @@ export async function POST(
             return NextResponse.json({ error: `El código "${assignedCodigo}" ya está en uso.` }, { status: 409 });
           }
         }
+
+        // Compute first review date = file.createdAt + interval
+        const baseDate = cr.file?.createdAt ?? now;
+        const reviewDate = new Date(baseDate.getTime() + reviewIntervalDays * 24 * 60 * 60 * 1000);
+
         await prisma.file.update({
           where: { id: cr.fileId },
           data: {
-            status: "REVIEWED",
+            status:                "REVIEWED",
+            encargadoDocumentoId,
+            reviewIntervalDays,
+            fechaRevision:         reviewDate,
+            reviewDueDate:         reviewDate,
             ...(assignedCodigo ? { codigo: assignedCodigo } : {}),
             ...(adminVersionStr?.trim() ? { versionStr: adminVersionStr.trim() } : {}),
           },
@@ -123,6 +151,10 @@ export async function POST(
 
       } else if (cr.type === "DELETE") {
         await prisma.file.update({ where: { id: cr.fileId }, data: { deletedAt: now } });
+
+      } else if (cr.type === "REVISION_REQUEST") {
+        // No automatic file changes — admin will manually create OutgoingRequest afterwards.
+        // Just mark approved and notify user (handled below).
 
       } else if (cr.type === "OTHER") {
         const updates = pc.proposedFileUpdates as Record<string, unknown> | undefined;

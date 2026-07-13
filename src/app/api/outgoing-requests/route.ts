@@ -8,7 +8,7 @@ import { logAction } from "@/lib/audit";
 const createSchema = z.object({
   fileId:           z.string().min(1),
   type:             z.enum(["ACTUALIZACION", "REVISION", "CORRECCION"]),
-  instructions:     z.string().max(5000).optional().nullable(),
+  instructions:     z.string().min(1, "El cambio a realizar es obligatorio").max(5000),
   correctionFields: z.object({
     nombre:   z.boolean().default(false),
     contenido: z.boolean().default(false),
@@ -34,9 +34,6 @@ export async function POST(req: NextRequest) {
 
   const { fileId, type, instructions, correctionFields, assigneeIds, dueDate } = parsed.data;
 
-  if (type === "CORRECCION" && !instructions?.trim()) {
-    return NextResponse.json({ error: "Las instrucciones son obligatorias para una corrección" }, { status: 400 });
-  }
   if (type === "CORRECCION" && correctionFields) {
     const anyChecked = correctionFields.nombre || correctionFields.contenido || correctionFields.area || correctionFields.carpeta || correctionFields.otro?.trim();
     if (!anyChecked) return NextResponse.json({ error: "Debes especificar qué corregir" }, { status: 400 });
@@ -135,11 +132,11 @@ export async function GET(req: NextRequest) {
 
   const { companyId } = session;
   const statusFilter = req.nextUrl.searchParams.get("status");
+  const fileIdFilter  = req.nextUrl.searchParams.get("fileId");
 
   const where: Record<string, unknown> = { companyId };
-  if (statusFilter) {
-    where.status = statusFilter;
-  }
+  if (statusFilter) where.status = statusFilter;
+  if (fileIdFilter)  where.fileId = fileIdFilter;
 
   const outgoing = await prisma.outgoingRequest.findMany({
     where,
