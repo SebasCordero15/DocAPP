@@ -71,7 +71,7 @@ interface ChangeRequest {
   createdAt: string;
   reviewedAt: string | null;
   adminNotes: string | null;
-  file: { id: string; name: string; nombreDocumento: string | null; codigo: string | null } | null;
+  file: { id: string; name: string; nombreDocumento: string | null; codigo: string | null; mimeType?: string } | null;
 }
 
 interface RejectedCR {
@@ -99,6 +99,28 @@ interface RejectedOutgoing {
   finalReviewedAt: string | null;
   file: { id: string; name: string; nombreDocumento: string | null; codigo: string | null; mimeType: string } | null;
   finalReviewer: { id: string; name: string } | null;
+}
+
+interface PipelineDoc {
+  id: string;
+  name: string;
+  nombreDocumento: string | null;
+  codigo: string | null;
+  versionStr: string | null;
+  mimeType: string;
+  status: string;
+  updatedAt: string;
+  createdAt: string;
+  folder: { id: string; name: string } | null;
+  uploadedBy: { id: string; name: string } | null;
+  encargadoDocumento: { id: string; name: string } | null;
+  activeChain: {
+    id: string;
+    status: string;
+    currentStep: number;
+    totalSteps: number;
+    steps: { id: string; stepOrder: number; status: string; rejectionNote: string | null; assignedTo: { id: string; name: string } }[];
+  } | null;
 }
 
 interface Props {
@@ -134,9 +156,10 @@ const CR_TYPE_LABELS: Record<string, string> = {
   NEW_UPLOAD:            "Subida nueva",
   EDIT_METADATA:         "Edición de metadatos",
   REPLACE_FILE:          "Reemplazo de archivo",
-  DELETE:                "Eliminación",
+  DELETE:                "Solicitud de eliminación",
   REVISION_DATE_CHANGE:  "Cambio de fecha de revisión",
   OTHER:                 "Otro",
+  REVISION_REQUEST:      "Propuesta de revisión",
 };
 const CR_STATUS_LABELS: Record<string, string> = {
   PENDING:  "Pendiente",
@@ -169,6 +192,13 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
   const [docFiles,   setDocFiles]   = useState<DocFile[]>([]);
   const [docCounts,  setDocCounts]  = useState<DocCounts>({ enRevision: 0, borrador: 0, revisados: 0, atrasadas: 0 });
   const [loadingDocs, setLoadingDocs] = useState(true);
+
+  // ── Pipeline: mis documentos
+  const [pipelineDocs,    setPipelineDocs]    = useState<PipelineDoc[]>([]);
+  const [pipelineCounts,  setPipelineCounts]  = useState({ EN_ESPERA: 0, REVISADOS: 0 });
+  const [pipelineLoading, setPipelineLoading] = useState(false);
+  const [pipelineLoaded,  setPipelineLoaded]  = useState(false);
+  const [pipelineStatus,  setPipelineStatus]  = useState<"EN_ESPERA"|"REVISADOS">("EN_ESPERA");
 
   // ── team filter
   const [filterUser,   setFilterUser]   = useState("");
@@ -337,7 +367,32 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
   const [rejectedCRs,      setRejectedCRs]      = useState<RejectedCR[]>([]);
   const [rejectedChains,   setRejectedChains]   = useState<RejectedChain[]>([]);
   const [rejectedOutgoing, setRejectedOutgoing] = useState<RejectedOutgoing[]>([]);
-  const [loadingRejected, setLoadingRejected] = useState(true);
+  const [loadingRejected,  setLoadingRejected]  = useState(true);
+  const [dismissedIds,     setDismissedIds]     = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("dismissed_rejected") ?? "[]")); } catch { return new Set(); }
+  });
+
+  function dismissItem(id: string) {
+    setDismissedIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      try { localStorage.setItem("dismissed_rejected", JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  }
+  function clearAllDismissed() {
+    const allIds = [
+      ...rejectedChains.map((c) => c.id),
+      ...rejectedCRs.map((c) => c.id),
+      ...rejectedOutgoing.map((o) => o.id),
+    ];
+    setDismissedIds((prev) => {
+      const next = new Set(prev);
+      allIds.forEach((id) => next.add(id));
+      try { localStorage.setItem("dismissed_rejected", JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  }
 
   // ── document inline viewer (Point 5)
   const [pdfViewerFile,     setPdfViewerFile]     = useState<{ id: string; name: string } | null>(null);
@@ -409,9 +464,25 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
     setLoadingRejected(false);
   }, []);
 
-  useEffect(() => { fetchMyTasks(); fetchDocCounts(); fetchDocFiles(docTab); fetchMyChangeRequests(); fetchRejectedItems(); }, []);
+  const fetchPipeline = async () => {
+    setPipelineLoading(true);
+    const r = await fetch("/api/pendientes/mis-documentos");
+    if (r.ok) {
+      const d = await r.json();
+      const files: PipelineDoc[] = d.files ?? [];
+      setPipelineDocs(files);
+      setPipelineCounts({
+        EN_ESPERA: files.filter((f) => f.status === "IN_REVIEW" || f.status === "PENDING_APPROVAL" || f.status === "DRAFT").length,
+        REVISADOS: files.filter((f) => f.status === "REVIEWED").length,
+      });
+    }
+    setPipelineLoading(false);
+    setPipelineLoaded(true);
+  };
+
+  useEffect(() => { fetchMyTasks(); fetchDocCounts(); fetchMyChangeRequests(); fetchRejectedItems(); }, []);
   useEffect(() => { if (isAdmin && mainTab === "equipo") { fetchTeamTasks(); fetchCompanyUsers(); } }, [mainTab, filterUser, filterType]);
-  useEffect(() => { if (mainTab === "seguimiento") fetchDocFiles(docTab); }, [docTab, mainTab]);
+  useEffect(() => { if (mainTab === "seguimiento" && !pipelineLoaded) fetchPipeline(); }, [mainTab]);
 
   // ── complete a task
   const completeTask = async (taskId: string) => {
@@ -504,8 +575,27 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
 
   const tasksToShow = mainTab === "equipo" ? teamTasks : myTasks;
   const loadingTasksNow = loadingTasks && mainTab === "acciones";
-  const rejectedCount = rejectedCRs.length + rejectedChains.length + rejectedOutgoing.length;
+
+  const visibleRejectedChains   = rejectedChains.filter((c) => !dismissedIds.has(c.id));
+  const visibleRejectedCRs      = rejectedCRs.filter((c) => !dismissedIds.has(c.id));
+  const visibleRejectedOutgoing = rejectedOutgoing.filter((o) => !dismissedIds.has(o.id));
+  const rejectedCount = visibleRejectedChains.length + visibleRejectedCRs.length + visibleRejectedOutgoing.length;
+
   const pendingCRs = myChangeRequests.filter((cr) => cr.status === "PENDING");
+
+  // ── Equipo: group outgoing-request tasks by request ID ──────────────────────
+  const equipoOutGroups = new Map<string, Task[]>();
+  const equipoStandalone: Task[] = [];
+  if (mainTab === "equipo") {
+    for (const task of tasksToShow) {
+      if (task.outgoingRequestId) {
+        if (!equipoOutGroups.has(task.outgoingRequestId)) equipoOutGroups.set(task.outgoingRequestId, []);
+        equipoOutGroups.get(task.outgoingRequestId)!.push(task);
+      } else {
+        equipoStandalone.push(task);
+      }
+    }
+  }
 
   return (
     <div style={{ flex: 1, overflowY: "auto", background: "#f8fafc", fontFamily: `'${company.fontFamily}', Inter, system-ui, sans-serif` }}>
@@ -531,7 +621,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
       <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 32px", display: "flex", gap: 0 }}>
         {([
           { key: "acciones"    as MainTab, label: "Acciones",            badge: myTasks.length + rejectedCount },
-          { key: "seguimiento" as MainTab, label: "Seguimiento",         badge: docCounts.enRevision + docCounts.atrasadas + pendingCRs.length },
+          { key: "seguimiento" as MainTab, label: "Seguimiento",         badge: pipelineCounts.EN_ESPERA },
           ...(isAdmin ? [{ key: "equipo" as MainTab, label: "Equipo", badge: teamTasks.length }] : []),
         ]).map((t) => (
           <button
@@ -575,7 +665,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                 </p>
               </div>
 
-              {/* Admin team view filters + assign button */}
+              {/* Admin team view filters */}
               {isAdmin && mainTab === "equipo" && (
                 <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                   <select className="select-input" value={filterUser} onChange={(e) => setFilterUser(e.target.value)}>
@@ -588,19 +678,13 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                       <option key={t} value={t}>{TASK_TYPE_LABELS[t]}</option>
                     ))}
                   </select>
-                  <button
-                    onClick={() => openAssignModal("", "")}
-                    style={{ background: p, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: "pointer" }}
-                  >
-                    + Asignar tarea
-                  </button>
                 </div>
               )}
             </div>
 
             {loadingTasksNow ? (
               [1,2,3].map((i) => <div key={i} className="skeleton" style={{ height: 80, marginBottom: 10 }} />)
-            ) : tasksToShow.length === 0 ? (
+            ) : (mainTab === "equipo" ? (equipoOutGroups.size === 0 && equipoStandalone.length === 0) : tasksToShow.length === 0) ? (
               <div style={{ textAlign: "center", padding: "48px 0", color: "#94a3b8" }}>
                 <div style={{ marginBottom: 10 }}><CheckCircle size={40} color="#22c55e" /></div>
                 <div style={{ fontSize: 15, fontWeight: 600 }}>
@@ -608,281 +692,445 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                 </div>
               </div>
             ) : (
-              tasksToShow.map((task) => {
-                const tc = TASK_TYPE_COLORS[task.type];
-                const isCompleting = completing === task.id;
-                const canComplete = task.assignedTo.id === userId || task.assignedBy.id === userId;
-                const isChainTask = !!task.reviewChainId && task.stepOrder !== null;
-                const isMyChainTurn = isChainTask && task.assignedTo.id === userId;
-                const isOutTask = !!task.outgoingRequestId && !!task.outgoingRequest;
-                const isMyOutTurn = isOutTask && task.assignedTo.id === userId;
-                const OUT_TYPE_LABELS: Record<string, string> = { ACTUALIZACION: "Actualización", REVISION: "Revisión", CORRECCION: "Corrección" };
-                const docName = task.file.nombreDocumento || task.file.name;
-                return (
-                  <div key={task.id} className="card" style={{ borderLeft: task.isOverdue ? "4px solid #dc2626" : isChainTask ? `4px solid #7c3aed` : `4px solid ${p}` }}>
-                    <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
-                      <FileIcon mimeType={task.file.mimeType} size={30} />
-
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        {/* Title row */}
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
-                          <span style={{ fontWeight: 700, fontSize: 15, color: "#1e293b" }}>
-                            {docName}
-                          </span>
-                          <span style={{ background: tc.bg, color: tc.color, borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
-                            {TASK_TYPE_LABELS[task.type]}
-                          </span>
-                          {isChainTask && (
-                            <span style={{ background: "#ede9fe", color: "#6d28d9", borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>
-                              Cadena · Paso {task.stepOrder}/{task.chainTotalSteps}
+              <>
+                {/* ── Equipo: grouped outgoing-request cards ── */}
+                {mainTab === "equipo" && Array.from(equipoOutGroups.values()).map((groupTasks) => {
+                  const sorted = [...groupTasks].sort((a, b) => (a.stepOrder ?? 0) - (b.stepOrder ?? 0));
+                  const rep = sorted[0];
+                  const or = rep.outgoingRequest!;
+                  const docName = rep.file.nombreDocumento || rep.file.name;
+                  const OUT_TYPE_LABELS_LOC: Record<string, string> = { ACTUALIZACION: "Actualización", REVISION: "Revisión", CORRECCION: "Corrección" };
+                  const OUT_TYPE_COLORS_LOC: Record<string, { bg: string; color: string }> = {
+                    ACTUALIZACION: { bg: "#dbeafe", color: "#1e40af" },
+                    REVISION:      { bg: "#ede9fe", color: "#5b21b6" },
+                    CORRECCION:    { bg: "#fef3c7", color: "#92400e" },
+                  };
+                  const tc = OUT_TYPE_COLORS_LOC[or.type] ?? { bg: "#f3f4f6", color: "#374151" };
+                  const overallDone = sorted.every((t) => t.status === "COMPLETED");
+                  return (
+                    <div key={or.id} className="card" style={{ borderLeft: `4px solid ${tc.color}` }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+                        <FileIcon mimeType={rep.file.mimeType} size={30} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          {/* Title row */}
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+                            <span style={{ fontWeight: 700, fontSize: 15, color: "#1e293b" }}>{docName}</span>
+                            <span style={{ background: tc.bg, color: tc.color, borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>
+                              {OUT_TYPE_LABELS_LOC[or.type] ?? or.type}
                             </span>
-                          )}
-                          {isOutTask && task.outgoingRequest && (
                             <span style={{ background: "#fef3c7", color: "#92400e", borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>
-                              Solicitud saliente · {OUT_TYPE_LABELS[task.outgoingRequest.type]}
+                              Solicitud saliente
                             </span>
-                          )}
-                          {task.isOverdue && (
-                            <span style={{ background: "#fee2e2", color: "#dc2626", borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>
-                              ATRASADA
+                            <span style={{ background: overallDone ? "#dcfce7" : "#f1f5f9", color: overallDone ? "#166534" : "#64748b", borderRadius: 6, padding: "1px 8px", fontSize: 11 }}>
+                              {overallDone ? "Completada" : "En progreso"}
                             </span>
-                          )}
-                          <span style={{ background: "#f1f5f9", color: "#64748b", borderRadius: 6, padding: "1px 8px", fontSize: 11 }}>
-                            {TASK_STATUS_LABELS[task.status]}
-                          </span>
-                        </div>
-
-                        {/* Meta row */}
-                        <div style={{ display: "flex", gap: 14, fontSize: 12, color: "#64748b", flexWrap: "wrap" }}>
-                          {task.file.codigo && <span>Código: <b>{task.file.codigo}</b></span>}
-                          <span>Asignado por: <b>{task.assignedBy.name}</b></span>
-                          {mainTab === "equipo" && <span>Asignado a: <b>{task.assignedTo.name}</b></span>}
-                          {task.dueDate && (
-                            <span style={{ color: task.isOverdue ? "#dc2626" : "#64748b", fontWeight: task.isOverdue ? 700 : 400 }}>
-                              Vence: <b>{new Date(task.dueDate).toLocaleDateString("es-MX")}</b>
-                            </span>
-                          )}
-                          {task.file.folder && <span>Carpeta: {task.file.folder.name}</span>}
-                        </div>
-
-                        {/* Notes */}
-                        {task.notes && (
-                          <div style={{ marginTop: 8, padding: "8px 12px", background: "#f8fafc", borderRadius: 6, fontSize: 12, color: "#475569", borderLeft: "3px solid #e2e8f0" }}>
-                            {task.notes}
                           </div>
-                        )}
-
-                        {/* Motivo de devolución */}
-                        {task.rejectionNote && (
-                          <div style={{ marginTop: 8, padding: "8px 12px", background: "#fff7ed", borderRadius: 6, fontSize: 12, color: "#92400e", borderLeft: "3px solid #f59e0b" }}>
-                            <span style={{ fontWeight: 700 }}>Motivo de devolución:</span> {task.rejectionNote}
+                          {/* Meta */}
+                          <div style={{ display: "flex", gap: 14, fontSize: 12, color: "#64748b", flexWrap: "wrap", marginBottom: 10 }}>
+                            {rep.file.codigo && <span>Código: <b>{rep.file.codigo}</b></span>}
+                            <span>Asignado por: <b>{rep.assignedBy.name}</b></span>
+                            {rep.file.folder && <span>Carpeta: {rep.file.folder.name}</span>}
+                            {rep.dueDate && <span>Vence: <b>{new Date(rep.dueDate).toLocaleDateString("es-MX")}</b></span>}
                           </div>
-                        )}
-                      </div>
-
-                      {/* Actions */}
-                      <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
-                        {isViewable(task.file.mimeType) ? (
-                          <>
-                            <button
-                              className="action-btn"
-                              style={{ background: "#f1f5f9", color: "#475569" }}
-                              onClick={() => openPreview({ id: task.file.id, name: task.file.nombreDocumento || task.file.name, mimeType: task.file.mimeType })}
-                            >
-                              Ver
-                            </button>
-                            <button
-                              className="action-btn"
-                              style={{ background: "#f1f5f9", color: "#475569", opacity: openingDoc === task.file.id ? 0.5 : 1 }}
-                              disabled={openingDoc === task.file.id}
-                              onClick={() => openDoc(task.file.id)}
-                            >
-                              {openingDoc === task.file.id ? "…" : "Descargar"}
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            className="action-btn"
-                            style={{ background: "#f1f5f9", color: "#475569", opacity: openingDoc === task.file.id ? 0.5 : 1 }}
-                            disabled={openingDoc === task.file.id}
-                            onClick={() => openDoc(task.file.id)}
-                          >
-                            {openingDoc === task.file.id ? "…" : "Ver doc"}
-                          </button>
-                        )}
-
-                        {/* Review chain actions */}
-                        {isMyChainTurn && task.status !== "COMPLETED" && (
-                          <>
-                            <button
-                              className="action-btn"
-                              style={{ background: "#dcfce7", color: "#166534" }}
-                              onClick={() => { setChainNotes(""); setChainError(""); setChainModal({ taskId: task.id, action: "APPROVE", docName, stepOrder: task.stepOrder! }); }}
-                            >
-                              Aprobar
-                            </button>
-                            {(task.stepOrder ?? 1) > 1 && (
-                              <button
-                                className="action-btn"
-                                style={{ background: "#fff7ed", color: "#d97706" }}
-                                onClick={() => { setChainNotes(""); setChainError(""); setChainModal({ taskId: task.id, action: "RETURN_TO_PREVIOUS", docName, stepOrder: task.stepOrder! }); }}
-                              >
-                                Devolver
-                              </button>
+                          {/* Step timeline — shows all steps (known + pending placeholders) */}
+                          <div style={{ display: "flex", alignItems: "center", gap: 0, flexWrap: "wrap" }}>
+                            {Array.from({ length: or.totalSteps }, (_, i) => {
+                              const stepNum = i + 1;
+                              const task = sorted.find((t) => t.stepOrder === stepNum);
+                              const done   = task?.status === "COMPLETED";
+                              const active = !done && stepNum === (or.currentStep ?? 1) && task !== undefined;
+                              const future = stepNum > (or.currentStep ?? 1) && !done;
+                              const dotColor   = done ? "#22c55e" : active ? p : "#e2e8f0";
+                              const textColor  = done ? "#166534" : active ? "#1e293b" : "#94a3b8";
+                              const isLast     = i === or.totalSteps - 1;
+                              return (
+                                <div key={stepNum} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                                    <div style={{
+                                      width: 28, height: 28, borderRadius: "50%",
+                                      background: dotColor,
+                                      color: done ? "#fff" : active ? "#fff" : "#94a3b8",
+                                      display: "flex", alignItems: "center", justifyContent: "center",
+                                      fontSize: 12, fontWeight: 700,
+                                      border: active ? `2px solid ${p}` : "none",
+                                      boxShadow: active ? `0 0 0 3px ${p}22` : "none",
+                                    }}>
+                                      {done ? "✓" : stepNum}
+                                    </div>
+                                  </div>
+                                  <div style={{ fontSize: 12 }}>
+                                    <div style={{ fontWeight: active ? 700 : 500, color: textColor }}>
+                                      {task ? task.assignedTo.name : `Paso ${stepNum}`}
+                                    </div>
+                                    <div style={{ fontSize: 10, color: done ? "#22c55e" : active ? p : "#94a3b8" }}>
+                                      {done ? "Completado" : active ? "En progreso" : future ? "Siguiente" : "Pendiente"}
+                                    </div>
+                                  </div>
+                                  {!isLast && (
+                                    <div style={{ width: 24, height: 2, background: done ? "#22c55e" : "#e2e8f0", margin: "0 6px" }} />
+                                  )}
+                                </div>
+                              );
+                            })}
+                            {/* Admin final review stage (PENDING_APPROVAL) */}
+                            {or.status === "PENDING_APPROVAL" && (
+                              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                                <div style={{ width: 24, height: 2, background: "#22c55e", margin: "0 6px" }} />
+                                <div style={{
+                                  width: 28, height: 28, borderRadius: "50%",
+                                  background: "#fef3c7", color: "#92400e",
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                  fontSize: 10, fontWeight: 700, border: "2px solid #f59e0b",
+                                }}>
+                                  ✍
+                                </div>
+                                <div style={{ fontSize: 12 }}>
+                                  <div style={{ fontWeight: 700, color: "#92400e" }}>Revisión admin</div>
+                                  <div style={{ fontSize: 10, color: "#f59e0b" }}>Aprobación pendiente</div>
+                                </div>
+                              </div>
                             )}
-                            <button
-                              className="action-btn"
-                              style={{ background: "#fee2e2", color: "#dc2626" }}
-                              onClick={() => { setChainNotes(""); setChainError(""); setChainModal({ taskId: task.id, action: "REJECT", docName, stepOrder: task.stepOrder! }); }}
-                            >
-                              Rechazar
+                          </div>
+                          <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
+                            Paso {or.currentStep} de {or.totalSteps}{or.status === "PENDING_APPROVAL" ? " · Esperando aprobación del admin" : ""}
+                          </div>
+                          {/* Notes from any task */}
+                          {sorted.find((t) => t.notes) && (
+                            <div style={{ marginTop: 8, padding: "8px 12px", background: "#f8fafc", borderRadius: 6, fontSize: 12, color: "#475569", borderLeft: "3px solid #e2e8f0" }}>
+                              {sorted.find((t) => t.notes)!.notes}
+                            </div>
+                          )}
+                        </div>
+                        {/* Actions */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+                          {isViewable(rep.file.mimeType) ? (
+                            <>
+                              <button className="action-btn" style={{ background: "#f1f5f9", color: "#475569" }}
+                                onClick={() => openPreview({ id: rep.file.id, name: docName, mimeType: rep.file.mimeType })}>
+                                Ver
+                              </button>
+                              <button className="action-btn" style={{ background: "#f1f5f9", color: "#475569", opacity: openingDoc === rep.file.id ? 0.5 : 1 }}
+                                disabled={openingDoc === rep.file.id} onClick={() => openDoc(rep.file.id)}>
+                                {openingDoc === rep.file.id ? "…" : "Descargar"}
+                              </button>
+                            </>
+                          ) : (
+                            <button className="action-btn" style={{ background: "#f1f5f9", color: "#475569", opacity: openingDoc === rep.file.id ? 0.5 : 1 }}
+                              disabled={openingDoc === rep.file.id} onClick={() => openDoc(rep.file.id)}>
+                              {openingDoc === rep.file.id ? "…" : "Ver doc"}
                             </button>
-                          </>
-                        )}
-
-                        {/* Outgoing request submit button */}
-                        {isMyOutTurn && task.status !== "COMPLETED" && (
-                          <button
-                            className="action-btn"
-                            style={{ background: "#fef3c7", color: "#92400e" }}
-                            onClick={() => openOutModal(task)}
-                          >
-                            Responder
-                          </button>
-                        )}
-
-                        {/* Non-chain complete button */}
-                        {!isChainTask && !isOutTask && canComplete && task.status !== "COMPLETED" && (
-                          <button
-                            className="action-btn"
-                            style={{ background: "#dcfce7", color: "#166534", opacity: isCompleting ? 0.5 : 1 }}
-                            disabled={isCompleting}
-                            onClick={() => completeTask(task.id)}
-                          >
-                            {isCompleting ? "…" : "Completar"}
-                          </button>
-                        )}
-
-                        {isAdmin && mainTab === "equipo" && !isChainTask && (
-                          <button
-                            className="action-btn"
-                            style={{ background: p + "18", color: p }}
-                            onClick={() => openAssignModal(task.file.id, docName)}
-                          >
-                            + Asignar
-                          </button>
-                        )}
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })
+                  );
+                })}
+
+                {/* ── Standalone / Acciones tasks ── */}
+                {(mainTab === "acciones" ? tasksToShow : equipoStandalone).map((task) => {
+                  const tc = TASK_TYPE_COLORS[task.type];
+                  const isCompleting = completing === task.id;
+                  const canComplete = task.assignedTo.id === userId || task.assignedBy.id === userId;
+                  const isChainTask = !!task.reviewChainId && task.stepOrder !== null;
+                  const isMyChainTurn = isChainTask && task.assignedTo.id === userId;
+                  const isOutTask = !!task.outgoingRequestId && !!task.outgoingRequest;
+                  const isMyOutTurn = isOutTask && task.assignedTo.id === userId;
+                  const OUT_TYPE_LABELS: Record<string, string> = { ACTUALIZACION: "Actualización", REVISION: "Revisión", CORRECCION: "Corrección" };
+                  const docName = task.file.nombreDocumento || task.file.name;
+                  return (
+                    <div key={task.id} className="card" style={{ borderLeft: task.isOverdue ? "4px solid #dc2626" : isChainTask ? `4px solid #7c3aed` : `4px solid ${p}` }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+                        <FileIcon mimeType={task.file.mimeType} size={30} />
+
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          {/* Title row */}
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+                            <span style={{ fontWeight: 700, fontSize: 15, color: "#1e293b" }}>{docName}</span>
+                            <span style={{ background: tc.bg, color: tc.color, borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                              {TASK_TYPE_LABELS[task.type]}
+                            </span>
+                            {isChainTask && (
+                              <span style={{ background: "#ede9fe", color: "#6d28d9", borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>
+                                Cadena · Paso {task.stepOrder}/{task.chainTotalSteps}
+                              </span>
+                            )}
+                            {isOutTask && task.outgoingRequest && (
+                              <span style={{ background: "#fef3c7", color: "#92400e", borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>
+                                Solicitud saliente · {OUT_TYPE_LABELS[task.outgoingRequest.type]}
+                              </span>
+                            )}
+                            {task.isOverdue && (
+                              <span style={{ background: "#fee2e2", color: "#dc2626", borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>ATRASADA</span>
+                            )}
+                            <span style={{ background: "#f1f5f9", color: "#64748b", borderRadius: 6, padding: "1px 8px", fontSize: 11 }}>
+                              {TASK_STATUS_LABELS[task.status]}
+                            </span>
+                          </div>
+
+                          {/* Meta row */}
+                          <div style={{ display: "flex", gap: 14, fontSize: 12, color: "#64748b", flexWrap: "wrap" }}>
+                            {task.file.codigo && <span>Código: <b>{task.file.codigo}</b></span>}
+                            <span>Asignado por: <b>{task.assignedBy.name}</b></span>
+                            {mainTab === "equipo" && <span>Asignado a: <b>{task.assignedTo.name}</b></span>}
+                            {task.dueDate && (
+                              <span style={{ color: task.isOverdue ? "#dc2626" : "#64748b", fontWeight: task.isOverdue ? 700 : 400 }}>
+                                Vence: <b>{new Date(task.dueDate).toLocaleDateString("es-MX")}</b>
+                              </span>
+                            )}
+                            {task.file.folder && <span>Carpeta: {task.file.folder.name}</span>}
+                          </div>
+
+                          {task.notes && (
+                            <div style={{ marginTop: 8, padding: "8px 12px", background: "#f8fafc", borderRadius: 6, fontSize: 12, color: "#475569", borderLeft: "3px solid #e2e8f0" }}>
+                              {task.notes}
+                            </div>
+                          )}
+                          {task.rejectionNote && (
+                            <div style={{ marginTop: 8, padding: "8px 12px", background: "#fff7ed", borderRadius: 6, fontSize: 12, color: "#92400e", borderLeft: "3px solid #f59e0b" }}>
+                              <span style={{ fontWeight: 700 }}>Motivo de devolución:</span> {task.rejectionNote}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Actions */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+                          {isViewable(task.file.mimeType) ? (
+                            <>
+                              <button className="action-btn" style={{ background: "#f1f5f9", color: "#475569" }}
+                                onClick={() => openPreview({ id: task.file.id, name: task.file.nombreDocumento || task.file.name, mimeType: task.file.mimeType })}>
+                                Ver
+                              </button>
+                              <button className="action-btn" style={{ background: "#f1f5f9", color: "#475569", opacity: openingDoc === task.file.id ? 0.5 : 1 }}
+                                disabled={openingDoc === task.file.id} onClick={() => openDoc(task.file.id)}>
+                                {openingDoc === task.file.id ? "…" : "Descargar"}
+                              </button>
+                            </>
+                          ) : (
+                            <button className="action-btn" style={{ background: "#f1f5f9", color: "#475569", opacity: openingDoc === task.file.id ? 0.5 : 1 }}
+                              disabled={openingDoc === task.file.id} onClick={() => openDoc(task.file.id)}>
+                              {openingDoc === task.file.id ? "…" : "Ver doc"}
+                            </button>
+                          )}
+
+                          {isMyChainTurn && task.status !== "COMPLETED" && (
+                            <>
+                              <button className="action-btn" style={{ background: "#dcfce7", color: "#166534" }}
+                                onClick={() => { setChainNotes(""); setChainError(""); setChainModal({ taskId: task.id, action: "APPROVE", docName, stepOrder: task.stepOrder! }); }}>
+                                Aprobar
+                              </button>
+                              {(task.stepOrder ?? 1) > 1 && (
+                                <button className="action-btn" style={{ background: "#fff7ed", color: "#d97706" }}
+                                  onClick={() => { setChainNotes(""); setChainError(""); setChainModal({ taskId: task.id, action: "RETURN_TO_PREVIOUS", docName, stepOrder: task.stepOrder! }); }}>
+                                  Devolver
+                                </button>
+                              )}
+                              <button className="action-btn" style={{ background: "#fee2e2", color: "#dc2626" }}
+                                onClick={() => { setChainNotes(""); setChainError(""); setChainModal({ taskId: task.id, action: "REJECT", docName, stepOrder: task.stepOrder! }); }}>
+                                Rechazar
+                              </button>
+                            </>
+                          )}
+
+                          {isMyOutTurn && task.status !== "COMPLETED" && (
+                            <button className="action-btn" style={{ background: "#fef3c7", color: "#92400e" }}
+                              onClick={() => openOutModal(task)}>
+                              Responder
+                            </button>
+                          )}
+
+                          {!isChainTask && !isOutTask && canComplete && task.status !== "COMPLETED" && (
+                            <button className="action-btn" style={{ background: "#dcfce7", color: "#166534", opacity: isCompleting ? 0.5 : 1 }}
+                              disabled={isCompleting} onClick={() => completeTask(task.id)}>
+                              {isCompleting ? "…" : "Completar"}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
             )}
           </section>
         )}
 
-        {/* ── Section B: Estado General de Documentos ──────────────────────────── */}
+        {/* ── Section B: Pipeline de mis documentos ──────────────────────────── */}
         {mainTab === "seguimiento" && (
           <section style={{ marginBottom: 48 }}>
-            <div style={{ marginBottom: 16 }}>
-              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#1e293b" }}>Estado General de Documentos</h2>
-              <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94a3b8" }}>Estado del documento en sí, independiente de las tareas asignadas</p>
+            <div style={{ marginBottom: 8 }}>
+              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#1e293b" }}>Mis Documentos</h2>
+              <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94a3b8" }}>Documentos que subiste o eres responsable</p>
             </div>
 
-            {/* Doc status tabs */}
-            <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
-              {docTabs.map((t) => (
+            {/* Status tabs */}
+            <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+              {([
+                { key: "EN_ESPERA" as const, label: "En espera",  description: "Pendiente de revisión o aprobación", color: p },
+                { key: "REVISADOS" as const, label: "Revisados",   description: "Ciclo completo terminado",            color: "#16a34a" },
+              ]).map((s) => (
                 <button
-                  key={t.key}
+                  key={s.key}
                   className="tab-pill"
                   style={{
-                    background: docTab === t.key ? t.color : "#fff",
-                    color: docTab === t.key ? "#fff" : "#64748b",
-                    border: docTab === t.key ? `2px solid ${t.color}` : "2px solid #e2e8f0",
+                    background: pipelineStatus === s.key ? s.color : "#fff",
+                    color: pipelineStatus === s.key ? "#fff" : "#64748b",
+                    border: pipelineStatus === s.key ? `2px solid ${s.color}` : "2px solid #e2e8f0",
                   }}
-                  onClick={() => setDocTab(t.key)}
+                  onClick={() => setPipelineStatus(s.key)}
                 >
-                  {t.label}
+                  {s.label}
                   <span style={{
-                    background: docTab === t.key ? "rgba(255,255,255,0.25)" : t.color + "22",
-                    color: docTab === t.key ? "#fff" : t.color,
+                    background: pipelineStatus === s.key ? "rgba(255,255,255,0.25)" : s.color + "22",
+                    color: pipelineStatus === s.key ? "#fff" : s.color,
                     borderRadius: 20, padding: "1px 8px", fontSize: 11, fontWeight: 700,
                   }}>
-                    {t.count}
+                    {pipelineCounts[s.key]}
                   </span>
                 </button>
               ))}
             </div>
 
-            {loadingDocs ? (
-              [1,2,3].map((i) => <div key={i} className="skeleton" style={{ height: 64, marginBottom: 8 }} />)
-            ) : docFiles.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "40px 0", color: "#94a3b8" }}>
-                <div style={{ marginBottom: 8 }}><ClipboardList size={36} color="#cbd5e1" /></div>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>No hay documentos en esta categoría</div>
-              </div>
-            ) : (
-              docFiles.map((f) => {
-                const sc = DOC_STATUS_COLORS[f.status] ?? DOC_STATUS_COLORS.DRAFT;
+            {pipelineLoading ? (
+              [1,2,3].map((i) => <div key={i} className="skeleton" style={{ height: 80, marginBottom: 10 }} />)
+            ) : (() => {
+              const filtered = pipelineDocs.filter((f) =>
+                pipelineStatus === "REVISADOS"
+                  ? f.status === "REVIEWED"
+                  : f.status === "IN_REVIEW" || f.status === "PENDING_APPROVAL" || f.status === "DRAFT"
+              );
+              if (filtered.length === 0) return (
+                <div style={{ textAlign: "center", padding: "48px 0", color: "#94a3b8" }}>
+                  <div style={{ marginBottom: 8 }}><ClipboardList size={36} color="#cbd5e1" /></div>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>
+                    {pipelineStatus === "EN_ESPERA" ? "No tienes documentos esperando revisión" : "Aún no tienes documentos revisados"}
+                  </div>
+                </div>
+              );
+              return filtered.map((f) => {
+                const chain = f.activeChain;
+                const docName = f.nombreDocumento || f.name;
+                const statusColors: Record<string, { bg: string; color: string }> = {
+                  DRAFT:            { bg: "#f1f5f9",   color: "#475569" },
+                  IN_REVIEW:        { bg: "#dbeafe",   color: "#1e40af" },
+                  REVIEWED:         { bg: "#dcfce7",   color: "#166534" },
+                  PENDING_APPROVAL: { bg: "#fef3c7",   color: "#92400e" },
+                };
+                const statusLabels: Record<string, string> = {
+                  DRAFT: "Borrador", IN_REVIEW: "En Revisión", REVIEWED: "Revisado", PENDING_APPROVAL: "Esperando Admin",
+                };
+                const sc = statusColors[f.status] ?? statusColors.DRAFT;
                 return (
-                  <div key={f.id} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "12px 16px", marginBottom: 8, display: "flex", alignItems: "center", gap: 12 }}>
-                    <FileIcon mimeType={f.mimeType} size={26} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-                        <span style={{ fontWeight: 600, color: "#1e293b", fontSize: 14 }}>{f.nombreDocumento || f.name}</span>
-                        {f.isOverdue && <span style={{ background: "#fee2e2", color: "#dc2626", borderRadius: 8, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>ATRASADO</span>}
+                  <div key={f.id} className="card" style={{ borderLeft: `4px solid ${sc.color}`, marginBottom: 10 }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+                      <FileIcon mimeType={f.mimeType} size={28} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        {/* Title + status */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+                          <span style={{ fontWeight: 700, fontSize: 14, color: "#1e293b" }}>{docName}</span>
+                          <span style={{ background: sc.bg, color: sc.color, borderRadius: 5, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>
+                            {statusLabels[f.status] ?? f.status}
+                          </span>
+                        </div>
+                        {/* Meta */}
+                        <div style={{ display: "flex", gap: 12, fontSize: 12, color: "#64748b", flexWrap: "wrap", marginBottom: chain ? 10 : 0 }}>
+                          {f.codigo && <span>Código: <b>{f.codigo}</b></span>}
+                          {f.versionStr && <span>Versión: <b>{f.versionStr}</b></span>}
+                          {f.folder && <span>Carpeta: {f.folder.name}</span>}
+                          <span>Actualizado: {new Date(f.updatedAt).toLocaleDateString("es-CR", { day: "2-digit", month: "short" })}</span>
+                        </div>
+                        {/* Review chain steps */}
+                        {chain && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 0, flexWrap: "wrap" }}>
+                            {chain.steps.map((step, idx) => {
+                              const done   = step.status === "COMPLETED";
+                              const active = !done && step.stepOrder === chain.currentStep;
+                              const dotColor  = done ? "#22c55e" : active ? p : "#e2e8f0";
+                              const textColor = done ? "#166534" : active ? "#1e293b" : "#94a3b8";
+                              return (
+                                <div key={step.id} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                                  <div style={{
+                                    width: 26, height: 26, borderRadius: "50%",
+                                    background: dotColor, color: done ? "#fff" : active ? "#fff" : "#94a3b8",
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    fontSize: 11, fontWeight: 700,
+                                    border: active ? `2px solid ${p}` : "none",
+                                    boxShadow: active ? `0 0 0 3px ${p}22` : "none",
+                                    flexShrink: 0,
+                                  }}>
+                                    {done ? "✓" : step.stepOrder}
+                                  </div>
+                                  <div style={{ fontSize: 11 }}>
+                                    <div style={{ fontWeight: active ? 700 : 500, color: textColor }}>{step.assignedTo.name}</div>
+                                    <div style={{ fontSize: 10, color: done ? "#22c55e" : active ? p : "#94a3b8" }}>
+                                      {done ? "Listo" : active ? "Revisando…" : "Pendiente"}
+                                    </div>
+                                  </div>
+                                  {idx < chain.steps.length - 1 && (
+                                    <div style={{ width: 20, height: 2, background: done ? "#22c55e" : "#e2e8f0", margin: "0 4px" }} />
+                                  )}
+                                </div>
+                              );
+                            })}
+                            <div style={{ marginLeft: 8, fontSize: 11, color: "#94a3b8" }}>
+                              Paso {chain.currentStep}/{chain.totalSteps}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div style={{ display: "flex", gap: 12, fontSize: 12, color: "#64748b", flexWrap: "wrap" }}>
-                        {f.codigo && <span>Código: <b>{f.codigo}</b></span>}
-                        {f.encargadoDocumento && <span>Encargado: <b>{f.encargadoDocumento.name}</b></span>}
-                        {f.fechaRevision && <span>Revisión: <b>{new Date(f.fechaRevision).toLocaleDateString("es-MX")}</b></span>}
-                      </div>
-                    </div>
-                    <span style={{ background: sc.bg, color: sc.color, borderRadius: 7, padding: "3px 10px", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
-                      {DOC_STATUS_LABELS[f.status]}
-                    </span>
-                    {isAdmin && (
-                      <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
-                        <button className="action-btn" style={{ background: p + "18", color: p }}
-                          onClick={() => openAssignModal(f.id, f.nombreDocumento || f.name)}>
-                          Asignar
-                        </button>
-                        {f.status !== "REVIEWED" && (
-                          <button className="action-btn" style={{ background: "#dcfce7", color: "#166534" }}
-                            onClick={() => changeDocStatus(f.id, "REVIEWED")}>
-                            Revisado
+                      {/* View button */}
+                      <div style={{ flexShrink: 0 }}>
+                        {isViewable(f.mimeType) ? (
+                          <button className="action-btn" style={{ background: "#f1f5f9", color: "#475569" }}
+                            onClick={() => openPreview({ id: f.id, name: docName, mimeType: f.mimeType })}>
+                            Ver
+                          </button>
+                        ) : (
+                          <button className="action-btn" style={{ background: "#f1f5f9", color: "#475569", opacity: openingDoc === f.id ? 0.5 : 1 }}
+                            disabled={openingDoc === f.id} onClick={() => openDoc(f.id)}>
+                            {openingDoc === f.id ? "…" : "Ver doc"}
                           </button>
                         )}
                       </div>
-                    )}
+                    </div>
                   </div>
                 );
-              })
-            )}
+              });
+            })()}
           </section>
         )}
 
         {/* ── Section C: Rechazados / Devueltos ───────────────────────────────── */}
         {mainTab === "acciones" && (rejectedCRs.length > 0 || rejectedChains.length > 0 || rejectedOutgoing.length > 0 || loadingRejected) && (
           <section style={{ marginBottom: 48 }}>
-            <div style={{ marginBottom: 16 }}>
-              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#dc2626" }}>Rechazados / Devueltos</h2>
-              <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94a3b8" }}>
-                Documentos que fueron rechazados o devueltos con observaciones
-              </p>
+            <div style={{ marginBottom: 16, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#dc2626" }}>Rechazados / Devueltos</h2>
+                <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94a3b8" }}>
+                  Documentos que fueron rechazados o devueltos con observaciones
+                </p>
+              </div>
+              {rejectedCount > 0 && (
+                <button
+                  onClick={clearAllDismissed}
+                  style={{ background: "#fee2e2", color: "#dc2626", border: "1px solid #fca5a5", borderRadius: 7, padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0, marginTop: 2 }}
+                >
+                  Limpiar todo
+                </button>
+              )}
             </div>
 
             {loadingRejected ? (
               [1,2].map((i) => <div key={i} className="skeleton" style={{ height: 72, marginBottom: 8 }} />)
             ) : (
               <>
-                {rejectedChains.map((chain) => {
+                {visibleRejectedChains.map((chain) => {
                   const f = chain.file;
                   const docName = f?.nombreDocumento || f?.name || "Documento eliminado";
                   const reason = chain.rejectionNote ?? chain.rejectingStep?.rejectionNote ?? null;
                   const rejectedBy = chain.rejectingStep?.assignedTo?.name ?? "Revisor";
                   return (
-                    <div key={chain.id} style={{ background: "#fff", border: "1px solid #fca5a5", borderLeft: "4px solid #dc2626", borderRadius: 10, padding: "14px 18px", marginBottom: 10 }}>
+                    <div key={chain.id} style={{ background: "#fff", border: "1px solid #fca5a5", borderLeft: "4px solid #dc2626", borderRadius: 10, padding: "14px 18px", marginBottom: 10, position: "relative" }}>
+                      <button onClick={() => dismissItem(chain.id)} title="Descartar" style={{ position: "absolute", top: 8, right: 10, background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 18, lineHeight: 1, padding: 2 }}>×</button>
                       <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
                         {f && <FileIcon mimeType={f.mimeType} size={28} />}
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -920,12 +1168,13 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                   );
                 })}
 
-                {rejectedCRs.map((cr) => {
+                {visibleRejectedCRs.map((cr) => {
                   const f = cr.file;
                   const docName = f?.nombreDocumento || f?.name || "Documento eliminado";
                   const rejectedBy = cr.reviewedBy?.name ?? "Administrador";
                   return (
-                    <div key={cr.id} style={{ background: "#fff", border: "1px solid #fca5a5", borderLeft: "4px solid #f97316", borderRadius: 10, padding: "14px 18px", marginBottom: 10 }}>
+                    <div key={cr.id} style={{ background: "#fff", border: "1px solid #fca5a5", borderLeft: "4px solid #f97316", borderRadius: 10, padding: "14px 18px", marginBottom: 10, position: "relative" }}>
+                      <button onClick={() => dismissItem(cr.id)} title="Descartar" style={{ position: "absolute", top: 8, right: 10, background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 18, lineHeight: 1, padding: 2 }}>×</button>
                       <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
                         {f && <FileIcon mimeType={f.mimeType} size={28} />}
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -966,13 +1215,14 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                   );
                 })}
 
-                {rejectedOutgoing.map((o) => {
+                {visibleRejectedOutgoing.map((o) => {
                   const f = o.file;
                   const docName = f?.nombreDocumento || f?.name || "Documento eliminado";
                   const rejectedBy = o.finalReviewer?.name ?? "Administrador";
                   const typeLabel = { ACTUALIZACION: "Actualización", REVISION: "Revisión", CORRECCION: "Corrección" }[o.type] ?? o.type;
                   return (
-                    <div key={o.id} style={{ background: "#fff", border: "1px solid #fca5a5", borderLeft: "4px solid #8b5cf6", borderRadius: 10, padding: "14px 18px", marginBottom: 10 }}>
+                    <div key={o.id} style={{ background: "#fff", border: "1px solid #fca5a5", borderLeft: "4px solid #8b5cf6", borderRadius: 10, padding: "14px 18px", marginBottom: 10, position: "relative" }}>
+                      <button onClick={() => dismissItem(o.id)} title="Descartar" style={{ position: "absolute", top: 8, right: 10, background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 18, lineHeight: 1, padding: 2 }}>×</button>
                       <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
                         {f && <FileIcon mimeType={f.mimeType} size={28} />}
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -1016,63 +1266,64 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
           </section>
         )}
 
-        {/* ── Section D: Mis Solicitudes de Cambio (solo PENDING) ──────────────── */}
-        {mainTab === "seguimiento" && (
-          <section style={{ marginTop: 48 }}>
-            <div style={{ marginBottom: 16 }}>
-              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#1e293b" }}>Mis Solicitudes Pendientes</h2>
-              <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94a3b8" }}>
-                Cambios enviados al administrador que aun no han sido revisados
-              </p>
-            </div>
-
-            {loadingCR ? (
-              [1,2].map((i) => <div key={i} className="skeleton" style={{ height: 64, marginBottom: 8 }} />)
-            ) : pendingCRs.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "32px 0", color: "#94a3b8" }}>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>No tienes solicitudes pendientes de revision</div>
+        {/* ── Section D: Mis Solicitudes (Eliminación + Propuesta de revisión) ── */}
+        {mainTab === "seguimiento" && (() => {
+          const mySolicitudes = myChangeRequests.filter(
+            (cr) => cr.type === "DELETE" || cr.type === "REVISION_REQUEST"
+          );
+          if (loadingCR || mySolicitudes.length === 0) return null;
+          return (
+            <section style={{ marginTop: 48 }}>
+              <div style={{ marginBottom: 16 }}>
+                <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#1e293b" }}>Mis Solicitudes</h2>
+                <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94a3b8" }}>
+                  Solicitudes de eliminación y propuestas de revisión enviadas al admin
+                </p>
               </div>
-            ) : (
-              pendingCRs.map((cr) => {
+              {mySolicitudes.map((cr) => {
                 const sc = CR_STATUS_COLORS[cr.status] ?? CR_STATUS_COLORS.PENDING;
-                const docName = cr.file?.nombreDocumento || cr.file?.name || "Documento eliminado";
+                const docName = cr.file?.nombreDocumento || cr.file?.name || "Documento";
+                const typeColor = cr.type === "DELETE"
+                  ? { bg: "#fee2e2", color: "#dc2626" }
+                  : { bg: "#fdf4ff", color: "#7c3aed" };
                 return (
-                  <div key={cr.id} style={{ background: "#fff", border: `1px solid #e2e8f0`, borderLeft: `4px solid ${sc.border}`, borderRadius: 10, padding: "14px 18px", marginBottom: 10 }}>
+                  <div key={cr.id} style={{ background: "#fff", border: "1px solid #e2e8f0", borderLeft: `4px solid ${sc.border}`, borderRadius: 10, padding: "14px 18px", marginBottom: 10 }}>
                     <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+                      {cr.file && <FileIcon mimeType={(cr.file as { mimeType?: string }).mimeType ?? "application/octet-stream"} size={26} />}
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        {/* Title + badges */}
                         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
                           <span style={{ fontWeight: 700, fontSize: 14, color: "#1e293b" }}>{docName}</span>
-                          <span style={{ background: "#f1f5f9", color: "#475569", borderRadius: 5, padding: "1px 7px", fontSize: 11, fontWeight: 600 }}>
+                          <span style={{ background: typeColor.bg, color: typeColor.color, borderRadius: 5, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>
                             {CR_TYPE_LABELS[cr.type] ?? cr.type}
                           </span>
                         </div>
-                        {/* Meta */}
                         <div style={{ display: "flex", gap: 14, fontSize: 12, color: "#64748b", flexWrap: "wrap" }}>
                           {cr.file?.codigo && <span>Código: <b>{cr.file.codigo}</b></span>}
                           <span>Enviada: <b>{new Date(cr.createdAt).toLocaleDateString("es-MX")}</b></span>
-                          {cr.reviewedAt && (
-                            <span>Revisada: <b>{new Date(cr.reviewedAt).toLocaleDateString("es-MX")}</b></span>
-                          )}
+                          {cr.reviewedAt && <span>Revisada: <b>{new Date(cr.reviewedAt).toLocaleDateString("es-MX")}</b></span>}
                         </div>
-                        {/* Admin notes on rejection */}
+                        {cr.status === "APPROVED" && (
+                          <div style={{ marginTop: 8, padding: "7px 12px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 6, fontSize: 12, color: "#166534" }}>
+                            {cr.type === "DELETE" ? "El documento fue eliminado." : "Aprobada — el admin iniciará el proceso de cambio."}
+                            {cr.adminNotes && <span> <b>Nota:</b> {cr.adminNotes}</span>}
+                          </div>
+                        )}
                         {cr.status === "REJECTED" && cr.adminNotes && (
                           <div style={{ marginTop: 8, padding: "7px 12px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6, fontSize: 12, color: "#dc2626" }}>
-                            <b>Motivo:</b> {cr.adminNotes}
+                            <b>Rechazada — Motivo:</b> {cr.adminNotes}
                           </div>
                         )}
                       </div>
-                      {/* Status badge */}
                       <span style={{ background: sc.bg, color: sc.color, border: `1px solid ${sc.border}`, borderRadius: 7, padding: "4px 12px", fontSize: 12, fontWeight: 700, flexShrink: 0, alignSelf: "center" }}>
                         {CR_STATUS_LABELS[cr.status]}
                       </span>
                     </div>
                   </div>
                 );
-              })
-            )}
-          </section>
-        )}
+              })}
+            </section>
+          );
+        })()}
       </div>
 
       {/* ── Outgoing request submit modal ───────────────────────────────────── */}

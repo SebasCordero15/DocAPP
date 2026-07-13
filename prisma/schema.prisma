@@ -50,6 +50,7 @@ enum ChangeRequestType {
   DELETE
   REVISION_DATE_CHANGE
   OTHER
+  REVISION_REQUEST
 }
 
 enum ChangeRequestStatus {

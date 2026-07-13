@@ -42,7 +42,7 @@ export async function GET() {
     prisma.outgoingRequest.findMany({
       where: {
         companyId,
-        type: "REVISION",
+        type: { in: ["REVISION", "ACTUALIZACION", "CORRECCION"] },
         status: { in: ["PENDING", "IN_PROGRESS", "PENDING_APPROVAL"] },
         ...(!isAdmin ? {
           tasks: { some: { assignedToUserId: userId } },

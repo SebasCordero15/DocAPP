@@ -797,7 +797,7 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                       {canEdit && (
                         <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                           <button className="ghost-btn" onClick={() => { setRenamingId(f.id); setRenameValue(f.name); }} style={ghostBtnStyle} title="Rename"><Pencil size={13} /></button>
-                          <button className="danger-btn" onClick={() => deleteFolder(f.id, f.name)} style={dangerBtnStyle} title="Trash"><Trash2 size={13} /></button>
+                          {isAdmin && <button className="danger-btn" onClick={() => deleteFolder(f.id, f.name)} style={dangerBtnStyle} title="Trash"><Trash2 size={13} /></button>}
                         </div>
                       )}
                     </>
@@ -840,14 +840,8 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                         </button>
                       )}
                       <button className="ghost-btn" onClick={() => downloadFile(f.id)} style={ghostBtnStyle} title="Descargar"><Download size={13} /></button>
-                      {isAdmin && <button className="ghost-btn" onClick={() => openReviewPanel(f)} style={{ ...ghostBtnStyle, display: "flex", alignItems: "center", gap: 4 }} title="Programar revisión"><Calendar size={13} /></button>}
                       {isAdmin && f.reviewDueDate && (
                         <button className="ghost-btn" onClick={() => completeReview(f)} style={{ ...ghostBtnStyle, color: "#16a34a", borderColor: "#bbf7d0" }} title="Marcar revisión completa"><CheckCircle size={13} /></button>
-                      )}
-                      {!isAdmin && canEdit && (
-                        <button className="ghost-btn" onClick={() => openPeerReviewModal(f)} style={{ ...ghostBtnStyle, display: "flex", alignItems: "center", gap: 4 }} title="Solicitar revisión a colega">
-                          <UserCheck size={13} /> Solicitar
-                        </button>
                       )}
                       {(isAdmin || canEdit) && f.comparisonStorageKey ? (
                         <button className="ghost-btn" onClick={() => viewComparison(f.id)} style={{ ...ghostBtnStyle, color: "#15803d", borderColor: "#bbf7d0" }} title="Ver documento comparativo"><Paperclip size={13} /></button>
@@ -857,7 +851,7 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                       {isAdmin && f.status === "REVIEWED" && (
                         <button className="ghost-btn" onClick={() => markObsolete(f)} style={{ ...ghostBtnStyle, color: "#92400e", borderColor: "#fde68a" }} title="Archivar como obsoleto"><Archive size={13} /></button>
                       )}
-                      {canEdit && <button className="danger-btn" onClick={() => deleteFile(f.id, f.nombreDocumento || f.name)} style={dangerBtnStyle} title="Trash"><Trash2 size={13} /></button>}
+                      {isAdmin && <button className="danger-btn" onClick={() => deleteFile(f.id, f.nombreDocumento || f.name)} style={dangerBtnStyle} title="Trash"><Trash2 size={13} /></button>}
                     </div>
                   </div>
 
@@ -947,7 +941,7 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                           {canEdit && !isRenaming && (
                             <div style={{ position: "absolute", top: 8, right: 8, display: "flex", gap: 4 }} onClick={(e) => e.stopPropagation()}>
                               <button className="ghost-btn" onClick={() => { setRenamingId(f.id); setRenameValue(f.name); }} style={{ ...ghostBtnStyle, padding: "3px 5px" }}><Pencil size={11} /></button>
-                              <button className="danger-btn" onClick={() => deleteFolder(f.id, f.name)} style={{ ...dangerBtnStyle, padding: "3px 5px" }}><Trash2 size={11} /></button>
+                              {isAdmin && <button className="danger-btn" onClick={() => deleteFolder(f.id, f.name)} style={{ ...dangerBtnStyle, padding: "3px 5px" }}><Trash2 size={11} /></button>}
                             </div>
                           )}
                         </div>
@@ -989,7 +983,7 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                           <div className="fade-up" style={{ position: "absolute", bottom: 8, left: 8, right: 8, display: "flex", gap: 4, justifyContent: "center" }} onClick={(e) => e.stopPropagation()}>
                             {isViewable(f.mimeType) && <button className="ghost-btn" onClick={() => openPreview(f)} style={{ ...ghostBtnStyle, fontSize: 11, padding: "3px 7px" }}><Eye size={12} /> Ver</button>}
                             <button className="ghost-btn" onClick={() => downloadFile(f.id)} style={{ ...ghostBtnStyle, padding: "3px 6px" }}><Download size={12} /></button>
-                            {canEdit && <button className="danger-btn" onClick={() => deleteFile(f.id, f.nombreDocumento || f.name)} style={{ ...dangerBtnStyle, padding: "3px 6px" }}><Trash2 size={12} /></button>}
+                            {isAdmin && <button className="danger-btn" onClick={() => deleteFile(f.id, f.nombreDocumento || f.name)} style={{ ...dangerBtnStyle, padding: "3px 6px" }}><Trash2 size={12} /></button>}
                           </div>
                         )}
                       </div>

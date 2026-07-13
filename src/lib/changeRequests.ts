@@ -14,6 +14,7 @@ const CR_TYPE_LABELS: Record<string, string> = {
   DELETE:               "eliminación de documento",
   REVISION_DATE_CHANGE: "cambio de fecha de revisión",
   OTHER:                "cambio de documento",
+  REVISION_REQUEST:     "propuesta de revisión",
 };
 
 /**

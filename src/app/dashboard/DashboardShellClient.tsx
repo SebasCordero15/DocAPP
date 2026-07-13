@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import {
   Files, ClipboardList, ClipboardCheck, History, FilePlus,
   Users, Shield, Inbox, ScrollText, BarChart2, LogOut,
-  ChevronLeft, ChevronRight, Globe, Archive,
+  ChevronLeft, ChevronRight, Globe, Trash2, FileEdit,
 } from "lucide-react";
 
 interface Props {
@@ -67,11 +67,14 @@ export default function DashboardShellClient({
     ...(canCreate ? [
       { label: "Crear Documento", icon: <FilePlus size={18} />,    href: "/dashboard/crear-documento",        badge: 0 },
     ] : []),
+    ...(!isAdmin ? [
+      { label: "Solicitar Cambio",  icon: <FileEdit size={18} />,  href: "/dashboard/solicitar-cambio",       badge: 0 },
+      { label: "Elim. Documento",   icon: <Trash2 size={18} />,    href: "/dashboard/eliminar-documento",     badge: 0 },
+    ] : []),
     ...(isAdmin ? [
       { label: "Equipo",       icon: <Users size={18} />,      href: "/dashboard/team",              badge: 0 },
       { label: "Permisos",     icon: <Shield size={18} />,     href: "/dashboard/permissions",       badge: 0 },
       { label: "Solicitudes",  icon: <Inbox size={18} />,      href: "/dashboard/solicitudes",       badge: pendingCRCount },
-      { label: "Archivo",      icon: <Archive size={18} />,    href: "/dashboard/archivo-historico", badge: 0 },
       { label: "Reportes",     icon: <BarChart2 size={18} />,  href: "/dashboard/reportes",          badge: 0 },
       { label: "Historial",    icon: <ScrollText size={18} />, href: "/dashboard/audit",             badge: 0 },
     ] : []),

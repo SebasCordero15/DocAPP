@@ -58,8 +58,6 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
   const [tipo,         setTipo]         = useState("PROCEDIMIENTO");
   const [version,      setVersion]      = useState("v1.0");
   const [folderId,     setFolderId]     = useState("");
-  const [codigo,       setCodigo]       = useState("");
-  const [codigoSuggested, setCodigoSuggested] = useState("");
   const [departments,  setDepartments]  = useState<{ id: string; name: string }[]>([]);
 
   // Step 1 — File upload
@@ -86,21 +84,6 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
       .then((r) => r.json())
       .then((d) => setDepartments(d.departments ?? []));
   }, []);
-
-  // Suggest code when tipo changes
-  useEffect(() => {
-    if (!tipo) return;
-    fetch(`/api/files/suggest-code?tipo=${tipo}`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.suggested) {
-          setCodigoSuggested(d.suggested);
-          setCodigo((prev) => prev === "" || prev === codigoSuggested ? d.suggested : prev);
-        }
-      })
-      .catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tipo]);
 
   const availableUsers = users.filter(
     (u) => u.id !== currentUserId && !reviewers.find((r) => r.id === u.id)
@@ -169,7 +152,6 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
           departamento,
           tipoDocumento:   tipo,
           versionStr:      version,
-          codigo:          codigo.trim() || null,
           ...(folderId ? { folderId } : {}),
           reviewerIds:     reviewers.map((r) => r.id),
         }),
@@ -275,22 +257,6 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
                 <div>
                   <label style={ls}>Versión</label>
                   <input style={is} value={version} onChange={(e) => setVersion(e.target.value)} placeholder="v1.0" />
-                </div>
-                <div>
-                  <label style={ls}>
-                    Código{" "}
-                    {codigoSuggested && (
-                      <span style={{ fontWeight: 400, color: "#64748b", textTransform: "none", fontSize: 11 }}>
-                        (sugerido: {codigoSuggested})
-                      </span>
-                    )}
-                  </label>
-                  <input
-                    style={is}
-                    value={codigo}
-                    onChange={(e) => setCodigo(e.target.value)}
-                    placeholder={codigoSuggested || "ej. MA-001"}
-                  />
                 </div>
               </div>
 
@@ -458,7 +424,6 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
                 <Row label="Departamento" value={departamento} />
                 <Row label="Tipo" value={TIPO_OPTIONS.find((t) => t.value === tipo)?.label ?? tipo} />
                 <Row label="Versión" value={version} />
-                {codigo.trim() && <Row label="Código" value={codigo.trim()} />}
                 <Row label="Carpeta" value={selectedFolderLabel} />
                 <Row label="Archivo" value={file?.name ?? "—"} />
                 {!isExternalFolder && (
