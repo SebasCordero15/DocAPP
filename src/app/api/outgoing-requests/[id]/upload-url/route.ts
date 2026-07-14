@@ -22,7 +22,7 @@ export async function POST(
   const { companyId, userId } = session;
 
   const outgoing = await prisma.outgoingRequest.findFirst({
-    where: { id: params.id, companyId, status: { in: ["PENDING", "IN_PROGRESS"] } },
+    where: { id: params.id, companyId, status: { in: ["PENDING", "IN_PROGRESS", "RETURNED"] } },
     include: {
       file: { select: { id: true, folderId: true, size: true } },
       tasks: { orderBy: { stepOrder: "asc" } },
@@ -30,8 +30,13 @@ export async function POST(
   });
   if (!outgoing) return NextResponse.json({ error: "Solicitud no encontrada" }, { status: 404 });
 
-  const currentTask = outgoing.tasks.find((t) => t.stepOrder === outgoing.currentStep);
-  if (!currentTask || currentTask.assignedToUserId !== userId) {
+  // RETURNED: any task assignee can upload the corrected file
+  // Active: only the current-step assignee can upload
+  const isAllowed = outgoing.status === "RETURNED"
+    ? outgoing.tasks.some((t) => t.assignedToUserId === userId)
+    : outgoing.tasks.find((t) => t.stepOrder === outgoing.currentStep)?.assignedToUserId === userId;
+
+  if (!isAllowed) {
     return NextResponse.json({ error: "No tienes acceso a esta solicitud" }, { status: 403 });
   }
 

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle, ClipboardList, X } from "lucide-react";
 import FileIcon from "@/components/FileIcon";
@@ -383,8 +383,12 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
   // ── correction modal (for RETURNED outgoing requests)
   const [correctModal,        setCorrectModal]        = useState<{ id: string; type: string; docName: string } | null>(null);
   const [correctInstructions, setCorrectInstructions] = useState("");
+  const [correctFile,         setCorrectFile]         = useState<File | null>(null);
+  const [correctVersionStr,   setCorrectVersionStr]   = useState("");
+  const [correctProgress,     setCorrectProgress]     = useState(0);
   const [correctSubmitting,   setCorrectSubmitting]   = useState(false);
   const [correctError,        setCorrectError]        = useState("");
+  const correctFileRef = useRef<HTMLInputElement>(null);
   const [dismissedIds,     setDismissedIds]     = useState<Set<string>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem("dismissed_rejected") ?? "[]")); } catch { return new Set(); }
   });
@@ -392,15 +396,57 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
   async function submitCorrection() {
     if (!correctModal) return;
     if (!correctInstructions.trim()) { setCorrectError("El cambio a realizar es obligatorio"); return; }
-    setCorrectSubmitting(true); setCorrectError("");
+    setCorrectSubmitting(true); setCorrectError(""); setCorrectProgress(0);
+
+    let storageKey: string | null = null;
+    let fileName: string | null   = null;
+    let mimeType: string | null   = null;
+    let size: number | null       = null;
+
+    if (correctFile) {
+      // 1. Get presigned upload URL
+      const urlRes = await fetch(`/api/outgoing-requests/${correctModal.id}/upload-url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: correctFile.name, mimeType: correctFile.type || "application/octet-stream", size: correctFile.size }),
+      });
+      if (!urlRes.ok) {
+        const d = await urlRes.json().catch(() => ({}));
+        setCorrectError(d.error ?? "Error al obtener URL de carga");
+        setCorrectSubmitting(false);
+        return;
+      }
+      const { uploadUrl, storageKey: sk } = await urlRes.json();
+      setCorrectProgress(40);
+
+      // 2. Upload file
+      const putRes = await fetch(uploadUrl, {
+        method: "PUT",
+        body: correctFile,
+        headers: { "Content-Type": correctFile.type || "application/octet-stream" },
+      });
+      if (!putRes.ok) { setCorrectError("Error al subir el archivo"); setCorrectSubmitting(false); return; }
+      setCorrectProgress(80);
+
+      storageKey = sk;
+      fileName   = correctFile.name;
+      mimeType   = correctFile.type || "application/octet-stream";
+      size       = correctFile.size;
+    }
+
     const res = await fetch(`/api/outgoing-requests/${correctModal.id}/correct`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ instructions: correctInstructions.trim() }),
+      body: JSON.stringify({
+        instructions: correctInstructions.trim(),
+        storageKey, fileName, mimeType, size,
+        versionStr: correctVersionStr.trim() || null,
+      }),
     });
     setCorrectSubmitting(false);
     if (res.ok) {
       setCorrectModal(null);
+      setCorrectFile(null); setCorrectVersionStr(""); setCorrectProgress(0);
       setReturnedOutgoing((prev) => prev.filter((o) => o.id !== correctModal.id));
     } else {
       const d = await res.json().catch(() => ({}));
@@ -1808,20 +1854,79 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
               />
             </div>
 
+            {/* File re-upload — only for ACTUALIZACION and CORRECCION */}
+            {(correctModal.type === "ACTUALIZACION" || correctModal.type === "CORRECCION") && (
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#475569", marginBottom: 6 }}>
+                  Archivo corregido <span style={{ fontSize: 11, fontWeight: 400, color: "#94a3b8" }}>(opcional — reemplaza el anterior)</span>
+                </label>
+                <div
+                  onClick={() => !correctSubmitting && correctFileRef.current?.click()}
+                  style={{
+                    border: `2px dashed ${correctFile ? "#f97316" : "#cbd5e1"}`,
+                    borderRadius: 8, padding: "12px 14px", cursor: correctSubmitting ? "default" : "pointer",
+                    textAlign: "center", background: correctFile ? "#fff7ed" : "#f8fafc",
+                  }}
+                >
+                  {correctFile ? (
+                    <div style={{ fontSize: 13, color: "#c2410c" }}>
+                      <strong>{correctFile.name}</strong>
+                      <span style={{ marginLeft: 8, fontSize: 11, color: "#64748b" }}>
+                        {(correctFile.size / 1024 / 1024).toFixed(1)} MB
+                      </span>
+                      {!correctSubmitting && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setCorrectFile(null); }}
+                          style={{ marginLeft: 10, background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 14 }}
+                        >×</button>
+                      )}
+                    </div>
+                  ) : (
+                    <span style={{ fontSize: 12, color: "#94a3b8" }}>Haz clic para seleccionar un archivo</span>
+                  )}
+                </div>
+                <input
+                  ref={correctFileRef}
+                  type="file"
+                  style={{ display: "none" }}
+                  onChange={(e) => setCorrectFile(e.target.files?.[0] ?? null)}
+                />
+                {correctModal.type === "ACTUALIZACION" && correctFile && (
+                  <input
+                    value={correctVersionStr}
+                    onChange={(e) => setCorrectVersionStr(e.target.value)}
+                    placeholder="Etiqueta de versión (ej. v2.1)"
+                    disabled={correctSubmitting}
+                    style={{ marginTop: 8, width: "100%", padding: "7px 10px", border: "1px solid #e2e8f0", borderRadius: 7, fontSize: 13, boxSizing: "border-box", outline: "none" }}
+                  />
+                )}
+              </div>
+            )}
+
+            {/* Upload progress */}
+            {correctSubmitting && correctFile && correctProgress > 0 && correctProgress < 100 && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ height: 4, background: "#e2e8f0", borderRadius: 2, overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${correctProgress}%`, background: "#f97316", transition: "width 0.3s ease" }} />
+                </div>
+                <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 4, textAlign: "center" }}>Subiendo archivo…</p>
+              </div>
+            )}
+
             {correctError && (
               <p style={{ margin: "0 0 14px", padding: "8px 12px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6, fontSize: 12, color: "#dc2626" }}>{correctError}</p>
             )}
 
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               {!correctSubmitting && (
-                <button onClick={() => setCorrectModal(null)} style={{ border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", padding: "9px 18px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancelar</button>
+                <button onClick={() => { setCorrectModal(null); setCorrectFile(null); setCorrectVersionStr(""); }} style={{ border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", padding: "9px 18px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancelar</button>
               )}
               <button
                 onClick={submitCorrection}
                 disabled={correctSubmitting || !correctInstructions.trim()}
                 style={{ background: "#f97316", color: "#fff", border: "none", padding: "9px 22px", borderRadius: 8, cursor: correctSubmitting ? "default" : "pointer", fontSize: 13, fontWeight: 700, opacity: (correctSubmitting || !correctInstructions.trim()) ? 0.65 : 1 }}
               >
-                {correctSubmitting ? "Enviando…" : "Reenviar para aprobación"}
+                {correctSubmitting ? (correctFile ? "Subiendo…" : "Enviando…") : "Reenviar para aprobación"}
               </button>
             </div>
           </div>
