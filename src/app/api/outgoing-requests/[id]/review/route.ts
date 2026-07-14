@@ -7,7 +7,7 @@ import { logAction } from "@/lib/audit";
 import { deleteObject } from "@/lib/storage";
 
 const schema = z.object({
-  decision: z.enum(["APPROVED", "REJECTED"]),
+  decision: z.enum(["APPROVED", "REJECTED", "RETURNED"]),
   notes:    z.string().max(2000).optional().nullable(),
   // Override version label (admin can adjust before approving)
   versionStr: z.string().optional().nullable(),
@@ -87,6 +87,40 @@ export async function POST(
 
     await logAction({
       companyId, userId, action: "OUTGOING_REQUEST_REJECTED",
+      resourceType: "FILE", resourceId: outgoing.fileId,
+      detail: docName,
+    });
+
+    return NextResponse.json({ ok: true });
+  }
+
+  if (decision === "RETURNED") {
+    await prisma.$transaction(async (tx) => {
+      await tx.outgoingRequest.update({
+        where: { id: params.id },
+        data: {
+          status:                "RETURNED",
+          finalNotes:            notes ?? null,
+          finalReviewedByUserId: userId,
+          finalReviewedAt:       now,
+        },
+      });
+
+      const uniqueUserIds = [...new Set(outgoing.tasks.map((t) => t.assignedToUserId))];
+      await tx.notification.createMany({
+        data: uniqueUserIds.map((uid) => ({
+          companyId,
+          userId:  uid,
+          type:    "OUTGOING_REQUEST_RETURNED",
+          message: (`Tu entrega para "${docName}" fue devuelta para corrección.${notes ? ` ${notes}` : ""}`).trim(),
+          fileId:  outgoing.fileId,
+        })),
+        skipDuplicates: true,
+      });
+    });
+
+    await logAction({
+      companyId, userId, action: "OUTGOING_REQUEST_RETURNED",
       resourceType: "FILE", resourceId: outgoing.fileId,
       detail: docName,
     });

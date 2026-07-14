@@ -101,6 +101,16 @@ interface RejectedOutgoing {
   finalReviewer: { id: string; name: string } | null;
 }
 
+interface ReturnedOutgoing {
+  id: string;
+  type: "ACTUALIZACION" | "REVISION" | "CORRECCION";
+  instructions: string | null;
+  finalNotes: string | null;
+  finalReviewedAt: string | null;
+  file: { id: string; name: string; nombreDocumento: string | null; codigo: string | null; mimeType: string } | null;
+  finalReviewer: { id: string; name: string } | null;
+}
+
 interface PipelineDoc {
   id: string;
   name: string;
@@ -367,10 +377,36 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
   const [rejectedCRs,      setRejectedCRs]      = useState<RejectedCR[]>([]);
   const [rejectedChains,   setRejectedChains]   = useState<RejectedChain[]>([]);
   const [rejectedOutgoing, setRejectedOutgoing] = useState<RejectedOutgoing[]>([]);
+  const [returnedOutgoing, setReturnedOutgoing] = useState<ReturnedOutgoing[]>([]);
   const [loadingRejected,  setLoadingRejected]  = useState(true);
+
+  // ── correction modal (for RETURNED outgoing requests)
+  const [correctModal,        setCorrectModal]        = useState<{ id: string; type: string; docName: string } | null>(null);
+  const [correctInstructions, setCorrectInstructions] = useState("");
+  const [correctSubmitting,   setCorrectSubmitting]   = useState(false);
+  const [correctError,        setCorrectError]        = useState("");
   const [dismissedIds,     setDismissedIds]     = useState<Set<string>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem("dismissed_rejected") ?? "[]")); } catch { return new Set(); }
   });
+
+  async function submitCorrection() {
+    if (!correctModal) return;
+    if (!correctInstructions.trim()) { setCorrectError("El cambio a realizar es obligatorio"); return; }
+    setCorrectSubmitting(true); setCorrectError("");
+    const res = await fetch(`/api/outgoing-requests/${correctModal.id}/correct`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ instructions: correctInstructions.trim() }),
+    });
+    setCorrectSubmitting(false);
+    if (res.ok) {
+      setCorrectModal(null);
+      setReturnedOutgoing((prev) => prev.filter((o) => o.id !== correctModal.id));
+    } else {
+      const d = await res.json().catch(() => ({}));
+      setCorrectError(d.error ?? "Error al enviar la corrección");
+    }
+  }
 
   function dismissItem(id: string) {
     setDismissedIds((prev) => {
@@ -385,6 +421,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
       ...rejectedChains.map((c) => c.id),
       ...rejectedCRs.map((c) => c.id),
       ...rejectedOutgoing.map((o) => o.id),
+      ...returnedOutgoing.map((o) => o.id),
     ];
     setDismissedIds((prev) => {
       const next = new Set(prev);
@@ -460,6 +497,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
       setRejectedCRs(d.rejectedCRs ?? []);
       setRejectedChains(d.rejectedChains ?? []);
       setRejectedOutgoing(d.rejectedOutgoing ?? []);
+      setReturnedOutgoing(d.returnedOutgoing ?? []);
     }
     setLoadingRejected(false);
   }, []);
@@ -579,7 +617,8 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
   const visibleRejectedChains   = rejectedChains.filter((c) => !dismissedIds.has(c.id));
   const visibleRejectedCRs      = rejectedCRs.filter((c) => !dismissedIds.has(c.id));
   const visibleRejectedOutgoing = rejectedOutgoing.filter((o) => !dismissedIds.has(o.id));
-  const rejectedCount = visibleRejectedChains.length + visibleRejectedCRs.length + visibleRejectedOutgoing.length;
+  const visibleReturnedOutgoing = returnedOutgoing.filter((o) => !dismissedIds.has(o.id));
+  const rejectedCount = visibleRejectedChains.length + visibleRejectedCRs.length + visibleRejectedOutgoing.length + visibleReturnedOutgoing.length;
 
   const pendingCRs = myChangeRequests.filter((cr) => cr.status === "PENDING");
 
@@ -1100,7 +1139,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
         )}
 
         {/* ── Section C: Rechazados / Devueltos ───────────────────────────────── */}
-        {mainTab === "acciones" && (rejectedCRs.length > 0 || rejectedChains.length > 0 || rejectedOutgoing.length > 0 || loadingRejected) && (
+        {mainTab === "acciones" && (rejectedCRs.length > 0 || rejectedChains.length > 0 || rejectedOutgoing.length > 0 || returnedOutgoing.length > 0 || loadingRejected) && (
           <section style={{ marginBottom: 48 }}>
             <div style={{ marginBottom: 16, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
               <div>
@@ -1210,6 +1249,55 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                             </button>
                           </div>
                         )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {visibleReturnedOutgoing.map((o) => {
+                  const f = o.file;
+                  const docName = f?.nombreDocumento || f?.name || "Documento eliminado";
+                  const returnedBy = o.finalReviewer?.name ?? "Administrador";
+                  const typeLabel = { ACTUALIZACION: "Actualización", REVISION: "Revisión", CORRECCION: "Corrección" }[o.type] ?? o.type;
+                  return (
+                    <div key={o.id} style={{ background: "#fff", border: "1px solid #fed7aa", borderLeft: "4px solid #f97316", borderRadius: 10, padding: "14px 18px", marginBottom: 10, position: "relative" }}>
+                      <button onClick={() => dismissItem(o.id)} title="Descartar" style={{ position: "absolute", top: 8, right: 10, background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 18, lineHeight: 1, padding: 2 }}>×</button>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+                        {f && <FileIcon mimeType={f.mimeType} size={28} />}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+                            <span style={{ fontWeight: 700, fontSize: 14, color: "#1e293b" }}>{docName}</span>
+                            <span style={{ background: "#fff7ed", color: "#c2410c", borderRadius: 5, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>
+                              Devuelta — pendiente corrección
+                            </span>
+                            <span style={{ background: "#f1f5f9", color: "#475569", borderRadius: 5, padding: "1px 7px", fontSize: 11 }}>
+                              {typeLabel}
+                            </span>
+                          </div>
+                          <div style={{ display: "flex", gap: 12, fontSize: 12, color: "#64748b", flexWrap: "wrap" }}>
+                            {f?.codigo && <span>Código: <b>{f.codigo}</b></span>}
+                            <span>Devuelta por: <b>{returnedBy}</b></span>
+                            {o.finalReviewedAt && <span>Fecha: <b>{new Date(o.finalReviewedAt).toLocaleDateString("es-MX")}</b></span>}
+                          </div>
+                          {o.finalNotes && (
+                            <div style={{ marginTop: 8, padding: "7px 12px", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 6, fontSize: 12, color: "#c2410c" }}>
+                              <b>Nota del admin:</b> {o.finalNotes}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+                          <button
+                            className="action-btn"
+                            style={{ background: "#f97316", color: "#fff", border: "none", fontWeight: 700 }}
+                            onClick={() => {
+                              setCorrectModal({ id: o.id, type: o.type, docName });
+                              setCorrectInstructions(o.instructions ?? "");
+                              setCorrectError("");
+                            }}
+                          >
+                            Corregir
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -1685,6 +1773,55 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
               </button>
               <button onClick={() => setShowAssign(false)} style={{ background: "#f1f5f9", color: "#64748b", border: "none", padding: "11px 16px", borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
                 Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Correction modal (RETURNED outgoing requests) ── */}
+      {correctModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
+          onClick={(e) => { if (e.target === e.currentTarget && !correctSubmitting) setCorrectModal(null); }}>
+          <div style={{ background: "#fff", borderRadius: 12, padding: 28, width: "100%", maxWidth: 520, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#1e293b" }}>Corregir y reenviar</h3>
+                <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b" }}>{correctModal.docName}</p>
+              </div>
+              {!correctSubmitting && (
+                <button onClick={() => setCorrectModal(null)} style={{ border: "none", background: "transparent", cursor: "pointer", color: "#94a3b8", fontSize: 22, lineHeight: 1 }}>×</button>
+              )}
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#475569", marginBottom: 6 }}>
+                Cambio a realizar <span style={{ color: "#dc2626" }}>*</span>
+              </label>
+              <textarea
+                rows={4}
+                value={correctInstructions}
+                onChange={(e) => setCorrectInstructions(e.target.value)}
+                disabled={correctSubmitting}
+                placeholder="Describe el cambio que se realizará…"
+                style={{ width: "100%", padding: "9px 11px", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 13, resize: "vertical", boxSizing: "border-box", outline: "none" }}
+              />
+            </div>
+
+            {correctError && (
+              <p style={{ margin: "0 0 14px", padding: "8px 12px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6, fontSize: 12, color: "#dc2626" }}>{correctError}</p>
+            )}
+
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              {!correctSubmitting && (
+                <button onClick={() => setCorrectModal(null)} style={{ border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", padding: "9px 18px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancelar</button>
+              )}
+              <button
+                onClick={submitCorrection}
+                disabled={correctSubmitting || !correctInstructions.trim()}
+                style={{ background: "#f97316", color: "#fff", border: "none", padding: "9px 22px", borderRadius: 8, cursor: correctSubmitting ? "default" : "pointer", fontSize: 13, fontWeight: 700, opacity: (correctSubmitting || !correctInstructions.trim()) ? 0.65 : 1 }}
+              >
+                {correctSubmitting ? "Enviando…" : "Reenviar para aprobación"}
               </button>
             </div>
           </div>

@@ -3,15 +3,15 @@ import { requireActiveSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 // GET /api/pendientes/rejected
-// Returns ChangeRequests rejected by admin and ReviewChains rejected by a reviewer,
-// both belonging to the current user (as requester/creator).
+// Returns ChangeRequests rejected by admin, ReviewChains rejected by a reviewer,
+// rejected OutgoingRequests, and returned OutgoingRequests for the current user.
 export async function GET() {
   const session = await requireActiveSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!session.companyId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const { companyId, userId } = session;
 
-  const [rejectedCRs, rejectedOutgoing, rejectedChains] = await Promise.all([
+  const [rejectedCRs, rejectedOutgoing, rejectedChains, returnedOutgoing] = await Promise.all([
     prisma.changeRequest.findMany({
       where: { companyId, requestedByUserId: userId, status: "REJECTED" },
       orderBy: { reviewedAt: "desc" },
@@ -70,6 +70,26 @@ export async function GET() {
         },
       },
     }),
+
+    prisma.outgoingRequest.findMany({
+      where: {
+        companyId,
+        status: "RETURNED",
+        tasks: { some: { assignedToUserId: userId } },
+      },
+      orderBy: { finalReviewedAt: "desc" },
+      select: {
+        id: true,
+        type: true,
+        instructions: true,
+        finalNotes: true,
+        finalReviewedAt: true,
+        file: {
+          select: { id: true, name: true, nombreDocumento: true, codigo: true, mimeType: true },
+        },
+        finalReviewer: { select: { id: true, name: true } },
+      },
+    }),
   ]);
 
   return NextResponse.json({
@@ -84,6 +104,10 @@ export async function GET() {
       rejectingStep: chain.steps[0] ?? null,
     })),
     rejectedOutgoing: rejectedOutgoing.map((o) => ({
+      ...o,
+      finalReviewedAt: o.finalReviewedAt?.toISOString() ?? null,
+    })),
+    returnedOutgoing: returnedOutgoing.map((o) => ({
       ...o,
       finalReviewedAt: o.finalReviewedAt?.toISOString() ?? null,
     })),

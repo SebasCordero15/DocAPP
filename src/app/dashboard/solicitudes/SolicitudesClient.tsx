@@ -32,7 +32,7 @@ interface OutgoingTask {
 
 interface OutgoingRequest {
   id: string; type: "ACTUALIZACION" | "REVISION" | "CORRECCION";
-  status: "PENDING" | "IN_PROGRESS" | "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "CANCELLED";
+  status: "PENDING" | "IN_PROGRESS" | "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "RETURNED" | "CANCELLED";
   instructions: string | null; correctionFields: Record<string, unknown> | null;
   currentStep: number; totalSteps: number;
   outcomeType: string | null; pendingVersionStr: string | null;
@@ -87,7 +87,7 @@ const OUT_TYPE_COLORS: Record<string, { bg: string; color: string }> = {
 const OUT_STATUS_LABELS: Record<string, string> = {
   PENDING: "Pendiente", IN_PROGRESS: "En progreso",
   PENDING_APPROVAL: "Pendiente de aprobación", APPROVED: "Aprobada",
-  REJECTED: "Rechazada", CANCELLED: "Cancelada",
+  REJECTED: "Rechazada", RETURNED: "Devuelta", CANCELLED: "Cancelada",
 };
 const OUT_STATUS_COLORS: Record<string, { bg: string; color: string }> = {
   PENDING:           { bg: "#f1f5f9", color: "#64748b" },
@@ -95,6 +95,7 @@ const OUT_STATUS_COLORS: Record<string, { bg: string; color: string }> = {
   PENDING_APPROVAL:  { bg: "#ede9fe", color: "#5b21b6" },
   APPROVED:          { bg: "#dcfce7", color: "#166534" },
   REJECTED:          { bg: "#fee2e2", color: "#dc2626" },
+  RETURNED:          { bg: "#fff7ed", color: "#c2410c" },
   CANCELLED:         { bg: "#f3f4f6", color: "#94a3b8" },
 };
 const OUTCOME_LABELS: Record<string, string> = {
@@ -295,7 +296,7 @@ export default function SolicitudesClient({ company, userRole }: Props) {
     }
   }
 
-  async function submitOutReview(id: string, decision: "APPROVED" | "REJECTED") {
+  async function submitOutReview(id: string, decision: "APPROVED" | "REJECTED" | "RETURNED") {
     const notes = reviewNotes[id]?.trim();
     if (decision === "REJECTED" && !notes) return;
     const versionStr = reviewVer[id]?.trim() || null;
@@ -822,9 +823,12 @@ export default function SolicitudesClient({ company, userRole }: Props) {
                         )}
                         <label className="form-label">Notas (requeridas para rechazo)</label>
                         <textarea rows={3} value={reviewNotes[o.id] ?? ""} onChange={(e) => setReviewNotes((n) => ({ ...n, [o.id]: e.target.value }))} className="form-input" style={{ resize: "vertical", marginBottom: 10 }} placeholder="Observaciones para el equipo…" />
-                        <div style={{ display: "flex", gap: 8 }}>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                           <button className="btn" disabled={outProcessing === o.id} onClick={() => submitOutReview(o.id, "APPROVED")} style={{ background: "#dcfce7", color: "#166534" }}>
                             {outProcessing === o.id ? "Procesando…" : <><Check size={13} style={{ marginRight: 4 }} />Aprobar</>}
+                          </button>
+                          <button className="btn" disabled={outProcessing === o.id || !reviewNotes[o.id]?.trim()} onClick={() => submitOutReview(o.id, "RETURNED")} style={{ background: "#fff7ed", color: "#c2410c", border: "1px solid #fed7aa" }}>
+                            Devolver
                           </button>
                           <button className="btn" disabled={outProcessing === o.id || !reviewNotes[o.id]?.trim()} onClick={() => submitOutReview(o.id, "REJECTED")} style={{ background: "#fee2e2", color: "#dc2626" }}>
                             <XIcon size={13} style={{ marginRight: 4 }} />Rechazar
