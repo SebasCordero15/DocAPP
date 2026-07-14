@@ -122,7 +122,7 @@ export async function POST(
     await logAction({
       companyId, userId, action: "OUTGOING_REQUEST_RETURNED",
       resourceType: "FILE", resourceId: outgoing.fileId,
-      detail: docName,
+      detail: notes ?? undefined,
     });
 
     return NextResponse.json({ ok: true });

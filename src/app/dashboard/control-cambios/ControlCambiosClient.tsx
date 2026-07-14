@@ -99,8 +99,10 @@ const TIPO_COLORS: Record<string, string> = {
   OR_ACTUALIZACION:         "#2563eb",
   OR_REVISION:              "#7c3aed",
   OR_CORRECCION:            "#d97706",
-  CR_REVISION_DATE_CHANGE:  "#0891b2",
-  CR_OTHER:                 "#64748b",
+  CR_REVISION_DATE_CHANGE:        "#0891b2",
+  CR_OTHER:                       "#64748b",
+  OUTGOING_REQUEST_RETURNED:      "#f97316",
+  OUTGOING_REQUEST_CORRECTED:     "#0891b2",
 };
 
 export default function ControlCambiosClient({ company, userRole }: Props) {

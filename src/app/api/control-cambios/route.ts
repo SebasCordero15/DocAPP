@@ -47,6 +47,7 @@ export async function GET(req: NextRequest) {
           in: [
             "FILE_UPLOAD", "FILE_DELETE", "FILE_REVIEW_COMPLETE", "FILE_REVIEW_UPDATE",
             "FILE_METADATA_UPDATE", "FILE_STATUS_UPDATE", "FILE_OBSOLETE",
+            "OUTGOING_REQUEST_RETURNED", "OUTGOING_REQUEST_CORRECTED",
           ],
         },
       },
@@ -135,17 +136,19 @@ export async function GET(req: NextRequest) {
   };
 
   const AUDIT_LABELS: Record<string, string> = {
-    FILE_UPLOAD:          "Archivo subido",
-    FILE_DELETE:          "Archivo eliminado",
-    FILE_REVIEW_COMPLETE: "Revisión completada",
-    FILE_REVIEW_UPDATE:   "Revisión programada",
-    FILE_METADATA_UPDATE: "Metadatos actualizados",
-    FILE_STATUS_UPDATE:   "Estado actualizado",
-    FILE_OBSOLETE:        "Archivado como obsoleto",
-    FOLDER_CREATE:        "Carpeta creada",
-    FOLDER_DELETE:        "Carpeta eliminada",
-    FOLDER_RENAME:        "Carpeta renombrada",
-    FOLDER_MOVE:          "Carpeta movida",
+    FILE_UPLOAD:                   "Archivo subido",
+    FILE_DELETE:                   "Archivo eliminado",
+    FILE_REVIEW_COMPLETE:          "Revisión completada",
+    FILE_REVIEW_UPDATE:            "Revisión programada",
+    FILE_METADATA_UPDATE:          "Metadatos actualizados",
+    FILE_STATUS_UPDATE:            "Estado actualizado",
+    FILE_OBSOLETE:                 "Archivado como obsoleto",
+    FOLDER_CREATE:                 "Carpeta creada",
+    FOLDER_DELETE:                 "Carpeta eliminada",
+    FOLDER_RENAME:                 "Carpeta renombrada",
+    FOLDER_MOVE:                   "Carpeta movida",
+    OUTGOING_REQUEST_RETURNED:     "Entrega devuelta",
+    OUTGOING_REQUEST_CORRECTED:    "Entrega corregida y reenviada",
   };
 
   function resolveLabel(action: string, detail: string | null): string {
@@ -165,6 +168,8 @@ export async function GET(req: NextRequest) {
     if (detail.startsWith("Archivado")) return detail;
     // STATUS_UPDATE may have a useful label
     if (action === "FILE_STATUS_UPDATE") return detail;
+    // Return/correction events store meaningful detail directly
+    if (action === "OUTGOING_REQUEST_RETURNED" || action === "OUTGOING_REQUEST_CORRECTED") return detail;
     return null;
   }
 

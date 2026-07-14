@@ -72,10 +72,11 @@ export async function POST(
     data: updateData,
   });
 
+  const truncated = instructions.length > 150 ? instructions.slice(0, 147) + "…" : instructions;
   await logAction({
     companyId, userId, action: "OUTGOING_REQUEST_CORRECTED",
     resourceType: "FILE", resourceId: outgoing.fileId,
-    detail: docName,
+    detail: truncated,
   });
 
   return NextResponse.json({ ok: true });
