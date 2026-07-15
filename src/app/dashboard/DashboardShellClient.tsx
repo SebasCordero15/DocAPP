@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import {
   Files, ClipboardList, ClipboardCheck, History, FilePlus,
@@ -36,20 +36,34 @@ export default function DashboardShellClient({
   const [pendingTotal,  setPendingTotal]  = useState(0);
   const [pendingCRCount, setPendingCRCount] = useState(0);
 
-  useEffect(() => {
+  const refreshTaskCounts = useCallback(() => {
     fetch("/api/tasks/counts")
       .then((r) => r.json())
-      .then((d) => setPendingTotal((d.pendientes ?? 0) + (d.atrasadas ?? 0)))
+      .then((d) => setPendingTotal((d.pendientes ?? 0) + (d.atrasadas ?? 0) + (d.returnedOutgoing ?? 0)))
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
+  const refreshCRCounts = useCallback(() => {
     if (!isAdmin) return;
     fetch("/api/change-requests/counts")
       .then((r) => r.json())
       .then((d) => setPendingCRCount(d.pending ?? 0))
       .catch(() => {});
   }, [isAdmin]);
+
+  useEffect(() => {
+    refreshTaskCounts();
+    const interval = setInterval(refreshTaskCounts, 30_000);
+    const handler = () => { refreshTaskCounts(); refreshCRCounts(); };
+    window.addEventListener("pendientes-changed", handler);
+    return () => { clearInterval(interval); window.removeEventListener("pendientes-changed", handler); };
+  }, [refreshTaskCounts, refreshCRCounts]);
+
+  useEffect(() => {
+    refreshCRCounts();
+    const interval = setInterval(refreshCRCounts, 30_000);
+    return () => clearInterval(interval);
+  }, [refreshCRCounts]);
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });

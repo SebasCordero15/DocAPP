@@ -10,9 +10,15 @@ export async function GET() {
   if (!session.companyId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   if (!isAdminRole(session.role)) return NextResponse.json({ pending: 0 });
 
-  const pending = await prisma.changeRequest.count({
-    where: { companyId: session.companyId, status: "PENDING" },
-  });
+  const [pendingCR, pendingOutgoing] = await Promise.all([
+    prisma.changeRequest.count({
+      where: { companyId: session.companyId, status: "PENDING" },
+    }),
+    // OutgoingRequests waiting for admin final approval
+    prisma.outgoingRequest.count({
+      where: { companyId: session.companyId, status: "PENDING_APPROVAL" },
+    }),
+  ]);
 
-  return NextResponse.json({ pending });
+  return NextResponse.json({ pending: pendingCR + pendingOutgoing });
 }

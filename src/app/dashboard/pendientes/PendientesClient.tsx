@@ -363,6 +363,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
     if (res.ok) {
       setOutModal(null);
       await fetchMyTasks();
+      window.dispatchEvent(new Event("pendientes-changed"));
     } else {
       const d = await res.json().catch(() => ({}));
       setOutError(d.error ?? "Error al enviar la respuesta");
@@ -448,6 +449,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
       setCorrectModal(null);
       setCorrectFile(null); setCorrectVersionStr(""); setCorrectProgress(0);
       setReturnedOutgoing((prev) => prev.filter((o) => o.id !== correctModal.id));
+      window.dispatchEvent(new Event("pendientes-changed"));
     } else {
       const d = await res.json().catch(() => ({}));
       setCorrectError(d.error ?? "Error al enviar la corrección");
@@ -579,6 +581,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
     await Promise.all([fetchMyTasks(), fetchDocCounts(), fetchDocFiles(docTab), fetchMyChangeRequests(), fetchRejectedItems()]);
     if (isAdmin && mainTab === "equipo") await fetchTeamTasks();
     setCompleting(null);
+    window.dispatchEvent(new Event("pendientes-changed"));
   };
 
   // ── review chain: approve / return to previous / reject
@@ -602,6 +605,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
     setChainWorking(false);
     await Promise.all([fetchMyTasks(), fetchDocCounts(), fetchDocFiles(docTab), fetchMyChangeRequests(), fetchRejectedItems()]);
     if (isAdmin && mainTab === "equipo") await fetchTeamTasks();
+    window.dispatchEvent(new Event("pendientes-changed"));
   };
 
   // ── assign a task
@@ -792,8 +796,9 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                   };
                   const tc = OUT_TYPE_COLORS_LOC[or.type] ?? { bg: "#f3f4f6", color: "#374151" };
                   const overallDone = sorted.every((t) => t.status === "COMPLETED");
+                  const anyOverdue  = !overallDone && sorted.some((t) => t.isOverdue);
                   return (
-                    <div key={or.id} className="card" style={{ borderLeft: `4px solid ${tc.color}` }}>
+                    <div key={or.id} className="card" style={{ borderLeft: `4px solid ${anyOverdue ? "#dc2626" : tc.color}` }}>
                       <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
                         <FileIcon mimeType={rep.file.mimeType} size={30} />
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -806,8 +811,12 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                             <span style={{ background: "#fef3c7", color: "#92400e", borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>
                               Solicitud saliente
                             </span>
-                            <span style={{ background: overallDone ? "#dcfce7" : "#f1f5f9", color: overallDone ? "#166534" : "#64748b", borderRadius: 6, padding: "1px 8px", fontSize: 11 }}>
-                              {overallDone ? "Completada" : "En progreso"}
+                            <span style={{
+                              background: overallDone ? "#dcfce7" : anyOverdue ? "#fee2e2" : "#f1f5f9",
+                              color:      overallDone ? "#166534" : anyOverdue ? "#dc2626" : "#64748b",
+                              borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: anyOverdue ? 700 : 400,
+                            }}>
+                              {overallDone ? "Completada" : anyOverdue ? "Retrasado" : "En progreso"}
                             </span>
                           </div>
                           {/* Meta */}
@@ -931,9 +940,12 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                           {/* Title row */}
                           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
                             <span style={{ fontWeight: 700, fontSize: 15, color: "#1e293b" }}>{docName}</span>
-                            <span style={{ background: tc.bg, color: tc.color, borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
-                              {TASK_TYPE_LABELS[task.type]}
-                            </span>
+                            {/* Only show generic type chip when not an outgoing task (outgoing chip below already names the type) */}
+                            {!isOutTask && (
+                              <span style={{ background: tc.bg, color: tc.color, borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                                {TASK_TYPE_LABELS[task.type]}
+                              </span>
+                            )}
                             {isChainTask && (
                               <span style={{ background: "#ede9fe", color: "#6d28d9", borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>
                                 Cadena · Paso {task.stepOrder}/{task.chainTotalSteps}
@@ -945,11 +957,16 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                               </span>
                             )}
                             {task.isOverdue && (
-                              <span style={{ background: "#fee2e2", color: "#dc2626", borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>ATRASADA</span>
+                              <span style={{ background: "#fee2e2", color: "#dc2626", borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>Retrasado</span>
                             )}
-                            <span style={{ background: "#f1f5f9", color: "#64748b", borderRadius: 6, padding: "1px 8px", fontSize: 11 }}>
-                              {TASK_STATUS_LABELS[task.status]}
-                            </span>
+                            {/* Action-required chip */}
+                            {task.status !== "COMPLETED" && task.assignedTo.id === userId && (
+                              <span style={{ background: "#dcfce7", color: "#166534", borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                                {isChainTask ? "Aprobar / Devolver / Rechazar"
+                                  : isOutTask ? "Subir respuesta"
+                                  : "Completar tarea"}
+                              </span>
+                            )}
                           </div>
 
                           {/* Meta row */}

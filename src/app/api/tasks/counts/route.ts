@@ -10,7 +10,7 @@ export async function GET() {
   const companyId = session.companyId;
   const now = new Date();
 
-  const [pendientes, atrasadas, myPendingCR, top5] = await Promise.all([
+  const [pendientes, atrasadas, myPendingCR, returnedOutgoing, top5] = await Promise.all([
     prisma.documentTask.count({
       where: {
         companyId,
@@ -31,6 +31,14 @@ export async function GET() {
         companyId,
         requestedByUserId: session.userId,
         status: "PENDING",
+      },
+    }),
+    // RETURNED outgoing requests the user must correct
+    prisma.outgoingRequest.count({
+      where: {
+        companyId,
+        status: "RETURNED",
+        tasks: { some: { assignedToUserId: session.userId } },
       },
     }),
     prisma.documentTask.findMany({
@@ -54,6 +62,7 @@ export async function GET() {
     pendientes,
     atrasadas,
     myPendingCR,
+    returnedOutgoing,
     top5: top5.map((t) => ({
       id: t.id,
       type: t.type,
