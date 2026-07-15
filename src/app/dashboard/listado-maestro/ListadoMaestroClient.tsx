@@ -187,17 +187,39 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
   }
 
   async function saveEdit(fileId: string) {
+    const orig = files.find((f) => f.id === fileId);
+    const body: Record<string, unknown> = {};
+
+    const newCodigo = editForm.codigo || null;
+    if (newCodigo !== (orig?.codigo ?? null)) body.codigo = newCodigo;
+
+    const newNombre = editForm.nombreDocumento || null;
+    if (newNombre !== (orig?.nombreDocumento ?? null)) body.nombreDocumento = newNombre;
+
+    const newVer = editForm.versionStr || null;
+    if (newVer !== (orig?.versionStr ?? null)) body.versionStr = newVer;
+
+    const newFechaEm  = editForm.fechaEmision || null;
+    const oldFechaEm  = toInputDate(orig?.fechaEmision ?? null) || null;
+    if (newFechaEm !== oldFechaEm) body.fechaEmision = newFechaEm ? new Date(newFechaEm).toISOString() : null;
+
+    const newFechaRev = editForm.fechaRevision || null;
+    const oldFechaRev = toInputDate(orig?.fechaRevision ?? null) || null;
+    if (newFechaRev !== oldFechaRev) body.fechaRevision = newFechaRev ? new Date(newFechaRev).toISOString() : null;
+
+    const newFechaAct = editForm.fechaActualizacion || null;
+    const oldFechaAct = toInputDate(orig?.fechaActualizacion ?? null) || null;
+    if (newFechaAct !== oldFechaAct) body.fechaActualizacion = newFechaAct ? new Date(newFechaAct).toISOString() : null;
+
+    const newCC = editForm.controlCambios || null;
+    if (newCC !== (orig?.controlCambios ?? null)) body.controlCambios = newCC;
+
+    const newEnc = editForm.encargadoDocumentoId || null;
+    if (newEnc !== (orig?.encargadoDocumentoId ?? null)) body.encargadoDocumentoId = newEnc;
+
+    if (Object.keys(body).length === 0) { setEditingId(null); return; }
+
     setSaving(true);
-    const body: Record<string, unknown> = {
-      codigo:               editForm.codigo || null,
-      nombreDocumento:      editForm.nombreDocumento || null,
-      versionStr:           editForm.versionStr || null,
-      fechaEmision:         editForm.fechaEmision ? new Date(editForm.fechaEmision).toISOString() : null,
-      fechaRevision:        editForm.fechaRevision ? new Date(editForm.fechaRevision).toISOString() : null,
-      fechaActualizacion:   editForm.fechaActualizacion ? new Date(editForm.fechaActualizacion).toISOString() : null,
-      controlCambios:       editForm.controlCambios || null,
-      encargadoDocumentoId: editForm.encargadoDocumentoId || null,
-    };
     const res = await fetch(`/api/files/${fileId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },

@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import {
   Files, ClipboardList, ClipboardCheck, History, FilePlus,
   Users, Shield, Inbox, ScrollText, BarChart2, LogOut,
   ChevronLeft, ChevronRight, Globe, Trash2, FileEdit,
 } from "lucide-react";
+
+const IDLE_WARN_MS  = 58 * 60 * 1000; // show warning at 58 min
+const IDLE_LIMIT_MS = 60 * 60 * 1000; // force logout at 60 min
 
 interface Props {
   company: {
@@ -36,6 +39,11 @@ export default function DashboardShellClient({
   const [pendingTotal,  setPendingTotal]  = useState(0);
   const [pendingCRCount, setPendingCRCount] = useState(0);
 
+  // ── idle timeout ─────────────────────────────────────────────────────────
+  const lastActiveRef  = useRef(Date.now());
+  const [idleWarning,  setIdleWarning]  = useState(false);
+  const [countdown,    setCountdown]    = useState(120);
+
   const refreshTaskCounts = useCallback(() => {
     fetch("/api/tasks/counts")
       .then((r) => r.json())
@@ -64,6 +72,47 @@ export default function DashboardShellClient({
     const interval = setInterval(refreshCRCounts, 30_000);
     return () => clearInterval(interval);
   }, [refreshCRCounts]);
+
+  // ── idle detection ────────────────────────────────────────────────────────
+  useEffect(() => {
+    const reset = () => { lastActiveRef.current = Date.now(); };
+    const events = ["mousemove", "mousedown", "keydown", "touchstart", "scroll"] as const;
+    events.forEach((e) => window.addEventListener(e, reset, { passive: true }));
+
+    const tick = setInterval(() => {
+      const idle = Date.now() - lastActiveRef.current;
+      if (idle >= IDLE_LIMIT_MS) {
+        clearInterval(tick);
+        fetch("/api/auth/logout", { method: "POST" }).finally(() => {
+          window.location.href = "/login?reason=idle";
+        });
+        return;
+      }
+      if (idle >= IDLE_WARN_MS) {
+        setIdleWarning(true);
+        setCountdown(Math.max(0, Math.ceil((IDLE_LIMIT_MS - idle) / 1000)));
+      } else {
+        setIdleWarning(false);
+      }
+    }, 5_000);
+
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, reset));
+      clearInterval(tick);
+    };
+  }, []);
+
+  // ── smooth countdown when warning is visible ──────────────────────────────
+  useEffect(() => {
+    if (!idleWarning) return;
+    const sec = setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) { clearInterval(sec); return 0; }
+        return c - 1;
+      });
+    }, 1_000);
+    return () => clearInterval(sec);
+  }, [idleWarning]);
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -233,6 +282,28 @@ export default function DashboardShellClient({
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
         {children}
       </div>
+
+      {/* ── Idle warning modal ── */}
+      {idleWarning && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.6)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: "32px 28px", width: 380, maxWidth: "90vw", boxShadow: "0 24px 64px rgba(0,0,0,0.25)", textAlign: "center" }}>
+            <div style={{ width: 52, height: 52, borderRadius: "50%", background: "#fef3c7", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: 24 }}>⏱</div>
+            <h3 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 700, color: "#1e293b" }}>Sesión por expirar</h3>
+            <p style={{ margin: "0 0 6px", fontSize: 14, color: "#64748b" }}>
+              Has estado inactivo por un momento.<br />Tu sesión cerrará en:
+            </p>
+            <div style={{ fontSize: 36, fontWeight: 800, color: "#dc2626", margin: "12px 0 20px", fontVariantNumeric: "tabular-nums" }}>
+              {String(Math.floor(countdown / 60)).padStart(2, "0")}:{String(countdown % 60).padStart(2, "0")}
+            </div>
+            <button
+              onClick={() => { lastActiveRef.current = Date.now(); setIdleWarning(false); }}
+              style={{ width: "100%", padding: "12px", borderRadius: 10, border: "none", background: brand, color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer" }}
+            >
+              Continuar sesión
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

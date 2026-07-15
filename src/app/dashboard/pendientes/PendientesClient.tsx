@@ -276,6 +276,9 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
     action: "APPROVE" | "RETURN_TO_PREVIOUS" | "REJECT";
     docName: string;
     stepOrder: number;
+    fileId: string;
+    mimeType: string;
+    fileName: string;
   } | null>(null);
   const [chainNotes, setChainNotes] = useState("");
   const [chainWorking, setChainWorking] = useState(false);
@@ -1017,17 +1020,17 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                           {isMyChainTurn && task.status !== "COMPLETED" && (
                             <>
                               <button className="action-btn" style={{ background: "#dcfce7", color: "#166534" }}
-                                onClick={() => { setChainNotes(""); setChainError(""); setChainModal({ taskId: task.id, action: "APPROVE", docName, stepOrder: task.stepOrder! }); }}>
+                                onClick={() => { setChainNotes(""); setChainError(""); setChainModal({ taskId: task.id, action: "APPROVE", docName, stepOrder: task.stepOrder!, fileId: task.file.id, mimeType: task.file.mimeType, fileName: task.file.name }); }}>
                                 Aprobar
                               </button>
                               {(task.stepOrder ?? 1) > 1 && (
                                 <button className="action-btn" style={{ background: "#fff7ed", color: "#d97706" }}
-                                  onClick={() => { setChainNotes(""); setChainError(""); setChainModal({ taskId: task.id, action: "RETURN_TO_PREVIOUS", docName, stepOrder: task.stepOrder! }); }}>
+                                  onClick={() => { setChainNotes(""); setChainError(""); setChainModal({ taskId: task.id, action: "RETURN_TO_PREVIOUS", docName, stepOrder: task.stepOrder!, fileId: task.file.id, mimeType: task.file.mimeType, fileName: task.file.name }); }}>
                                   Devolver
                                 </button>
                               )}
                               <button className="action-btn" style={{ background: "#fee2e2", color: "#dc2626" }}
-                                onClick={() => { setChainNotes(""); setChainError(""); setChainModal({ taskId: task.id, action: "REJECT", docName, stepOrder: task.stepOrder! }); }}>
+                                onClick={() => { setChainNotes(""); setChainError(""); setChainModal({ taskId: task.id, action: "REJECT", docName, stepOrder: task.stepOrder!, fileId: task.file.id, mimeType: task.file.mimeType, fileName: task.file.name }); }}>
                                 Rechazar
                               </button>
                             </>
@@ -1605,8 +1608,15 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
               )}
             </div>
 
-            <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#374151" }}>
-              <b>{chainModal.docName}</b> — Paso {chainModal.stepOrder}
+            <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#374151", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+              <span><b>{chainModal.docName}</b> — Paso {chainModal.stepOrder}</span>
+              <button
+                onClick={() => openPreview({ id: chainModal.fileId, name: chainModal.fileName, mimeType: chainModal.mimeType })}
+                disabled={!!openingDoc}
+                style={{ background: "#e0f2fe", color: "#0369a1", border: "none", borderRadius: 6, padding: "4px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap" }}
+              >
+                Ver documento
+              </button>
             </div>
 
             {chainModal.action === "APPROVE" && (

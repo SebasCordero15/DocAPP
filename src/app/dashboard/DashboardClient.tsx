@@ -258,8 +258,9 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
     else { const d = await res.json().catch(() => ({})); alert(d.error ?? "Failed to create folder"); }
   }
 
-  async function saveRename(id: string) {
+  async function saveRename(id: string, originalName: string) {
     if (!renameValue.trim()) return;
+    if (renameValue.trim() === originalName) { setRenamingId(null); return; }
     const res = await fetch(`/api/folders/${id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: renameValue.trim() }),
@@ -783,9 +784,9 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                   {renamingId === f.id ? (
                     <div style={{ display: "flex", gap: 8, flex: 1 }}>
                       <input autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter") saveRename(f.id); if (e.key === "Escape") setRenamingId(null); }}
+                        onKeyDown={(e) => { if (e.key === "Enter") saveRename(f.id, f.name); if (e.key === "Escape") setRenamingId(null); }}
                         style={{ ...inputStyle, flex: 1 }} />
-                      <button onClick={() => saveRename(f.id)} style={{ background: brand, color: "#fff", border: "none", padding: "6px 14px", borderRadius: 7, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>Save</button>
+                      <button onClick={() => saveRename(f.id, f.name)} style={{ background: brand, color: "#fff", border: "none", padding: "6px 14px", borderRadius: 7, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>Save</button>
                       <button onClick={() => setRenamingId(null)} style={cancelBtnStyle}>Cancel</button>
                     </div>
                   ) : (
@@ -925,11 +926,11 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                                 autoFocus
                                 value={renameValue}
                                 onChange={(e) => setRenameValue(e.target.value)}
-                                onKeyDown={(e) => { if (e.key === "Enter") saveRename(f.id); if (e.key === "Escape") setRenamingId(null); }}
+                                onKeyDown={(e) => { if (e.key === "Enter") saveRename(f.id, f.name); if (e.key === "Escape") setRenamingId(null); }}
                                 style={{ width: "100%", padding: "5px 8px", border: `1px solid ${brand}`, borderRadius: 6, fontSize: 13, textAlign: "center", boxSizing: "border-box", outline: "none" }}
                               />
                               <div style={{ display: "flex", gap: 4 }}>
-                                <button onClick={() => saveRename(f.id)} style={{ background: brand, color: "#fff", border: "none", padding: "4px 10px", borderRadius: 5, cursor: "pointer", fontSize: 12, fontWeight: 600 }}>Guardar</button>
+                                <button onClick={() => saveRename(f.id, f.name)} style={{ background: brand, color: "#fff", border: "none", padding: "4px 10px", borderRadius: 5, cursor: "pointer", fontSize: 12, fontWeight: 600 }}>Guardar</button>
                                 <button onClick={() => setRenamingId(null)} style={{ background: "#f1f5f9", color: "#64748b", border: "none", padding: "4px 8px", borderRadius: 5, cursor: "pointer", fontSize: 12 }}>
                                   <X size={11} />
                                 </button>
