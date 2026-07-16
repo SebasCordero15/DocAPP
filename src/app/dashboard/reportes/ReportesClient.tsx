@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Download, BarChart2, FileCheck, FileX, Upload, Trash2, Clock } from "lucide-react";
 
 interface Summary {
@@ -30,24 +31,27 @@ interface Props {
   company: { name: string; primaryColor: string; accentColor: string; fontFamily: string };
 }
 
-const TIPO_LABELS: Record<string, string> = {
-  NEW_UPLOAD:           "Nueva subida",
-  EDIT_METADATA:        "Edición de metadatos",
-  REPLACE_FILE:         "Reemplazo de archivo",
-  DELETE:               "Eliminación",
-  REVISION_DATE_CHANGE: "Cambio de fecha de revisión",
-  OTHER:                "Cambio de documento",
-};
-
-const STATUS_LABELS: Record<string, { label: string; bg: string; color: string }> = {
-  APPROVED: { label: "Aprobado",  bg: "#dcfce7", color: "#166534" },
-  REJECTED: { label: "Rechazado", bg: "#fee2e2", color: "#dc2626" },
-  PENDING:  { label: "Pendiente", bg: "#fef3c7", color: "#92400e" },
-};
 
 export default function ReportesClient({ company }: Props) {
   const router = useRouter();
   const brand  = company.primaryColor;
+  const t  = useTranslations("reportes");
+  const tc = useTranslations("common");
+
+  const TIPO_LABELS: Record<string, string> = {
+    NEW_UPLOAD:           t("types.NEW_UPLOAD"),
+    EDIT_METADATA:        t("types.EDIT_METADATA"),
+    REPLACE_FILE:         t("types.REPLACE_FILE"),
+    DELETE:               t("types.DELETE"),
+    REVISION_DATE_CHANGE: t("types.REVISION_DATE_CHANGE"),
+    OTHER:                t("types.OTHER"),
+  };
+
+  const STATUS_LABELS: Record<string, { label: string; bg: string; color: string }> = {
+    APPROVED: { label: t("status.APPROVED"), bg: "#dcfce7", color: "#166534" },
+    REJECTED: { label: t("status.REJECTED"), bg: "#fee2e2", color: "#dc2626" },
+    PENDING:  { label: t("status.PENDING"),  bg: "#fef3c7", color: "#92400e" },
+  };
 
   const [summary, setSummary]   = useState<Summary | null>(null);
   const [details, setDetails]   = useState<DetailRow[]>([]);
@@ -79,7 +83,7 @@ export default function ReportesClient({ company }: Props) {
   useEffect(() => { fetchReport(); }, [fetchReport]);
 
   function exportCSV() {
-    const headers = ["Fecha", "Tipo", "Documento", "Código", "Solicitado por", "Estado", "Revisado por", "Fecha revisión", "Notas"];
+    const headers = [t("cols.fecha"), t("cols.tipo"), t("cols.documento"), t("cols.codigo"), t("cols.requestedBy"), t("cols.estado"), t("cols.reviewedBy"), t("cols.fecha"), t("cols.notas")];
     const rows = details.map((r) => [
       new Date(r.fecha).toLocaleDateString('es-CR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
       TIPO_LABELS[r.tipo] ?? r.tipo,
@@ -105,25 +109,25 @@ export default function ReportesClient({ company }: Props) {
     new Date(iso).toLocaleDateString('es-CR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
   const STAT_CARDS = summary ? [
-    { label: "Subidas",       value: summary.subidas,       icon: <Upload size={20} />,    color: "#2563eb" },
-    { label: "Eliminaciones", value: summary.eliminaciones, icon: <Trash2 size={20} />,    color: "#dc2626" },
-    { label: "Revisiones",    value: summary.revisiones,    icon: <FileCheck size={20} />, color: "#7c3aed" },
-    { label: "Aprobadas",     value: summary.aprobadas,     icon: <FileCheck size={20} />, color: "#16a34a" },
-    { label: "Rechazadas",    value: summary.rechazadas,    icon: <FileX size={20} />,     color: "#dc2626" },
-    { label: "Pendientes",    value: summary.pendientes,    icon: <Clock size={20} />,     color: "#d97706" },
+    { label: t("stats.uploads"),    value: summary.subidas,       icon: <Upload size={20} />,    color: "#2563eb" },
+    { label: t("stats.deletes"),    value: summary.eliminaciones, icon: <Trash2 size={20} />,    color: "#dc2626" },
+    { label: t("stats.reviews"),    value: summary.revisiones,    icon: <FileCheck size={20} />, color: "#7c3aed" },
+    { label: t("stats.approved"),   value: summary.aprobadas,     icon: <FileCheck size={20} />, color: "#16a34a" },
+    { label: t("stats.rejected"),   value: summary.rechazadas,    icon: <FileX size={20} />,     color: "#dc2626" },
+    { label: t("stats.pending"),    value: summary.pendientes,    icon: <Clock size={20} />,     color: "#d97706" },
   ] : [];
 
   return (
     <div style={{ flex: 1, overflowY: "auto", background: "#f1f5f9", fontFamily: `'${company.fontFamily}', Inter, system-ui, sans-serif` }}>
       {/* Section header */}
       <div style={{ background: brand, color: "#fff", padding: "12px 28px", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, zIndex: 10 }}>
-        <strong style={{ fontSize: 16 }}>Reporte de Cambios</strong>
+        <strong style={{ fontSize: 16 }}>{t("header")}</strong>
         <button
           onClick={exportCSV}
           disabled={details.length === 0}
           style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", color: "#fff", padding: "7px 14px", borderRadius: 7, cursor: details.length ? "pointer" : "not-allowed", fontSize: 13, fontWeight: 600, opacity: details.length ? 1 : 0.6 }}
         >
-          <Download size={14} /> Exportar CSV
+          <Download size={14} /> {t("exportCsv")}
         </button>
       </div>
 
@@ -132,25 +136,25 @@ export default function ReportesClient({ company }: Props) {
         {/* Filters */}
         <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px 20px", marginBottom: 24, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
           <div style={{ flex: "1 1 140px" }}>
-            <label style={labelStyle}>Desde</label>
+            <label style={labelStyle}>{t("filters.from")}</label>
             <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={inputStyle} />
           </div>
           <div style={{ flex: "1 1 140px" }}>
-            <label style={labelStyle}>Hasta</label>
+            <label style={labelStyle}>{t("filters.to")}</label>
             <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={inputStyle} />
           </div>
           <div style={{ flex: "2 1 180px" }}>
-            <label style={labelStyle}>Usuario</label>
+            <label style={labelStyle}>{t("filters.user")}</label>
             <select value={userId} onChange={(e) => setUserId(e.target.value)} style={inputStyle}>
-              <option value="">Todos los usuarios</option>
+              <option value="">{t("filters.allUsers")}</option>
               {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
           </div>
           <button onClick={fetchReport} style={{ background: brand, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 7, cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
-            Aplicar
+            {t("filters.apply")}
           </button>
           <button onClick={() => { setDateFrom(""); setDateTo(""); setUserId(""); }} style={{ background: "#f1f5f9", color: "#64748b", border: "1px solid #e2e8f0", padding: "8px 14px", borderRadius: 7, cursor: "pointer", fontSize: 13 }}>
-            Limpiar
+            {t("filters.clear")}
           </button>
         </div>
 
@@ -170,19 +174,19 @@ export default function ReportesClient({ company }: Props) {
         {/* Detail table */}
         <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden" }}>
           <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: "#1e293b" }}>Detalle de solicitudes</span>
-            <span style={{ fontSize: 12, color: "#94a3b8" }}>{total} registros</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: "#1e293b" }}>{t("detailTitle")}</span>
+            <span style={{ fontSize: 12, color: "#94a3b8" }}>{total} {t("records")}</span>
           </div>
           {loading ? (
-            <p style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>Cargando…</p>
+            <p style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>{tc("loading")}</p>
           ) : details.length === 0 ? (
-            <p style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>No hay datos para el período seleccionado.</p>
+            <p style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>{t("empty")}</p>
           ) : (
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ borderBottom: "1px solid #f1f5f9" }}>
-                    {["Fecha", "Tipo", "Documento", "Código", "Solicitado por", "Estado", "Revisado por", "Notas"].map((h) => (
+                    {[t("cols.fecha"), t("cols.tipo"), t("cols.documento"), t("cols.codigo"), t("cols.requestedBy"), t("cols.estado"), t("cols.reviewedBy"), t("cols.notas")].map((h) => (
                       <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5, whiteSpace: "nowrap" }}>{h}</th>
                     ))}
                   </tr>

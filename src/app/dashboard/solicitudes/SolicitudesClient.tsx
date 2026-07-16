@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { CheckCircle, Check, X as XIcon, Plus, ChevronDown, ChevronUp } from "lucide-react";
 import FileIcon from "@/components/FileIcon";
 
@@ -53,12 +54,6 @@ interface Props {
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
 
-const CR_TYPE_LABELS: Record<string, string> = {
-  NEW_UPLOAD: "Nueva subida", EDIT_METADATA: "Edición de metadatos",
-  REPLACE_FILE: "Reemplazo de archivo", DELETE: "Eliminación",
-  REVISION_DATE_CHANGE: "Cambio de fecha de revisión", OTHER: "Cambio de documento",
-  REVISION_REQUEST: "Propuesta de revisión",
-};
 const CR_TYPE_COLORS: Record<string, { bg: string; color: string }> = {
   NEW_UPLOAD: { bg: "#dbeafe", color: "#1e40af" },
   EDIT_METADATA: { bg: "#fef3c7", color: "#92400e" },
@@ -68,26 +63,12 @@ const CR_TYPE_COLORS: Record<string, { bg: string; color: string }> = {
   OTHER: { bg: "#f3f4f6", color: "#374151" },
   REVISION_REQUEST: { bg: "#fdf4ff", color: "#7c3aed" },
 };
-const FIELD_LABELS: Record<string, string> = {
-  status: "Estado", codigo: "Código", nombreDocumento: "Nombre del documento",
-  versionStr: "Versión", fechaEmision: "Fecha de emisión", fechaRevision: "Fecha de revisión",
-  fechaActualizacion: "Fecha de actualización", controlCambios: "Control de cambios",
-  encargadoDocumentoId: "Encargado",
-};
 const DATE_FIELD_KEYS = new Set(["fechaEmision", "fechaRevision", "fechaActualizacion"]);
 
-const OUT_TYPE_LABELS: Record<string, string> = {
-  ACTUALIZACION: "Actualización", REVISION: "Revisión", CORRECCION: "Corrección",
-};
 const OUT_TYPE_COLORS: Record<string, { bg: string; color: string }> = {
   ACTUALIZACION: { bg: "#dbeafe", color: "#1e40af" },
   REVISION: { bg: "#fef3c7", color: "#92400e" },
   CORRECCION: { bg: "#ede9fe", color: "#5b21b6" },
-};
-const OUT_STATUS_LABELS: Record<string, string> = {
-  PENDING: "Pendiente", IN_PROGRESS: "En progreso",
-  PENDING_APPROVAL: "Pendiente de aprobación", APPROVED: "Aprobada",
-  REJECTED: "Rechazada", RETURNED: "Devuelta", CANCELLED: "Cancelada",
 };
 const OUT_STATUS_COLORS: Record<string, { bg: string; color: string }> = {
   PENDING:           { bg: "#f1f5f9", color: "#64748b" },
@@ -97,11 +78,6 @@ const OUT_STATUS_COLORS: Record<string, { bg: string; color: string }> = {
   REJECTED:          { bg: "#fee2e2", color: "#dc2626" },
   RETURNED:          { bg: "#fff7ed", color: "#c2410c" },
   CANCELLED:         { bg: "#f3f4f6", color: "#94a3b8" },
-};
-const OUTCOME_LABELS: Record<string, string> = {
-  no_changes: "Sin cambios necesarios",
-  new_version: "Nueva versión subida",
-  corrected: "Corrección aplicada",
 };
 
 function fmtVal(key: string, val: unknown): string {
@@ -122,6 +98,40 @@ function fmtSize(bytes: number) {
 export default function SolicitudesClient({ company, userRole }: Props) {
   const p = company.primaryColor;
   const isAdmin = userRole === "COMPANY_ADMIN" || userRole === "SUPER_ADMIN";
+  const t = useTranslations("solicitudes");
+  const tc = useTranslations("common");
+
+  const CR_TYPE_LABELS: Record<string, string> = {
+    NEW_UPLOAD: "New upload", EDIT_METADATA: "Metadata edit",
+    REPLACE_FILE: "File replacement", DELETE: "Deletion",
+    REVISION_DATE_CHANGE: "Review date change", OTHER: "Document change",
+    REVISION_REQUEST: "Review proposal",
+  };
+  const OUT_TYPE_LABELS: Record<string, string> = {
+    ACTUALIZACION: "Update", REVISION: "Review", CORRECCION: "Correction",
+  };
+  const OUT_STATUS_LABELS: Record<string, string> = {
+    PENDING: "Pending", IN_PROGRESS: "In progress",
+    PENDING_APPROVAL: "Pending approval", APPROVED: "Approved",
+    REJECTED: "Rejected", RETURNED: "Returned", CANCELLED: "Cancelled",
+  };
+  const OUTCOME_LABELS: Record<string, string> = {
+    no_changes: t("result.noChanges"),
+    new_version: t("result.newVersion"),
+    corrected: t("result.corrected"),
+  };
+
+  const FIELD_LABELS: Record<string, string> = {
+    status: t("fieldLabels.status"),
+    codigo: t("fieldLabels.codigo"),
+    nombreDocumento: t("fieldLabels.nombreDocumento"),
+    versionStr: t("fieldLabels.versionStr"),
+    fechaEmision: t("fieldLabels.fechaEmision"),
+    fechaRevision: t("fieldLabels.fechaRevision"),
+    fechaActualizacion: t("fieldLabels.fechaActualizacion"),
+    controlCambios: t("fieldLabels.controlCambios"),
+    encargadoDocumentoId: t("fieldLabels.encargadoDocumentoId"),
+  };
 
   const [tab, setTab] = useState<"entrantes" | "salientes">("entrantes");
 
@@ -246,7 +256,7 @@ export default function SolicitudesClient({ company, userRole }: Props) {
       setRejectingId(null); setApprovingId(null);
     } else {
       const d = await res.json().catch(() => ({}));
-      alert(d.error ?? "Error al procesar la solicitud");
+      alert(d.error ?? t("errors.processingRequest"));
     }
   }
 
@@ -277,14 +287,14 @@ export default function SolicitudesClient({ company, userRole }: Props) {
 
   async function downloadFile(fileId: string) {
     const res = await fetch(`/api/files/${fileId}/download-url`);
-    if (!res.ok) { alert("No se pudo generar el enlace de descarga"); return; }
+    if (!res.ok) { alert(t("errors.downloadError")); return; }
     const { url } = await res.json();
     window.open(url, "_blank");
   }
 
   // ── Salientes actions ────────────────────────────────────────────────────────
   async function cancelOutgoing(id: string) {
-    if (!confirm("¿Cancelar esta solicitud saliente?")) return;
+    if (!confirm(t("cancelConfirm"))) return;
     setOutProcessing(id);
     const res = await fetch(`/api/outgoing-requests/${id}/cancel`, { method: "POST" });
     setOutProcessing(null);
@@ -292,7 +302,7 @@ export default function SolicitudesClient({ company, userRole }: Props) {
       setOutgoing((prev) => prev.map((o) => o.id === id ? { ...o, status: "CANCELLED" } : o));
     } else {
       const d = await res.json().catch(() => ({}));
-      alert(d.error ?? "Error al cancelar");
+      alert(d.error ?? t("errors.cancelError"));
     }
   }
 
@@ -312,21 +322,21 @@ export default function SolicitudesClient({ company, userRole }: Props) {
       setReviewingId(null);
     } else {
       const d = await res.json().catch(() => ({}));
-      alert(d.error ?? "Error al procesar la revisión");
+      alert(d.error ?? t("errors.processingReview"));
     }
   }
 
   // ── Create outgoing request ──────────────────────────────────────────────────
   async function submitCreate() {
-    if (!selectedFile) { setCreateError("Selecciona un documento"); return; }
+    if (!selectedFile) { setCreateError(t("errors.selectDoc")); return; }
     const assigneeIds = assignees.map((a) => a.trim()).filter(Boolean);
-    if (assigneeIds.length === 0) { setCreateError("Selecciona al menos un asignado"); return; }
+    if (assigneeIds.length === 0) { setCreateError(t("errors.selectAssignee")); return; }
     if (!instructions.trim()) {
-      setCreateError("El campo 'Cambio a realizar' es obligatorio"); return;
+      setCreateError(t("errors.instructionsRequired")); return;
     }
     if (outType === "CORRECCION") {
       const anyChecked = corrFields.nombre || corrFields.contenido || corrFields.area || corrFields.carpeta || corrFields.otro.trim();
-      if (!anyChecked) { setCreateError("Especifica qué corregir"); return; }
+      if (!anyChecked) { setCreateError(t("errors.specifyCorrectionFields")); return; }
     }
     setCreating(true); setCreateError(null);
     const res = await fetch("/api/outgoing-requests", {
@@ -350,7 +360,7 @@ export default function SolicitudesClient({ company, userRole }: Props) {
       setTab("salientes");
     } else {
       const d = await res.json().catch(() => ({}));
-      setCreateError(d.error ?? "Error al crear la solicitud");
+      setCreateError(d.error ?? t("errors.createError"));
     }
   }
 
@@ -362,10 +372,10 @@ export default function SolicitudesClient({ company, userRole }: Props) {
       const name = pc.name as string; const size = pc.size as number;
       return (
         <div style={{ fontSize: 13, color: "#475569" }}>
-          Nuevo archivo: <b>{name}</b>{size ? ` (${fmtSize(size)})` : ""}
+          {t("newFile")} <b>{name}</b>{size ? ` (${fmtSize(size)})` : ""}
           {cr.file && (
             <button onClick={() => downloadFile(cr.file!.id)} style={{ marginLeft: 12, background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 6, padding: "3px 10px", fontSize: 12, cursor: "pointer", color: "#475569", fontWeight: 600 }}>
-              Descargar para revisar
+              {t("downloadReview")}
             </button>
           )}
         </div>
@@ -374,7 +384,7 @@ export default function SolicitudesClient({ company, userRole }: Props) {
     if (cr.type === "EDIT_METADATA" || cr.type === "REVISION_DATE_CHANGE") {
       const before = pc.before as Record<string, unknown> | undefined;
       const after  = pc.after  as Record<string, unknown> | undefined;
-      if (!after) return <span style={{ fontSize: 13, color: "#94a3b8" }}>Sin detalles</span>;
+      if (!after) return <span style={{ fontSize: 13, color: "#94a3b8" }}>{t("noDetails")}</span>;
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           {Object.entries(after).map(([key, newVal]) => (
@@ -389,12 +399,12 @@ export default function SolicitudesClient({ company, userRole }: Props) {
         </div>
       );
     }
-    if (cr.type === "DELETE") return <span style={{ fontSize: 13, color: "#dc2626", fontWeight: 600 }}>Eliminar permanentemente este documento del sistema</span>;
+    if (cr.type === "DELETE") return <span style={{ fontSize: 13, color: "#dc2626", fontWeight: 600 }}>{t("deleteDescription")}</span>;
     if (cr.type === "REVISION_REQUEST") {
       const tipo   = pc.tipo   as string | undefined;
       const motivo = pc.motivo as string | undefined;
       const hasProposal = !!(pc.proposalStorageKey);
-      const tipoLabels: Record<string, string> = { REVISION: "Revisión", ACTUALIZACION: "Actualización", CORRECCION: "Corrección" };
+      const tipoLabels = OUT_TYPE_LABELS;
       const tipoColors: Record<string, { bg: string; color: string }> = {
         REVISION:     { bg: "#fef3c7", color: "#92400e" },
         ACTUALIZACION: { bg: "#dbeafe", color: "#1e40af" },
@@ -405,13 +415,13 @@ export default function SolicitudesClient({ company, userRole }: Props) {
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {tipo && (
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase" }}>Tipo:</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase" }}>{t("revisionType")}</span>
               <span style={{ background: tc2.bg, color: tc2.color, borderRadius: 5, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>{tipoLabels[tipo] ?? tipo}</span>
             </div>
           )}
           {motivo && (
             <div>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase" }}>Motivo:</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase" }}>{t("revisionReason")}</span>
               <p style={{ margin: "3px 0 0", fontSize: 13, color: "#374151", whiteSpace: "pre-wrap" }}>{motivo}</p>
             </div>
           )}
@@ -420,37 +430,37 @@ export default function SolicitudesClient({ company, userRole }: Props) {
               <button
                 onClick={async () => {
                   const res = await fetch(`/api/change-requests/${cr.id}/proposal-url`);
-                  if (!res.ok) { alert("No se pudo obtener el archivo"); return; }
+                  if (!res.ok) { alert(t("errors.fileError")); return; }
                   const { url } = await res.json();
                   window.open(url, "_blank");
                 }}
                 style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 6, padding: "4px 12px", fontSize: 12, cursor: "pointer", color: "#475569", fontWeight: 600 }}
               >
-                Ver propuesta adjunta
+                {t("viewProposal")}
               </button>
               <button
                 onClick={async () => {
                   const res = await fetch(`/api/change-requests/${cr.id}/proposal-url`);
-                  if (!res.ok) { alert("No se pudo obtener el archivo"); return; }
+                  if (!res.ok) { alert(t("errors.fileError")); return; }
                   const { url, fileName } = await res.json();
                   const a = document.createElement("a"); a.href = url; a.download = fileName ?? "propuesta"; a.click();
                 }}
                 style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 6, padding: "4px 12px", fontSize: 12, cursor: "pointer", color: "#475569", fontWeight: 600 }}
               >
-                Descargar propuesta
+                {t("downloadProposal")}
               </button>
             </div>
           )}
         </div>
       );
     }
-    if (cr.type === "REPLACE_FILE") return <div style={{ fontSize: 13, color: "#475569" }}>Reemplazar archivo con una nueva versión{cr.file && <button onClick={() => downloadFile(cr.file!.id)} style={{ marginLeft: 12, background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 6, padding: "3px 10px", fontSize: 12, cursor: "pointer" }}>Descargar versión actual</button>}</div>;
+    if (cr.type === "REPLACE_FILE") return <div style={{ fontSize: 13, color: "#475569" }}>{t("replaceFile")}{cr.file && <button onClick={() => downloadFile(cr.file!.id)} style={{ marginLeft: 12, background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 6, padding: "3px 10px", fontSize: 12, cursor: "pointer" }}>{t("downloadCurrent")}</button>}</div>;
     if (cr.type === "OTHER") {
       const updates = pc.proposedFileUpdates as Record<string, unknown> | undefined;
-      if (!updates) return <span style={{ fontSize: 13, color: "#94a3b8" }}>Cambio al completar tarea</span>;
+      if (!updates) return <span style={{ fontSize: 13, color: "#94a3b8" }}>{t("taskChange")}</span>;
       return <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>{Object.entries(updates).map(([key, val]) => <div key={key} style={{ fontSize: 13 }}><span style={{ fontWeight: 600 }}>{FIELD_LABELS[key] ?? key}:</span> {fmtVal(key, val)}</div>)}</div>;
     }
-    return <span style={{ fontSize: 13, color: "#94a3b8" }}>Sin detalles disponibles</span>;
+    return <span style={{ fontSize: 13, color: "#94a3b8" }}>{t("noDetails")}</span>;
   }
 
   const filteredFiles = allFiles.filter((f) => {
@@ -487,24 +497,24 @@ export default function SolicitudesClient({ company, userRole }: Props) {
       {/* Header with tabs */}
       <div style={{ background: p, color: "#fff", padding: "12px 28px 0", position: "sticky", top: 0, zIndex: 10 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-          <strong style={{ fontSize: 16 }}>Solicitudes</strong>
+          <strong style={{ fontSize: 16 }}>{t("header")}</strong>
           {isAdmin && (
             <button
               onClick={openCreateModal}
               style={{ background: "rgba(255,255,255,0.2)", border: "1px solid rgba(255,255,255,0.4)", borderRadius: 8, color: "#fff", padding: "6px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
             >
-              <Plus size={14} /> Nueva solicitud saliente
+              <Plus size={14} /> {t("newOutgoing")}
             </button>
           )}
         </div>
         <div style={{ display: "flex", gap: 4 }}>
           <button className={`tab-btn${tab === "entrantes" ? " active" : ""}`} onClick={() => setTab("entrantes")} style={{ color: tab === "entrantes" ? "#fff" : "rgba(255,255,255,0.7)", borderBottomColor: tab === "entrantes" ? "#fff" : "transparent" }}>
-            Entrantes
+            {t("tabs.entrantes")}
             {pendingCrs > 0 && <span style={{ marginLeft: 6, background: "#ef4444", color: "#fff", borderRadius: 10, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>{pendingCrs}</span>}
           </button>
           {isAdmin && (
             <button className={`tab-btn${tab === "salientes" ? " active" : ""}`} onClick={() => setTab("salientes")} style={{ color: tab === "salientes" ? "#fff" : "rgba(255,255,255,0.7)", borderBottomColor: tab === "salientes" ? "#fff" : "transparent" }}>
-              Salientes
+              {t("tabs.salientes")}
               {pendingOutRev > 0 && <span style={{ marginLeft: 6, background: "#f59e0b", color: "#fff", borderRadius: 10, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>{pendingOutRev}</span>}
             </button>
           )}
@@ -517,20 +527,19 @@ export default function SolicitudesClient({ company, userRole }: Props) {
         {tab === "entrantes" && (
           <>
             <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, padding: "12px 18px", marginBottom: 28, fontSize: 13, color: "#1e40af" }}>
-              Los usuarios con nivel Editor deben solicitar aprobación para subir, editar o eliminar documentos.
-              Revisa cada solicitud y acepta o rechaza con un motivo.
+              {t("infoBanner")}
             </div>
             {loadingCrs ? (
               [1,2,3].map((i) => <div key={i} className="skeleton" style={{ height: 140, marginBottom: 14 }} />)
             ) : crs.length === 0 ? (
               <div style={{ textAlign: "center", padding: "80px 0", color: "#94a3b8" }}>
                 <div style={{ marginBottom: 16 }}><CheckCircle size={48} color="#22c55e" /></div>
-                <div style={{ fontSize: 17, fontWeight: 700, color: "#64748b", marginBottom: 6 }}>No hay solicitudes pendientes</div>
-                <div style={{ fontSize: 13 }}>Todas las solicitudes han sido revisadas.</div>
+                <div style={{ fontSize: 17, fontWeight: 700, color: "#64748b", marginBottom: 6 }}>{t("emptyTitle")}</div>
+                <div style={{ fontSize: 13 }}>{t("emptyMsg")}</div>
               </div>
             ) : (
               crs.map((cr) => {
-                const tc = CR_TYPE_COLORS[cr.type] ?? { bg: "#f3f4f6", color: "#374151" };
+                const typeColor = CR_TYPE_COLORS[cr.type] ?? { bg: "#f3f4f6", color: "#374151" };
                 const doc = cr.file?.nombreDocumento || cr.file?.name || "Documento eliminado";
                 const isRejecting  = rejectingId === cr.id;
                 const isApproving  = approvingId === cr.id;
@@ -542,68 +551,68 @@ export default function SolicitudesClient({ company, userRole }: Props) {
                       <div style={{ flex: 1 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 3 }}>
                           <span style={{ fontWeight: 700, fontSize: 15, color: "#1e293b" }}>{doc}</span>
-                          <span style={{ background: tc.bg, color: tc.color, borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>{CR_TYPE_LABELS[cr.type] ?? cr.type}</span>
+                          <span style={{ background: typeColor.bg, color: typeColor.color, borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>{CR_TYPE_LABELS[cr.type] ?? cr.type}</span>
                         </div>
                         <div style={{ display: "flex", gap: 14, fontSize: 12, color: "#64748b", flexWrap: "wrap" }}>
                           {cr.file?.codigo && <span>Código: <b>{cr.file.codigo}</b></span>}
-                          <span>Solicitado por: <b>{cr.requestedBy.name}</b></span>
+                          <span>Requested by: <b>{cr.requestedBy.name}</b></span>
                           <span>{new Date(cr.createdAt).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" })}</span>
                         </div>
                       </div>
                     </div>
                     <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "12px 14px", marginBottom: 16 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Cambio propuesto</div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>{t("proposedChange")}</div>
                       {renderCrProposal(cr)}
                     </div>
                     {!isRejecting && !isApproving ? (
                       <div style={{ display: "flex", gap: 8 }}>
                         <button className="btn" disabled={isProcessing} onClick={() => startApproveCr(cr)} style={{ background: "#dcfce7", color: "#166534" }}>
-                          {isProcessing ? "Procesando…" : <><Check size={13} style={{ marginRight: 4 }} />Aceptar</>}
+                          {isProcessing ? t("processing") : <><Check size={13} style={{ marginRight: 4 }} />{t("approve")}</>}
                         </button>
                         <button className="btn" disabled={isProcessing} onClick={() => { setRejectingId(cr.id); setRejectNote((n) => ({ ...n, [cr.id]: "" })); }} style={{ background: "#fee2e2", color: "#dc2626" }}>
-                          <XIcon size={13} style={{ marginRight: 4 }} />Rechazar
+                          <XIcon size={13} style={{ marginRight: 4 }} />{t("reject")}
                         </button>
                       </div>
                     ) : isApproving ? (
                       <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: 14 }}>
                         {cr.type === "NEW_UPLOAD" && (
                           <div style={{ marginBottom: 12 }}>
-                            <label className="form-label">Asignar código de documento</label>
+                            <label className="form-label">{t("newUploadApproval.assignCodigo")}</label>
                             <input
                               autoFocus
                               value={approveCodigo[cr.id] ?? ""}
                               onChange={(e) => setApproveCodigo((n) => ({ ...n, [cr.id]: e.target.value }))}
-                              placeholder="DOC-001"
+                              placeholder={t("newUploadApproval.codigoPlaceholder")}
                               className="form-input"
                               style={{ width: 160 }}
                             />
-                            <p style={{ margin: "4px 0 0", fontSize: 11, color: "#94a3b8" }}>Deja vacío para aprobar sin código.</p>
+                            <p style={{ margin: "4px 0 0", fontSize: 11, color: "#94a3b8" }}>{t("newUploadApproval.codigoHelp")}</p>
                           </div>
                         )}
                         <div style={{ marginBottom: 12 }}>
-                          <label className="form-label">Versión del documento</label>
+                          <label className="form-label">{t("newUploadApproval.versionLabel")}</label>
                           <input
                             value={approveVersionStr[cr.id] ?? ""}
                             onChange={(e) => setApproveVersionStr((n) => ({ ...n, [cr.id]: e.target.value }))}
-                            placeholder="v1.0"
+                            placeholder={t("newUploadApproval.versionPlaceholder")}
                             className="form-input"
                             style={{ width: 160 }}
                           />
-                          <p style={{ margin: "4px 0 0", fontSize: 11, color: "#94a3b8" }}>Deja vacío para mantener la versión actual.</p>
+                          <p style={{ margin: "4px 0 0", fontSize: 11, color: "#94a3b8" }}>{t("newUploadApproval.versionHelp")}</p>
                         </div>
                         {cr.type === "NEW_UPLOAD" && (
                           <>
                             <div style={{ marginBottom: 12 }}>
-                              <label className="form-label">Encargado de documento <span style={{ color: "#dc2626" }}>*</span></label>
+                              <label className="form-label">{t("newUploadApproval.encargadoLabel")} <span style={{ color: "#dc2626" }}>*</span></label>
                               {approveUsersLoading ? (
-                                <div style={{ fontSize: 12, color: "#94a3b8", padding: "6px 0" }}>Cargando usuarios…</div>
+                                <div style={{ fontSize: 12, color: "#94a3b8", padding: "6px 0" }}>{tc("loading")}</div>
                               ) : (
                                 <select
                                   value={approveEncargadoId[cr.id] ?? ""}
                                   onChange={(e) => setApproveEncargadoId((n) => ({ ...n, [cr.id]: e.target.value }))}
                                   className="form-input"
                                 >
-                                  <option value="">Seleccionar encargado…</option>
+                                  <option value="">{t("newUploadApproval.encargadoPlaceholder")}</option>
                                   {approveUsers.map((u) => (
                                     <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
                                   ))}
@@ -611,9 +620,9 @@ export default function SolicitudesClient({ company, userRole }: Props) {
                               )}
                             </div>
                             <div style={{ marginBottom: 12 }}>
-                              <label className="form-label">Intervalo de revisión <span style={{ color: "#dc2626" }}>*</span></label>
+                              <label className="form-label">{t("newUploadApproval.intervalLabel")} <span style={{ color: "#dc2626" }}>*</span></label>
                               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                                {([{ value: "365", label: "1 año" }, { value: "730", label: "2 años" }, { value: "custom", label: "Personalizado" }] as const).map((opt) => (
+                                {([{ value: "365", label: t("newUploadApproval.interval1y") }, { value: "730", label: t("newUploadApproval.interval2y") }, { value: "custom", label: t("newUploadApproval.intervalCustom") }] as const).map((opt) => (
                                   <button
                                     key={opt.value}
                                     type="button"
@@ -636,7 +645,7 @@ export default function SolicitudesClient({ company, userRole }: Props) {
                                     type="number" min="1" max="3650"
                                     value={approveIntervalCustom[cr.id] ?? ""}
                                     onChange={(e) => setApproveIntervalCustom((n) => ({ ...n, [cr.id]: e.target.value }))}
-                                    placeholder="Días (ej. 180)"
+                                    placeholder={t("newUploadApproval.intervalCustomPlaceholder")}
                                     className="form-input"
                                     style={{ width: 160 }}
                                   />
@@ -663,20 +672,20 @@ export default function SolicitudesClient({ company, userRole }: Props) {
                             )}
                             style={{ background: "#dcfce7", color: "#166534" }}
                           >
-                            {isProcessing ? "Procesando…" : <><Check size={13} style={{ marginRight: 4 }} />Confirmar</>}
+                            {isProcessing ? t("processing") : <><Check size={13} style={{ marginRight: 4 }} />{t("confirm")}</>}
                           </button>
-                          <button className="btn" disabled={isProcessing} onClick={() => setApprovingId(null)} style={{ background: "#f1f5f9", color: "#64748b" }}>Cancelar</button>
+                          <button className="btn" disabled={isProcessing} onClick={() => setApprovingId(null)} style={{ background: "#f1f5f9", color: "#64748b" }}>{tc("cancel")}</button>
                         </div>
                       </div>
                     ) : (
                       <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: 14 }}>
-                        <label className="form-label">Motivo del rechazo <span style={{ color: "#dc2626" }}>*</span></label>
-                        <textarea autoFocus rows={3} placeholder="Explica por qué se rechaza esta solicitud…" value={rejectNote[cr.id] ?? ""} onChange={(e) => setRejectNote((n) => ({ ...n, [cr.id]: e.target.value }))} className="form-input" style={{ resize: "vertical" }} />
+                        <label className="form-label">{t("rejectModal.reason")} <span style={{ color: "#dc2626" }}>*</span></label>
+                        <textarea autoFocus rows={3} placeholder={t("rejectModal.placeholder")} value={rejectNote[cr.id] ?? ""} onChange={(e) => setRejectNote((n) => ({ ...n, [cr.id]: e.target.value }))} className="form-input" style={{ resize: "vertical" }} />
                         <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                           <button className="btn" disabled={isProcessing || !rejectNote[cr.id]?.trim()} onClick={() => submitCrReview(cr.id, "REJECT")} style={{ background: "#dc2626", color: "#fff" }}>
-                            {isProcessing ? "Procesando…" : "Confirmar rechazo"}
+                            {isProcessing ? t("processing") : t("rejectModal.confirm")}
                           </button>
-                          <button className="btn" disabled={isProcessing} onClick={() => setRejectingId(null)} style={{ background: "#f1f5f9", color: "#64748b" }}>Cancelar</button>
+                          <button className="btn" disabled={isProcessing} onClick={() => setRejectingId(null)} style={{ background: "#f1f5f9", color: "#64748b" }}>{tc("cancel")}</button>
                         </div>
                       </div>
                     )}
@@ -695,12 +704,12 @@ export default function SolicitudesClient({ company, userRole }: Props) {
             ) : outgoing.length === 0 ? (
               <div style={{ textAlign: "center", padding: "80px 0", color: "#94a3b8" }}>
                 <div style={{ marginBottom: 16 }}><CheckCircle size={48} color="#94a3b8" /></div>
-                <div style={{ fontSize: 17, fontWeight: 700, color: "#64748b", marginBottom: 6 }}>No hay solicitudes salientes</div>
-                <div style={{ fontSize: 13 }}>Usa el botón "Nueva solicitud saliente" para pedir una actualización, revisión o corrección a un usuario.</div>
+                <div style={{ fontSize: 17, fontWeight: 700, color: "#64748b", marginBottom: 6 }}>{t("emptyOutgoing")}</div>
+                <div style={{ fontSize: 13 }}>{t("emptyOutgoingMsg")}</div>
               </div>
             ) : (
               outgoing.map((o) => {
-                const tc  = OUT_TYPE_COLORS[o.type]   ?? { bg: "#f3f4f6", color: "#374151" };
+                const typeColor  = OUT_TYPE_COLORS[o.type]   ?? { bg: "#f3f4f6", color: "#374151" };
                 const sc  = OUT_STATUS_COLORS[o.status] ?? { bg: "#f3f4f6", color: "#374151" };
                 const doc = o.file.nombreDocumento || o.file.name;
                 const isExp = expanded.has(o.id);
@@ -709,19 +718,19 @@ export default function SolicitudesClient({ company, userRole }: Props) {
                 const isReviewing = reviewingId === o.id;
 
                 return (
-                  <div key={o.id} className="card" style={{ borderLeft: `4px solid ${tc.color}` }}>
+                  <div key={o.id} className="card" style={{ borderLeft: `4px solid ${typeColor.color}` }}>
                     {/* Card header */}
                     <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
                       <FileIcon mimeType={o.file.mimeType} size={28} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
                           <span style={{ fontWeight: 700, fontSize: 15, color: "#1e293b" }}>{doc}</span>
-                          <span style={{ background: tc.bg, color: tc.color, borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>{OUT_TYPE_LABELS[o.type]}</span>
+                          <span style={{ background: typeColor.bg, color: typeColor.color, borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>{OUT_TYPE_LABELS[o.type]}</span>
                           <span style={{ background: sc.bg, color: sc.color, borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>{OUT_STATUS_LABELS[o.status]}</span>
                         </div>
                         <div style={{ display: "flex", gap: 14, fontSize: 12, color: "#64748b", flexWrap: "wrap" }}>
-                          {o.file.codigo && <span>Código: <b>{o.file.codigo}</b></span>}
-                          {o.file.versionStr && <span>Versión actual: <b>{o.file.versionStr}</b></span>}
+                          {o.file.codigo && <span>{tc("codigo")}: <b>{o.file.codigo}</b></span>}
+                          {o.file.versionStr && <span>{tc("version")}: <b>{o.file.versionStr}</b></span>}
                           <span>{new Date(o.createdAt).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" })}</span>
                         </div>
                       </div>
@@ -755,37 +764,37 @@ export default function SolicitudesClient({ company, userRole }: Props) {
                       <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #e2e8f0" }}>
                         {o.instructions && (
                           <div style={{ marginBottom: 10 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", marginBottom: 4 }}>Instrucciones</div>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", marginBottom: 4 }}>{t("newOutgoingModal.instructionsLabel")}</div>
                             <div style={{ fontSize: 13, color: "#374151", whiteSpace: "pre-wrap" }}>{o.instructions}</div>
                           </div>
                         )}
                         {o.type === "CORRECCION" && o.correctionFields && (
                           <div style={{ marginBottom: 10 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", marginBottom: 4 }}>Campos a corregir</div>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", marginBottom: 4 }}>{t("newOutgoingModal.whatToFix")}</div>
                             <div style={{ fontSize: 13, color: "#374151", display: "flex", gap: 8, flexWrap: "wrap" }}>
-                              {(o.correctionFields as Record<string,boolean|string|null>).nombre    && <span style={{ background: "#e0f2fe", color: "#0369a1", borderRadius: 4, padding: "2px 8px" }}>Nombre</span>}
-                              {(o.correctionFields as Record<string,boolean|string|null>).contenido && <span style={{ background: "#ede9fe", color: "#5b21b6", borderRadius: 4, padding: "2px 8px" }}>Contenido</span>}
-                              {(o.correctionFields as Record<string,boolean|string|null>).area      && <span style={{ background: "#fef3c7", color: "#92400e", borderRadius: 4, padding: "2px 8px" }}>Área</span>}
-                              {(o.correctionFields as Record<string,boolean|string|null>).carpeta   && <span style={{ background: "#dcfce7", color: "#166534", borderRadius: 4, padding: "2px 8px" }}>Carpeta</span>}
-                              {(o.correctionFields as Record<string,boolean|string|null>).otro      && <span style={{ background: "#f3f4f6", color: "#374151", borderRadius: 4, padding: "2px 8px" }}>Otro: {o.correctionFields.otro as string}</span>}
+                              {(o.correctionFields as Record<string,boolean|string|null>).nombre    && <span style={{ background: "#e0f2fe", color: "#0369a1", borderRadius: 4, padding: "2px 8px" }}>{t("newOutgoingModal.fixNombre")}</span>}
+                              {(o.correctionFields as Record<string,boolean|string|null>).contenido && <span style={{ background: "#ede9fe", color: "#5b21b6", borderRadius: 4, padding: "2px 8px" }}>{t("newOutgoingModal.fixContenido")}</span>}
+                              {(o.correctionFields as Record<string,boolean|string|null>).area      && <span style={{ background: "#fef3c7", color: "#92400e", borderRadius: 4, padding: "2px 8px" }}>{t("newOutgoingModal.fixArea")}</span>}
+                              {(o.correctionFields as Record<string,boolean|string|null>).carpeta   && <span style={{ background: "#dcfce7", color: "#166534", borderRadius: 4, padding: "2px 8px" }}>{t("newOutgoingModal.fixCarpeta")}</span>}
+                              {(o.correctionFields as Record<string,boolean|string|null>).otro      && <span style={{ background: "#f3f4f6", color: "#374151", borderRadius: 4, padding: "2px 8px" }}>{t("newOutgoingModal.fixOtro")} {o.correctionFields.otro as string}</span>}
                             </div>
                           </div>
                         )}
                         {isPendingApproval && o.outcomeType && (
                           <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: "#166534", textTransform: "uppercase", marginBottom: 4 }}>Resultado enviado</div>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "#166534", textTransform: "uppercase", marginBottom: 4 }}>{t("result.label")}</div>
                             <div style={{ fontSize: 13, color: "#15803d", fontWeight: 600 }}>{OUTCOME_LABELS[o.outcomeType] ?? o.outcomeType}</div>
-                            {o.pendingVersionStr && <div style={{ fontSize: 12, color: "#166534", marginTop: 4 }}>Versión propuesta: <b>{o.pendingVersionStr}</b></div>}
+                            {o.pendingVersionStr && <div style={{ fontSize: 12, color: "#166534", marginTop: 4 }}>{t("result.versionLabel")} <b>{o.pendingVersionStr}</b></div>}
                             {o.pendingMetadata && Object.keys(o.pendingMetadata).length > 0 && (
                               <div style={{ fontSize: 12, color: "#166534", marginTop: 4 }}>
-                                Cambios de metadatos: {Object.keys(o.pendingMetadata as object).join(", ")}
+                                {t("result.metadataChanges")} {Object.keys(o.pendingMetadata as object).join(", ")}
                               </div>
                             )}
                           </div>
                         )}
                         {o.finalNotes && (
                           <div style={{ background: o.status === "APPROVED" ? "#f0fdf4" : "#fff1f2", border: `1px solid ${o.status === "APPROVED" ? "#bbf7d0" : "#fecdd3"}`, borderRadius: 8, padding: "10px 14px", marginBottom: 10 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: o.status === "APPROVED" ? "#166534" : "#be123c", textTransform: "uppercase", marginBottom: 2 }}>Notas finales</div>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: o.status === "APPROVED" ? "#166534" : "#be123c", textTransform: "uppercase", marginBottom: 2 }}>{t("result.finalNotes")}</div>
                             <div style={{ fontSize: 13 }}>{o.finalNotes}</div>
                           </div>
                         )}
@@ -797,16 +806,16 @@ export default function SolicitudesClient({ company, userRole }: Props) {
                       {isPendingApproval && !isReviewing && (
                         <>
                           <button className="btn" onClick={() => { setReviewingId(o.id); setReviewNotes({}); setReviewVer({}); }} style={{ background: "#ede9fe", color: "#5b21b6" }}>
-                            Revisar resultado
+                            {t("reviewResult")}
                           </button>
                           <button className="btn" disabled={outProcessing === o.id} onClick={() => cancelOutgoing(o.id)} style={{ background: "#f1f5f9", color: "#64748b", fontSize: 12 }}>
-                            Cancelar solicitud
+                            {t("cancelRequest")}
                           </button>
                         </>
                       )}
                       {isActive && !isPendingApproval && (
                         <button className="btn" disabled={outProcessing === o.id} onClick={() => cancelOutgoing(o.id)} style={{ background: "#f1f5f9", color: "#64748b", fontSize: 12 }}>
-                          {outProcessing === o.id ? "Cancelando…" : "Cancelar solicitud"}
+                          {outProcessing === o.id ? t("cancelling") : t("cancelRequest")}
                         </button>
                       )}
                     </div>
@@ -816,24 +825,24 @@ export default function SolicitudesClient({ company, userRole }: Props) {
                       <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #e2e8f0" }}>
                         {o.outcomeType === "new_version" && (
                           <div style={{ marginBottom: 12 }}>
-                            <label className="form-label">Etiqueta de versión (opcional)</label>
+                            <label className="form-label">{t("reviewModal.versionLabel")}</label>
                             <input value={reviewVer[o.id] ?? o.pendingVersionStr ?? ""} onChange={(e) => setReviewVer((n) => ({ ...n, [o.id]: e.target.value }))} className="form-input" placeholder={o.pendingVersionStr ?? "v1.1"} style={{ maxWidth: 200 }} />
-                            <p style={{ fontSize: 11, color: "#94a3b8", margin: "4px 0 0" }}>Deja vacío para usar la etiqueta enviada por el usuario.</p>
+                            <p style={{ fontSize: 11, color: "#94a3b8", margin: "4px 0 0" }}>{t("reviewModal.versionHelp")}</p>
                           </div>
                         )}
-                        <label className="form-label">Notas (requeridas para rechazo)</label>
-                        <textarea rows={3} value={reviewNotes[o.id] ?? ""} onChange={(e) => setReviewNotes((n) => ({ ...n, [o.id]: e.target.value }))} className="form-input" style={{ resize: "vertical", marginBottom: 10 }} placeholder="Observaciones para el equipo…" />
+                        <label className="form-label">{t("reviewModal.notesLabel")}</label>
+                        <textarea rows={3} value={reviewNotes[o.id] ?? ""} onChange={(e) => setReviewNotes((n) => ({ ...n, [o.id]: e.target.value }))} className="form-input" style={{ resize: "vertical", marginBottom: 10 }} placeholder={t("reviewModal.notesPlaceholder")} />
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                           <button className="btn" disabled={outProcessing === o.id} onClick={() => submitOutReview(o.id, "APPROVED")} style={{ background: "#dcfce7", color: "#166534" }}>
-                            {outProcessing === o.id ? "Procesando…" : <><Check size={13} style={{ marginRight: 4 }} />Aprobar</>}
+                            {outProcessing === o.id ? t("processing") : <><Check size={13} style={{ marginRight: 4 }} />{t("approve")}</>}
                           </button>
                           <button className="btn" disabled={outProcessing === o.id || !reviewNotes[o.id]?.trim()} onClick={() => submitOutReview(o.id, "RETURNED")} style={{ background: "#fff7ed", color: "#c2410c", border: "1px solid #fed7aa" }}>
-                            Devolver
+                            {t("reviewModal.return")}
                           </button>
                           <button className="btn" disabled={outProcessing === o.id || !reviewNotes[o.id]?.trim()} onClick={() => submitOutReview(o.id, "REJECTED")} style={{ background: "#fee2e2", color: "#dc2626" }}>
-                            <XIcon size={13} style={{ marginRight: 4 }} />Rechazar
+                            <XIcon size={13} style={{ marginRight: 4 }} />{t("reject")}
                           </button>
-                          <button className="btn" onClick={() => setReviewingId(null)} style={{ background: "#f1f5f9", color: "#64748b" }}>Cancelar</button>
+                          <button className="btn" onClick={() => setReviewingId(null)} style={{ background: "#f1f5f9", color: "#64748b" }}>{tc("cancel")}</button>
                         </div>
                       </div>
                     )}
@@ -850,18 +859,18 @@ export default function SolicitudesClient({ company, userRole }: Props) {
         <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowCreate(false); }}>
           <div className="modal">
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#1e293b" }}>Nueva solicitud saliente</h2>
+              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#1e293b" }}>{t("newOutgoingModal.title")}</h2>
               <button onClick={() => setShowCreate(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8" }}><XIcon size={20} /></button>
             </div>
 
             {/* File search */}
             <div style={{ marginBottom: 18 }}>
-              <label className="form-label">Documento <span style={{ color: "#dc2626" }}>*</span></label>
+              <label className="form-label">{t("newOutgoingModal.docLabel")} <span style={{ color: "#dc2626" }}>*</span></label>
               {selectedFile ? (
                 <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 14, color: "#1e293b" }}>{selectedFile.nombreDocumento || selectedFile.name}</div>
-                    <div style={{ fontSize: 12, color: "#64748b" }}>{selectedFile.codigo && `Código: ${selectedFile.codigo} · `}Versión: {selectedFile.versionStr ?? "—"}</div>
+                    <div style={{ fontSize: 12, color: "#64748b" }}>{selectedFile.codigo && `${tc("codigo")}: ${selectedFile.codigo} · `}{tc("version")}: {selectedFile.versionStr ?? "—"}</div>
                   </div>
                   <button onClick={() => setSelectedFile(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8" }}><XIcon size={16} /></button>
                 </div>
@@ -871,13 +880,13 @@ export default function SolicitudesClient({ company, userRole }: Props) {
                     className="form-input"
                     value={fileSearch}
                     onChange={(e) => setFileSearch(e.target.value)}
-                    placeholder="Buscar por nombre o código…"
+                    placeholder={t("newOutgoingModal.searchPlaceholder")}
                     autoFocus
                   />
                   {fileSearch && (
                     <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, zIndex: 100, maxHeight: 240, overflowY: "auto", boxShadow: "0 4px 16px rgba(0,0,0,0.12)" }}>
                       {filteredFiles.length === 0 ? (
-                        <div style={{ padding: "12px 16px", fontSize: 13, color: "#94a3b8" }}>Sin resultados</div>
+                        <div style={{ padding: "12px 16px", fontSize: 13, color: "#94a3b8" }}>{t("newOutgoingModal.noResults")}</div>
                       ) : filteredFiles.map((f) => (
                         <div key={f.id} onClick={() => { setSelectedFile(f); setFileSearch(""); }} style={{ padding: "10px 16px", cursor: "pointer", borderBottom: "1px solid #f1f5f9", fontSize: 13 }} onMouseEnter={(e) => (e.currentTarget.style.background = "#f8fafc")} onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}>
                           <div style={{ fontWeight: 600, color: "#1e293b" }}>{f.nombreDocumento || f.name}</div>
@@ -892,7 +901,7 @@ export default function SolicitudesClient({ company, userRole }: Props) {
 
             {/* Type */}
             <div style={{ marginBottom: 18 }}>
-              <label className="form-label">Tipo de solicitud <span style={{ color: "#dc2626" }}>*</span></label>
+              <label className="form-label">{t("newOutgoingModal.typeLabel")} <span style={{ color: "#dc2626" }}>*</span></label>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 {(["ACTUALIZACION","REVISION","CORRECCION"] as const).map((t) => (
                   <button key={t} className={`type-pill${outType === t ? " selected" : ""}`} onClick={() => setOutType(t)} style={{ borderColor: outType === t ? p : "#e2e8f0", background: outType === t ? "#eff6ff" : "#fff", color: outType === t ? p : "#374151" }}>
@@ -901,37 +910,37 @@ export default function SolicitudesClient({ company, userRole }: Props) {
                 ))}
               </div>
               <p style={{ fontSize: 12, color: "#64748b", margin: "6px 0 0" }}>
-                {outType === "ACTUALIZACION" && "Pide al usuario que suba una versión más reciente del documento."}
-                {outType === "REVISION" && "Pide al usuario que revise el documento e indique si requiere cambios."}
-                {outType === "CORRECCION" && "Especifica qué campos o contenido deben corregirse."}
+                {outType === "ACTUALIZACION" && t("newOutgoingModal.actualizacionHelp")}
+                {outType === "REVISION" && t("newOutgoingModal.revisionHelp")}
+                {outType === "CORRECCION" && t("newOutgoingModal.correccionHelp")}
               </p>
             </div>
 
             {/* Correction fields (CORRECCION only) */}
             {outType === "CORRECCION" && (
               <div style={{ marginBottom: 18, background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "14px 16px" }}>
-                <label className="form-label" style={{ marginBottom: 10 }}>Qué corregir <span style={{ color: "#dc2626" }}>*</span></label>
+                <label className="form-label" style={{ marginBottom: 10 }}>{t("newOutgoingModal.whatToFix")} <span style={{ color: "#dc2626" }}>*</span></label>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {(["nombre","contenido","area","carpeta"] as const).map((field) => {
-                    const labels = { nombre: "Nombre del documento", contenido: "Contenido / archivo", area: "Área / departamento", carpeta: "Carpeta" };
+                    const labels = { nombre: t("newOutgoingModal.fixNombre"), contenido: t("newOutgoingModal.fixContenido"), area: t("newOutgoingModal.fixArea"), carpeta: t("newOutgoingModal.fixCarpeta") };
                     return (
                       <label key={field} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}>
                         <input type="checkbox" checked={corrFields[field]} onChange={(e) => setCorrFields((f) => ({ ...f, [field]: e.target.checked }))} />
                         {labels[field]}
                         {field === "contenido" && corrFields.contenido && (
-                          <span style={{ fontSize: 11, color: "#5b21b6", fontWeight: 600 }}>(el usuario deberá subir un archivo)</span>
+                          <span style={{ fontSize: 11, color: "#5b21b6", fontWeight: 600 }}>{t("newOutgoingModal.contenidoNote")}</span>
                         )}
                       </label>
                     );
                   })}
                   <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}>
                     <input type="checkbox" checked={!!corrFields.otro.trim() || false} onChange={(e) => { if (!e.target.checked) setCorrFields((f) => ({ ...f, otro: "" })); }} />
-                    Otro:
+                    {t("newOutgoingModal.fixOtro")}
                     <input
                       value={corrFields.otro}
                       onChange={(e) => setCorrFields((f) => ({ ...f, otro: e.target.value }))}
                       className="form-input"
-                      placeholder="Describe el campo a corregir…"
+                      placeholder={t("newOutgoingModal.fixOtroPlaceholder")}
                       style={{ flex: 1, padding: "5px 10px" }}
                     />
                   </label>
@@ -941,28 +950,28 @@ export default function SolicitudesClient({ company, userRole }: Props) {
 
             {/* Cambio a realizar */}
             <div style={{ marginBottom: 18 }}>
-              <label className="form-label">Cambio a realizar <span style={{ color: "#dc2626" }}>*</span></label>
+              <label className="form-label">{t("newOutgoingModal.instructionsLabel")} <span style={{ color: "#dc2626" }}>*</span></label>
               <textarea rows={3} value={instructions} onChange={(e) => setInstructions(e.target.value)} className="form-input" style={{ resize: "vertical" }} placeholder={
-                outType === "ACTUALIZACION" ? "Describe el cambio o actualización que se requiere…"
-                : outType === "REVISION" ? "Describe el alcance y motivo de la revisión…"
-                : "Explica detalladamente qué debe corregirse…"
+                outType === "ACTUALIZACION" ? t("newOutgoingModal.instrActualizacion")
+                : outType === "REVISION" ? t("newOutgoingModal.instrRevision")
+                : t("newOutgoingModal.instrCorreccion")
               } />
             </div>
 
             {/* Assignees */}
             <div style={{ marginBottom: 18 }}>
-              <label className="form-label">Asignado(s) <span style={{ color: "#dc2626" }}>*</span></label>
+              <label className="form-label">{t("newOutgoingModal.assigneesLabel")} <span style={{ color: "#dc2626" }}>*</span></label>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {assignees.map((val, idx) => (
                   <div key={idx} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <div style={{ fontSize: 11, color: "#94a3b8", width: 46, flexShrink: 0 }}>Paso {idx + 1}</div>
+                    <div style={{ fontSize: 11, color: "#94a3b8", width: 46, flexShrink: 0 }}>{tc("paso")} {idx + 1}</div>
                     <select
                       value={val}
                       onChange={(e) => setAssignees((prev) => prev.map((v, i) => i === idx ? e.target.value : v))}
                       className="form-select"
                       style={{ flex: 1 }}
                     >
-                      <option value="">Seleccionar usuario…</option>
+                      <option value="">{t("newOutgoingModal.selectUserPlaceholder")}</option>
                       {allUsers.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.email})</option>)}
                     </select>
                     {assignees.length > 1 && (
@@ -982,7 +991,7 @@ export default function SolicitudesClient({ company, userRole }: Props) {
                     onClick={() => setAssignees((prev) => [...prev, ""])}
                     style={{ background: "none", border: "1px dashed #d1d5db", borderRadius: 8, padding: "7px 12px", cursor: "pointer", color: "#64748b", fontSize: 13, display: "flex", alignItems: "center", gap: 6, alignSelf: "flex-start" }}
                   >
-                    <Plus size={13} /> Agregar usuario
+                    <Plus size={13} /> {t("newOutgoingModal.addUser")}
                   </button>
                 )}
               </div>
@@ -990,7 +999,7 @@ export default function SolicitudesClient({ company, userRole }: Props) {
 
             {/* Due date */}
             <div style={{ marginBottom: 24 }}>
-              <label className="form-label">Fecha límite (opcional)</label>
+              <label className="form-label">{t("newOutgoingModal.deadline")}</label>
               <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="form-input" style={{ maxWidth: 200 }} />
             </div>
 
@@ -1001,9 +1010,9 @@ export default function SolicitudesClient({ company, userRole }: Props) {
             )}
 
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <button className="btn" onClick={() => setShowCreate(false)} style={{ background: "#f1f5f9", color: "#64748b" }}>Cancelar</button>
+              <button className="btn" onClick={() => setShowCreate(false)} style={{ background: "#f1f5f9", color: "#64748b" }}>{tc("cancel")}</button>
               <button className="btn" disabled={creating} onClick={submitCreate} style={{ background: p, color: "#fff" }}>
-                {creating ? "Creando…" : "Crear solicitud"}
+                {creating ? t("newOutgoingModal.creating") : t("newOutgoingModal.create")}
               </button>
             </div>
           </div>

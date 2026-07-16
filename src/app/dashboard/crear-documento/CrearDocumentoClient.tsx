@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { GripVertical, X, UserPlus, CheckCircle, FilePlus } from "lucide-react";
 
 interface Folder { id: string; name: string; parentId: string | null; isExternal: boolean; }
@@ -13,17 +14,6 @@ interface Props {
   currentUserId: string;
 }
 
-const TIPO_OPTIONS = [
-  { value: "PROCEDIMIENTO", label: "Procedimiento" },
-  { value: "MANUAL",        label: "Manual" },
-  { value: "INSTRUCTIVO",   label: "Instructivo" },
-  { value: "FORMATO",       label: "Formato" },
-  { value: "POLITICA",      label: "Política" },
-  { value: "OTRO",          label: "Otro" },
-];
-
-const STEPS_NORMAL   = ["Información", "Archivo", "Revisores", "Confirmar"];
-const STEPS_EXTERNAL = ["Información", "Archivo", "Confirmar"];
 
 // Build a flat ordered list with depth for hierarchical display
 function buildFolderTree(folders: Folder[]): { id: string; label: string; depth: number }[] {
@@ -49,6 +39,19 @@ function buildFolderTree(folders: Folder[]): { id: string; label: string; depth:
 export default function CrearDocumentoClient({ company, folders, users, currentUserId }: Props) {
   const router = useRouter();
   const brand  = company.primaryColor;
+  const t = useTranslations("crearDoc");
+
+  const TIPO_OPTIONS = [
+    { value: "PROCEDIMIENTO", label: t("fields.tipoOptions.Procedimiento") },
+    { value: "MANUAL",        label: t("fields.tipoOptions.Manual") },
+    { value: "INSTRUCTIVO",   label: t("fields.tipoOptions.Instructivo") },
+    { value: "FORMATO",       label: t("fields.tipoOptions.Formato") },
+    { value: "POLITICA",      label: t("fields.tipoOptions.Política") },
+    { value: "OTRO",          label: t("fields.tipoOptions.Otro") },
+  ];
+
+  const STEPS_NORMAL   = [t("steps.info"), t("steps.file"), t("steps.reviewers"), t("steps.confirm")];
+  const STEPS_EXTERNAL = [t("steps.info"), t("steps.file"), t("steps.confirm")];
 
   const [step, setStep] = useState(0);
 
@@ -110,17 +113,17 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
 
   async function uploadSelectedFile() {
     if (!file) return;
-    setUploading(true); setUploadProgress("Preparando subida…");
+    setUploading(true); setUploadProgress(t("preparingUpload"));
     try {
       const urlRes = await fetch("/api/files/upload-url", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: file.name, mimeType: file.type || "application/octet-stream", size: file.size }),
       });
-      if (!urlRes.ok) { setError((await urlRes.json()).error ?? "Error al preparar la subida"); return; }
+      if (!urlRes.ok) { setError((await urlRes.json()).error ?? t("errors.prepareError")); return; }
       const { uploadUrl, storageKey: key } = await urlRes.json();
-      setUploadProgress("Subiendo archivo…");
+      setUploadProgress(t("uploadingFile"));
       const putRes = await fetch(uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type || "application/octet-stream" } });
-      if (!putRes.ok) { setError("Error al subir el archivo al almacenamiento"); return; }
+      if (!putRes.ok) { setError(t("errors.uploadError")); return; }
       setStorageKey(key);
       setUploadProgress("");
       setStep(2);
@@ -156,7 +159,7 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
           reviewerIds:     reviewers.map((r) => r.id),
         }),
       });
-      if (!res.ok) { const d = await res.json(); setError(d.error ?? "Error al crear documento"); return; }
+      if (!res.ok) { const d = await res.json(); setError(d.error ?? t("errors.createError")); return; }
       setDone(true);
     } finally {
       setSubmitting(false);
@@ -169,22 +172,22 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
 
   const selectedFolderLabel = folderId
     ? folderTree.find((f) => f.id === folderId)?.label ?? "—"
-    : "Sin carpeta";
+    : t("noFolder");
 
   if (done) {
     return (
       <main style={{ minHeight: "100vh", background: "#f1f5f9", display: "grid", placeItems: "center" }}>
         <div style={{ background: "#fff", padding: 48, borderRadius: 16, textAlign: "center", maxWidth: 420, border: "1px solid #e2e8f0", boxShadow: "0 4px 24px rgba(0,0,0,0.07)" }}>
           <CheckCircle size={52} color="#16a34a" style={{ marginBottom: 16 }} />
-          <h2 style={{ margin: "0 0 8px", color: "#1e293b" }}>Documento creado</h2>
+          <h2 style={{ margin: "0 0 8px", color: "#1e293b" }}>{t("successTitle")}</h2>
           <p style={{ color: "#64748b", margin: "0 0 24px", fontSize: 14 }}>
-            El documento "{nombre}" fue creado y enviado al primer revisor.
+            {t("successMsg")}
           </p>
           <button
             onClick={() => router.push("/dashboard")}
             style={{ background: brand, color: "#fff", border: "none", padding: "12px 28px", borderRadius: 9, fontWeight: 700, fontSize: 15, cursor: "pointer" }}
           >
-            Volver al dashboard
+            {t("successBtn")}
           </button>
         </div>
       </main>
@@ -194,7 +197,7 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
   return (
     <div style={{ flex: 1, overflowY: "auto", background: "#f1f5f9", fontFamily: `'${company.fontFamily}', Inter, system-ui, sans-serif` }}>
       <div style={{ background: brand, color: "#fff", padding: "14px 28px", position: "sticky", top: 0, zIndex: 10 }}>
-        <strong style={{ fontSize: 16 }}>Crear Documento</strong>
+        <strong style={{ fontSize: 16 }}>{t("header")}</strong>
       </div>
 
       <div style={{ maxWidth: 720, margin: "0 auto", padding: "36px 24px" }}>
@@ -222,31 +225,31 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
           {step === 0 && (
             <div>
               <h2 style={{ margin: "0 0 24px", fontSize: 20, color: "#1e293b", display: "flex", alignItems: "center", gap: 10 }}>
-                <FilePlus size={22} color={brand} /> Información del documento
+                <FilePlus size={22} color={brand} /> {t("infoSection")}
               </h2>
 
-              <label style={ls}>Nombre del documento <span style={{ color: "#dc2626" }}>*</span></label>
-              <input style={is} value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="ej. Manual de Calidad 2026" autoFocus />
+              <label style={ls}>{t("fields.nombre")} <span style={{ color: "#dc2626" }}>*</span></label>
+              <input style={is} value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder={t("fields.nombrePlaceholder")} autoFocus />
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, marginTop: 20 }}>
                 <div>
-                  <label style={ls}>Departamento <span style={{ color: "#dc2626" }}>*</span></label>
+                  <label style={ls}>{t("fields.departamento")} <span style={{ color: "#dc2626" }}>*</span></label>
                   {departments.length > 0 ? (
                     <select style={is} value={departamento} onChange={(e) => setDepartamento(e.target.value)}>
-                      <option value="">— Selecciona departamento —</option>
+                      <option value="">{t("fields.departamentoPlaceholder")}</option>
                       {departments.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
                     </select>
                   ) : (
-                    <input style={is} value={departamento} onChange={(e) => setDepartamento(e.target.value)} placeholder="ej. Operaciones" />
+                    <input style={is} value={departamento} onChange={(e) => setDepartamento(e.target.value)} placeholder={t("fields.departamentoPlaceholder")} />
                   )}
                   {departments.length === 0 && (
                     <p style={{ fontSize: 11, color: "#94a3b8", margin: "4px 0 0" }}>
-                      El admin puede definir departamentos en Equipo → Departamentos.
+                      {t("fields.noDepts")}
                     </p>
                   )}
                 </div>
                 <div>
-                  <label style={ls}>Tipo de documento <span style={{ color: "#dc2626" }}>*</span></label>
+                  <label style={ls}>{t("fields.tipo")} <span style={{ color: "#dc2626" }}>*</span></label>
                   <select style={is} value={tipo} onChange={(e) => setTipo(e.target.value)}>
                     {TIPO_OPTIONS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                   </select>
@@ -255,15 +258,15 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, marginTop: 20 }}>
                 <div>
-                  <label style={ls}>Versión</label>
+                  <label style={ls}>{t("fields.version")}</label>
                   <input style={is} value={version} onChange={(e) => setVersion(e.target.value)} placeholder="v1.0" />
                 </div>
               </div>
 
               <div style={{ marginTop: 20 }}>
-                <label style={ls}>Carpeta (opcional)</label>
+                <label style={ls}>{t("fields.carpeta")}</label>
                 <select style={is} value={folderId} onChange={(e) => setFolderId(e.target.value)}>
-                  <option value="">— Sin carpeta —</option>
+                  <option value="">{t("fields.carpetaPlaceholder")}</option>
                   {folderTree.map((f) => (
                     <option key={f.id} value={f.id}>
                       {"— ".repeat(f.depth)}{f.label}
@@ -277,7 +280,7 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
                 onClick={() => setStep(1)}
                 style={{ ...btnStyle(brand), marginTop: 32, opacity: canStep0 ? 1 : 0.5 }}
               >
-                Siguiente: Archivo →
+                {t("nextInfo")}
               </button>
             </div>
           )}
@@ -285,7 +288,7 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
           {/* ── Step 1: File ── */}
           {step === 1 && (
             <div>
-              <h2 style={{ margin: "0 0 24px", fontSize: 20, color: "#1e293b" }}>Adjuntar archivo</h2>
+              <h2 style={{ margin: "0 0 24px", fontSize: 20, color: "#1e293b" }}>{t("fileSection")}</h2>
 
               <div
                 onClick={() => fileRef.current?.click()}
@@ -299,12 +302,12 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
                   <div>
                     <div style={{ fontSize: 15, fontWeight: 700, color: "#1e293b" }}>{file.name}</div>
                     <div style={{ fontSize: 13, color: "#64748b", marginTop: 6 }}>{(file.size / 1024).toFixed(1)} KB</div>
-                    <div style={{ color: brand, fontSize: 13, marginTop: 10 }}>Clic para cambiar archivo</div>
+                    <div style={{ color: brand, fontSize: 13, marginTop: 10 }}>{t("changeFile")}</div>
                   </div>
                 ) : (
                   <div>
-                    <div style={{ fontSize: 15, color: "#64748b" }}>Haz clic o arrastra un archivo aquí</div>
-                    <div style={{ fontSize: 13, color: "#94a3b8", marginTop: 6 }}>PDF, Word, Excel, imágenes…</div>
+                    <div style={{ fontSize: 15, color: "#64748b" }}>{t("dropzone")}</div>
+                    <div style={{ fontSize: 13, color: "#94a3b8", marginTop: 6 }}>{t("dropzoneHint")}</div>
                   </div>
                 )}
                 <input
@@ -317,10 +320,10 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
               {uploadProgress && <p style={{ color: "#64748b", fontSize: 14, marginTop: 12 }}>{uploadProgress}</p>}
 
               <div style={{ display: "flex", gap: 12, marginTop: 28 }}>
-                <button onClick={() => setStep(0)} style={backBtn}>← Atrás</button>
+                <button onClick={() => setStep(0)} style={backBtn}>{t("back")}</button>
                 {storageKey ? (
                   <button onClick={() => setStep(isExternalFolder ? 3 : 2)} style={btnStyle(brand)}>
-                    {isExternalFolder ? "Siguiente: Confirmar →" : "Siguiente: Revisores →"}
+                    {isExternalFolder ? t("nextExternal") : t("nextNormal")}
                   </button>
                 ) : (
                   <button
@@ -328,7 +331,7 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
                     onClick={uploadSelectedFile}
                     style={{ ...btnStyle(brand), opacity: canStep1 && !uploading ? 1 : 0.5 }}
                   >
-                    {uploading ? uploadProgress || "Subiendo…" : "Subir archivo →"}
+                    {uploading ? uploadProgress || t("uploadingFile") : t("uploadBtn")}
                   </button>
                 )}
               </div>
@@ -338,17 +341,17 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
           {/* ── Step 2: Reviewers ── */}
           {step === 2 && (
             <div>
-              <h2 style={{ margin: "0 0 8px", fontSize: 20, color: "#1e293b" }}>Cadena de revisores</h2>
+              <h2 style={{ margin: "0 0 8px", fontSize: 20, color: "#1e293b" }}>{t("reviewersSection")}</h2>
               <p style={{ margin: "0 0 24px", fontSize: 14, color: "#64748b" }}>
-                Define quién revisa el documento y en qué orden. Cada revisor debe aprobar antes de que pase al siguiente.
+                {t("reviewersDesc")}
               </p>
 
               <div style={{ marginBottom: 18 }}>
-                <label style={ls}>Agregar revisor</label>
+                <label style={ls}>{t("addReviewer")}</label>
                 <input
                   style={is} value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
-                  placeholder="Buscar por nombre o correo…"
+                  placeholder={t("reviewerSearch")}
                 />
                 {userSearch && filteredUsers.length > 0 && (
                   <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, marginTop: 4, maxHeight: 200, overflowY: "auto", background: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
@@ -371,12 +374,12 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
 
               {reviewers.length === 0 ? (
                 <div style={{ padding: 28, textAlign: "center", color: "#94a3b8", border: "1px dashed #e2e8f0", borderRadius: 8, fontSize: 14 }}>
-                  Agrega al menos un revisor para continuar.
+                  {t("emptyReviewers")}
                 </div>
               ) : (
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
-                    Orden de revisión
+                    {t("orderLabel")}
                   </div>
                   {reviewers.map((r, idx) => (
                     <div key={r.id} style={{
@@ -392,9 +395,9 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
                         <div style={{ fontSize: 12, color: "#94a3b8" }}>{r.email}</div>
                       </div>
                       <div style={{ display: "flex", gap: 4 }}>
-                        {idx > 0 && <button onClick={() => moveReviewer(idx, idx - 1)} style={iconBtn} title="Mover arriba">↑</button>}
-                        {idx < reviewers.length - 1 && <button onClick={() => moveReviewer(idx, idx + 1)} style={iconBtn} title="Mover abajo">↓</button>}
-                        <button onClick={() => removeReviewer(r.id)} style={{ ...iconBtn, color: "#dc2626" }} title="Quitar"><X size={13} /></button>
+                        {idx > 0 && <button onClick={() => moveReviewer(idx, idx - 1)} style={iconBtn} title={t("moveUp")}>↑</button>}
+                        {idx < reviewers.length - 1 && <button onClick={() => moveReviewer(idx, idx + 1)} style={iconBtn} title={t("moveDown")}>↓</button>}
+                        <button onClick={() => removeReviewer(r.id)} style={{ ...iconBtn, color: "#dc2626" }} title={t("remove")}><X size={13} /></button>
                       </div>
                     </div>
                   ))}
@@ -402,13 +405,13 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
               )}
 
               <div style={{ display: "flex", gap: 12, marginTop: 28 }}>
-                <button onClick={() => setStep(1)} style={backBtn}>← Atrás</button>
+                <button onClick={() => setStep(1)} style={backBtn}>{t("back")}</button>
                 <button
                   disabled={!canStep2}
                   onClick={() => setStep(3)}
                   style={{ ...btnStyle(brand), opacity: canStep2 ? 1 : 0.5 }}
                 >
-                  Siguiente: Confirmar →
+                  {t("nextExternal")}
                 </button>
               </div>
             </div>
@@ -417,21 +420,21 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
           {/* ── Step 3: Confirm ── */}
           {step === 3 && (
             <div>
-              <h2 style={{ margin: "0 0 24px", fontSize: 20, color: "#1e293b" }}>Confirmar y crear</h2>
+              <h2 style={{ margin: "0 0 24px", fontSize: 20, color: "#1e293b" }}>{t("confirmSection")}</h2>
 
               <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, padding: "20px 24px", marginBottom: 24 }}>
-                <Row label="Nombre" value={nombre} />
-                <Row label="Departamento" value={departamento} />
-                <Row label="Tipo" value={TIPO_OPTIONS.find((t) => t.value === tipo)?.label ?? tipo} />
-                <Row label="Versión" value={version} />
-                <Row label="Carpeta" value={selectedFolderLabel} />
-                <Row label="Archivo" value={file?.name ?? "—"} />
+                <Row label={t("confirmLabels.nombre")} value={nombre} />
+                <Row label={t("confirmLabels.departamento")} value={departamento} />
+                <Row label={t("confirmLabels.tipo")} value={TIPO_OPTIONS.find((opt) => opt.value === tipo)?.label ?? tipo} />
+                <Row label={t("confirmLabels.version")} value={version} />
+                <Row label={t("confirmLabels.carpeta")} value={selectedFolderLabel} />
+                <Row label={t("confirmLabels.archivo")} value={file?.name ?? "—"} />
                 {!isExternalFolder && (
                   <div style={{ marginTop: 14, borderTop: "1px solid #e2e8f0", paddingTop: 14 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", marginBottom: 10 }}>Cadena de revisores</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", marginBottom: 10 }}>{t("confirmLabels.reviewers")}</div>
                     {reviewers.map((r, i) => (
                       <div key={r.id} style={{ fontSize: 14, color: "#374151", marginBottom: 6 }}>
-                        <span style={{ fontWeight: 700, color: brand }}>Paso {i + 1}:</span> {r.name}
+                        <span style={{ fontWeight: 700, color: brand }}>{t("confirmLabels.paso")} {i + 1}:</span> {r.name}
                       </div>
                     ))}
                   </div>
@@ -439,7 +442,7 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
                 {isExternalFolder && (
                   <div style={{ marginTop: 14, borderTop: "1px solid #e2e8f0", paddingTop: 14 }}>
                     <div style={{ background: "#e0f2fe", border: "1px solid #bae6fd", borderRadius: 7, padding: "10px 14px", fontSize: 13, color: "#0369a1" }}>
-                      Carpeta externa: el documento quedará aprobado directamente sin revisores.
+                      {t("externalNote")}
                     </div>
                   </div>
                 )}
@@ -452,13 +455,13 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
               )}
 
               <div style={{ display: "flex", gap: 12 }}>
-                <button onClick={() => setStep(isExternalFolder ? 1 : 2)} style={backBtn}>← Atrás</button>
+                <button onClick={() => setStep(isExternalFolder ? 1 : 2)} style={backBtn}>{t("back")}</button>
                 <button
                   disabled={submitting}
                   onClick={submit}
                   style={{ ...btnStyle(brand), opacity: submitting ? 0.7 : 1 }}
                 >
-                  {submitting ? "Creando documento…" : "Crear documento"}
+                  {submitting ? t("creating") : t("createBtn")}
                 </button>
               </div>
             </div>

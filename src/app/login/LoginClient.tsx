@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 
 const NAVY  = "#1B3A6B";
 const GREEN = "#3CB54A";
 
 export default function LoginClient() {
+  const t = useTranslations("login");
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [error, setError]       = useState("");
@@ -32,7 +34,7 @@ export default function LoginClient() {
         }
       } else {
         const d = await res.json().catch(() => ({}));
-        setError(d.error ?? "Credenciales inválidas");
+        setError(d.error ?? t("invalidCredentials"));
       }
     } finally {
       setLoading(false);
@@ -88,21 +90,21 @@ export default function LoginClient() {
             padding: "11px 28px",
           }}>
             <p style={{ margin: 0, color: "rgba(255,255,255,0.88)", fontSize: 13, fontWeight: 500, textAlign: "center" }}>
-              Inicia sesión en tu espacio de trabajo
+              {t("headline")}
             </p>
           </div>
 
           {/* ── Form ── */}
           <form onSubmit={submit} style={{ padding: "26px 28px 28px", background: "#fff" }}>
-            <label style={ls}>Correo electrónico</label>
+            <label style={ls}>{t("email")}</label>
             <input
               className="login-input"
               style={is} type="email" value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="usuario@empresa.com" required autoFocus
+              placeholder={t("emailPlaceholder")} required autoFocus
             />
 
-            <label style={{ ...ls, marginTop: 16 }}>Contraseña</label>
+            <label style={{ ...ls, marginTop: 16 }}>{t("password")}</label>
             <input
               className="login-input"
               style={is} type="password" value={password}
@@ -117,14 +119,14 @@ export default function LoginClient() {
             )}
 
             <button type="submit" disabled={loading} className="login-btn" style={btn}>
-              {loading ? "Iniciando sesión…" : "Iniciar sesión"}
+              {loading ? t("signingIn") : t("signIn")}
             </button>
           </form>
         </div>
 
         {/* Footer */}
         <p style={{ textAlign: "center", marginTop: 18, color: "rgba(255,255,255,0.4)", fontSize: 12 }}>
-          KE-Control · Gestión Documental Confiable
+          {t("footer")}
         </p>
       </div>
     </main>

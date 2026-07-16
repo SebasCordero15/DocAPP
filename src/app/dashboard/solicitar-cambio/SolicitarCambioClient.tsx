@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { CheckCircle, Search, X, Paperclip, Loader2 } from "lucide-react";
 import FileIcon from "@/components/FileIcon";
 
@@ -17,21 +18,24 @@ interface Props {
   company: { name: string; primaryColor: string; accentColor: string; fontFamily: string; logoUrl: string | null };
 }
 
-const TIPO_LABELS: Record<TipoCambio, string> = {
-  REVISION:     "Revisión",
-  ACTUALIZACION: "Actualización",
-  CORRECCION:   "Corrección",
-};
-const TIPO_DESC: Record<TipoCambio, string> = {
-  REVISION:     "Solicitar que el documento sea revisado para verificar si requiere cambios.",
-  ACTUALIZACION: "Solicitar una versión más actualizada del documento.",
-  CORRECCION:   "Señalar un error o inconsistencia que debe corregirse.",
-};
 
 export default function SolicitarCambioClient({ company }: Props) {
   const p = company.primaryColor;
   const router = useRouter();
+  const t  = useTranslations("solicitar");
+  const tc = useTranslations("common");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const TIPO_LABELS: Record<TipoCambio, string> = {
+    REVISION:      t("types.REVISION"),
+    ACTUALIZACION: t("types.ACTUALIZACION"),
+    CORRECCION:    t("types.CORRECCION"),
+  };
+  const TIPO_DESC: Record<TipoCambio, string> = {
+    REVISION:      t("typeDescs.REVISION"),
+    ACTUALIZACION: t("typeDescs.ACTUALIZACION"),
+    CORRECCION:    t("typeDescs.CORRECCION"),
+  };
 
   const [docs,        setDocs]        = useState<DocOption[]>([]);
   const [loading,     setLoading]     = useState(true);
@@ -59,8 +63,8 @@ export default function SolicitarCambioClient({ company }: Props) {
   });
 
   async function submit() {
-    if (!selected) { setError("Selecciona un documento"); return; }
-    if (!motivo.trim()) { setError("El motivo es obligatorio"); return; }
+    if (!selected) { setError(t("errors.noDoc")); return; }
+    if (!motivo.trim()) { setError(t("errors.noMotivo")); return; }
     setSubmitting(true); setError(null);
 
     let proposalStorageKey: string | null = null;
@@ -75,13 +79,13 @@ export default function SolicitarCambioClient({ company }: Props) {
       });
       if (!urlRes.ok) {
         const d = await urlRes.json().catch(() => ({}));
-        setError(d.error ?? "Error al preparar la subida del archivo");
+        setError(d.error ?? t("errors.uploadUrl"));
         setSubmitting(false); setUploading(false); return;
       }
       const { uploadUrl, storageKey } = await urlRes.json();
       const upRes = await fetch(uploadUrl, { method: "PUT", body: proposalFile, headers: { "Content-Type": proposalFile.type || "application/octet-stream" } });
       setUploading(false);
-      if (!upRes.ok) { setError("Error al subir el archivo de propuesta"); setSubmitting(false); return; }
+      if (!upRes.ok) { setError(t("errors.uploadFile")); setSubmitting(false); return; }
       proposalStorageKey = storageKey;
       proposalFileName   = proposalFile.name;
     }
@@ -99,9 +103,9 @@ export default function SolicitarCambioClient({ company }: Props) {
     if (res.status === 202 || res.ok) {
       setSuccess(true);
     } else if (res.status === 403) {
-      setError(data.error ?? "No tienes permisos para solicitar cambios en este documento. Se requiere permiso de edición.");
+      setError(data.error ?? t("errors.noPermission"));
     } else {
-      setError(data.error ?? "Error al enviar la solicitud");
+      setError(data.error ?? t("errors.generic"));
     }
   }
 
@@ -123,9 +127,9 @@ export default function SolicitarCambioClient({ company }: Props) {
 
       {/* Header */}
       <div style={{ background: p, color: "#fff", padding: "20px 32px" }}>
-        <strong style={{ fontSize: 17 }}>Solicitar Cambio de Documento</strong>
+        <strong style={{ fontSize: 17 }}>{t("header")}</strong>
         <p style={{ margin: "4px 0 0", fontSize: 13, opacity: 0.8 }}>
-          El administrador revisará tu propuesta antes de iniciar el proceso de cambio.
+          {t("headerDesc")}
         </p>
       </div>
 
@@ -134,16 +138,16 @@ export default function SolicitarCambioClient({ company }: Props) {
         {success ? (
           <div style={{ textAlign: "center", padding: "60px 0" }}>
             <CheckCircle size={56} color="#22c55e" style={{ marginBottom: 16 }} />
-            <div style={{ fontSize: 20, fontWeight: 700, color: "#1e293b", marginBottom: 8 }}>Propuesta enviada</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: "#1e293b", marginBottom: 8 }}>{t("successTitle")}</div>
             <p style={{ fontSize: 14, color: "#64748b", marginBottom: 28 }}>
-              El administrador revisará tu propuesta. Si la aprueba, iniciará el proceso de cambio y te notificará.
+              {t("successMsg")}
             </p>
             <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
               <button className="btn" onClick={() => { setSuccess(false); setSelected(null); setMotivo(""); setProposalFile(null); }} style={{ background: "#f1f5f9", color: "#475569" }}>
-                Nueva solicitud
+                {t("newRequest")}
               </button>
               <button className="btn" onClick={() => router.push("/dashboard/pendientes")} style={{ background: p, color: "#fff" }}>
-                Ver en Pendientes
+                {t("viewPendientes")}
               </button>
             </div>
           </div>
@@ -151,7 +155,7 @@ export default function SolicitarCambioClient({ company }: Props) {
           <>
             {/* Step 1: Document */}
             <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "24px", marginBottom: 20 }}>
-              <h3 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 700, color: "#1e293b" }}>1. Documento</h3>
+              <h3 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 700, color: "#1e293b" }}>{t("step1")}</h3>
               {selected ? (
                 <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 16px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -159,9 +163,9 @@ export default function SolicitarCambioClient({ company }: Props) {
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 700, fontSize: 14, color: "#1e293b" }}>{selected.nombreDocumento || selected.name}</div>
                       <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
-                        {selected.codigo && <span>Código: <b>{selected.codigo}</b> · </span>}
-                        {selected.versionStr && <span>Versión: <b>{selected.versionStr}</b> · </span>}
-                        {selected.folder && <span>Carpeta: {selected.folder.name}</span>}
+                        {selected.codigo && <span>{tc("codigo")}: <b>{selected.codigo}</b> · </span>}
+                        {selected.versionStr && <span>{tc("version")}: <b>{selected.versionStr}</b> · </span>}
+                        {selected.folder && <span>{tc("carpeta")}: {selected.folder.name}</span>}
                       </div>
                     </div>
                     <button onClick={() => setSelected(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", padding: 4 }}>
@@ -171,9 +175,9 @@ export default function SolicitarCambioClient({ company }: Props) {
                   {/* Readonly fields */}
                   <div style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
                     {[
-                      { label: "Nombre", value: selected.nombreDocumento || selected.name },
-                      { label: "Código", value: selected.codigo ?? "—" },
-                      { label: "Versión", value: selected.versionStr ?? "—" },
+                      { label: t("confirmLabels.nombre"), value: selected.nombreDocumento || selected.name },
+                      { label: t("confirmLabels.codigo"), value: selected.codigo ?? "—" },
+                      { label: t("confirmLabels.version"), value: selected.versionStr ?? "—" },
                     ].map((f) => (
                       <div key={f.label} style={{ background: "#f1f5f9", borderRadius: 7, padding: "7px 12px", minWidth: 110 }}>
                         <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", marginBottom: 2 }}>{f.label}</div>
@@ -186,14 +190,14 @@ export default function SolicitarCambioClient({ company }: Props) {
                 <>
                   <div style={{ position: "relative", marginBottom: 10 }}>
                     <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#94a3b8" }} />
-                    <input className="form-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nombre o código…" style={{ paddingLeft: 36 }} />
+                    <input className="form-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("searchPlaceholder")} style={{ paddingLeft: 36 }} />
                   </div>
                   <div style={{ border: "1px solid #e2e8f0", borderRadius: 9, overflow: "hidden", maxHeight: 260, overflowY: "auto" }}>
                     {loading ? (
-                      <div style={{ padding: "24px", textAlign: "center", color: "#94a3b8", fontSize: 13 }}>Cargando documentos…</div>
+                      <div style={{ padding: "24px", textAlign: "center", color: "#94a3b8", fontSize: 13 }}>{t("loadingDocs")}</div>
                     ) : filtered.length === 0 ? (
                       <div style={{ padding: "24px", textAlign: "center", color: "#94a3b8", fontSize: 13 }}>
-                        {docs.length === 0 ? "No tienes documentos asignados" : "Sin resultados"}
+                        {docs.length === 0 ? t("emptyDocs") : t("emptySearch")}
                       </div>
                     ) : filtered.map((doc) => (
                       <div key={doc.id} className="doc-row" onClick={() => { setSelected(doc); setSearch(""); }}>
@@ -213,12 +217,12 @@ export default function SolicitarCambioClient({ company }: Props) {
               <>
                 {/* Step 2: Type */}
                 <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "24px", marginBottom: 20 }}>
-                  <h3 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 700, color: "#1e293b" }}>2. Tipo de cambio</h3>
+                  <h3 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 700, color: "#1e293b" }}>{t("step2")}</h3>
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    {tipoOptions.map((t) => (
-                      <button key={t} className={`tipo-pill${tipo === t ? " active" : ""}`} onClick={() => setTipo(t)}>
-                        <div style={{ fontWeight: 700, marginBottom: 2 }}>{TIPO_LABELS[t]}</div>
-                        <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 400 }}>{TIPO_DESC[t]}</div>
+                    {tipoOptions.map((opt) => (
+                      <button key={opt} className={`tipo-pill${tipo === opt ? " active" : ""}`} onClick={() => setTipo(opt)}>
+                        <div style={{ fontWeight: 700, marginBottom: 2 }}>{TIPO_LABELS[opt]}</div>
+                        <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 400 }}>{TIPO_DESC[opt]}</div>
                       </button>
                     ))}
                   </div>
@@ -227,14 +231,14 @@ export default function SolicitarCambioClient({ company }: Props) {
                 {/* Step 3: Reason */}
                 <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "24px", marginBottom: 20 }}>
                   <h3 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 700, color: "#1e293b" }}>
-                    3. Motivo <span style={{ color: "#dc2626" }}>*</span>
+                    {t("step3")} <span style={{ color: "#dc2626" }}>*</span>
                   </h3>
                   <textarea
                     className="form-input"
                     rows={5}
                     value={motivo}
                     onChange={(e) => setMotivo(e.target.value)}
-                    placeholder="Describe el motivo o justificación del cambio solicitado…"
+                    placeholder={t("motivoPlaceholder")}
                     style={{ resize: "vertical" }}
                   />
                 </div>
@@ -242,10 +246,10 @@ export default function SolicitarCambioClient({ company }: Props) {
                 {/* Step 4: Optional file */}
                 <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "24px", marginBottom: 24 }}>
                   <h3 style={{ margin: "0 0 6px", fontSize: 15, fontWeight: 700, color: "#1e293b" }}>
-                    4. Archivo de propuesta <span style={{ fontSize: 12, fontWeight: 400, color: "#94a3b8" }}>(opcional)</span>
+                    {t("step4")} <span style={{ fontSize: 12, fontWeight: 400, color: "#94a3b8" }}>{t("step4Optional")}</span>
                   </h3>
                   <p style={{ margin: "0 0 14px", fontSize: 13, color: "#64748b" }}>
-                    Adjunta un documento de referencia o borrador que el administrador pueda revisar.
+                    {t("step4Desc")}
                   </p>
                   <input
                     ref={fileInputRef}
@@ -266,7 +270,7 @@ export default function SolicitarCambioClient({ company }: Props) {
                       onClick={() => fileInputRef.current?.click()}
                       style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "1px dashed #d1d5db", borderRadius: 9, padding: "10px 16px", cursor: "pointer", color: "#64748b", fontSize: 13, fontWeight: 600 }}
                     >
-                      <Paperclip size={15} /> Adjuntar archivo
+                      <Paperclip size={15} /> {t("attachFile")}
                     </button>
                   )}
                 </div>
@@ -281,7 +285,7 @@ export default function SolicitarCambioClient({ company }: Props) {
 
             <div style={{ display: "flex", gap: 10 }}>
               <button className="btn" onClick={() => router.push("/dashboard")} style={{ background: "#f1f5f9", color: "#475569" }}>
-                Cancelar
+                {tc("cancel")}
               </button>
               <button
                 className="btn"
@@ -290,8 +294,8 @@ export default function SolicitarCambioClient({ company }: Props) {
                 style={{ background: p, color: "#fff" }}
               >
                 {submitting ? (
-                  <><Loader2 size={14} style={{ marginRight: 6, animation: "spin 1s linear infinite" }} />{uploading ? "Subiendo archivo…" : "Enviando…"}</>
-                ) : "Enviar propuesta"}
+                  <><Loader2 size={14} style={{ marginRight: 6, animation: "spin 1s linear infinite" }} />{uploading ? t("uploading") : t("submitting")}</>
+                ) : t("submit")}
               </button>
             </div>
           </>

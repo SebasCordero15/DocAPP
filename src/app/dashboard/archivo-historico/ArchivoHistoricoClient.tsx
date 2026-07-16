@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { Archive, RotateCcw, Eye, Download, Paperclip, Trash2, X, Upload, Loader2, FileText } from "lucide-react";
 import FileIcon from "@/components/FileIcon";
 
@@ -38,6 +39,8 @@ function fmtSize(b: number): string {
 
 export default function ArchivoHistoricoClient({ company }: Props) {
   const brand = company.primaryColor;
+  const t  = useTranslations("archivo");
+  const tc = useTranslations("common");
 
   const [files,   setFiles]   = useState<ObsoleteFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -142,9 +145,9 @@ export default function ArchivoHistoricoClient({ company }: Props) {
       {/* Header */}
       <div style={{ background: brand, color: "#fff", padding: "12px 28px", flexShrink: 0, display: "flex", alignItems: "center", gap: 12 }}>
         <Archive size={18} />
-        <strong style={{ fontSize: 16 }}>Archivo Histórico</strong>
+        <strong style={{ fontSize: 16 }}>{t("header")}</strong>
         <span style={{ marginLeft: "auto", background: "rgba(255,255,255,0.18)", borderRadius: 10, padding: "2px 10px", fontSize: 12 }}>
-          {files.length} documento{files.length !== 1 ? "s" : ""} obsoleto{files.length !== 1 ? "s" : ""}
+          {files.length} {files.length !== 1 ? t("docPlural") : t("docSingular")} {files.length !== 1 ? t("obsoletePlural") : t("obsoleteSingular")}
         </span>
       </div>
 
@@ -153,32 +156,32 @@ export default function ArchivoHistoricoClient({ company }: Props) {
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar por nombre, código, carpeta, departamento…"
+          placeholder={t("searchPlaceholder")}
           style={{ width: "100%", maxWidth: 440, padding: "8px 14px", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 13, outline: "none", boxSizing: "border-box" }}
         />
       </div>
 
       {/* Notice */}
       <div style={{ margin: "12px 24px 0", background: "#fefce8", border: "1px solid #fde68a", borderRadius: 8, padding: "9px 14px", fontSize: 12, color: "#92400e" }}>
-        Los documentos obsoletos no aparecen en el dashboard principal ni en el Listado Maestro. Se pueden restaurar en cualquier momento.
+        {t("notice")}
       </div>
 
       {/* Content */}
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px 24px" }}>
         {loading ? (
-          <p style={{ color: "#aaa", fontSize: 14 }}>Cargando…</p>
+          <p style={{ color: "#aaa", fontSize: 14 }}>{tc("loading")}</p>
         ) : filtered.length === 0 ? (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 300, color: "#aaa", gap: 12 }}>
             <Archive size={40} strokeWidth={1} />
             <p style={{ margin: 0, fontSize: 14 }}>
-              {files.length === 0 ? "No hay documentos obsoletos." : "Sin resultados para esa búsqueda."}
+              {files.length === 0 ? t("emptyAll") : t("emptySearch")}
             </p>
           </div>
         ) : (
           <table style={{ width: "100%", borderCollapse: "collapse", background: "#fff", borderRadius: 10, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
             <thead>
               <tr style={{ borderBottom: "2px solid #f1f5f9" }}>
-                {["Documento", "Carpeta", "Tipo", "Versión", "Archivado el", "Comparativa", ""].map((h) => (
+                {[t("cols.documento"), t("cols.carpeta"), t("cols.tipo"), t("cols.version"), t("cols.archived"), t("cols.comparativa"), ""].map((h) => (
                   <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5 }}>{h}</th>
                 ))}
               </tr>
@@ -201,7 +204,7 @@ export default function ArchivoHistoricoClient({ company }: Props) {
 
                   {/* Folder */}
                   <td style={{ padding: "11px 14px", fontSize: 12, color: "#64748b" }}>
-                    {f.folder?.name ?? <span style={{ color: "#cbd5e1" }}>Sin carpeta</span>}
+                    {f.folder?.name ?? <span style={{ color: "#cbd5e1" }}>{t("noFolder")}</span>}
                   </td>
 
                   {/* Type */}
@@ -228,7 +231,7 @@ export default function ArchivoHistoricoClient({ company }: Props) {
                         <button
                           onClick={() => { setCompModal(f); setCompFile(null); setCompError(null); }}
                           style={{ display: "flex", alignItems: "center", gap: 4, background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0", borderRadius: 6, padding: "4px 9px", cursor: "pointer", fontSize: 11 }}
-                          title="Reemplazar comparativa"
+                          title={t("comparison.replaceTitle")}
                         >
                           <Upload size={12} />
                         </button>
@@ -245,7 +248,7 @@ export default function ArchivoHistoricoClient({ company }: Props) {
                         onClick={() => { setCompModal(f); setCompFile(null); setCompError(null); }}
                         style={{ display: "flex", alignItems: "center", gap: 5, background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0", borderRadius: 6, padding: "5px 10px", cursor: "pointer", fontSize: 12 }}
                       >
-                        <Paperclip size={12} /> Adjuntar
+                        <Paperclip size={12} /> {t("comparison.attach")}
                       </button>
                     )}
                   </td>
@@ -263,7 +266,7 @@ export default function ArchivoHistoricoClient({ company }: Props) {
                       }}
                     >
                       {restoring === f.id ? <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} /> : <RotateCcw size={13} />}
-                      Restaurar
+                      {t("restore")}
                     </button>
                   </td>
                 </tr>
@@ -280,7 +283,7 @@ export default function ArchivoHistoricoClient({ company }: Props) {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
               <h3 style={{ margin: 0, fontSize: 15, color: "#1e293b", display: "flex", alignItems: "center", gap: 8 }}>
                 <Paperclip size={16} color={brand} />
-                {compModal.comparisonStorageKey ? "Reemplazar comparativa" : "Adjuntar comparativa"}
+                {compModal.comparisonStorageKey ? t("comparison.titleReplace") : t("comparison.titleNew")}
               </h3>
               {!compUploading && <button onClick={() => setCompModal(null)} style={{ border: "none", background: "transparent", cursor: "pointer", color: "#94a3b8" }}><X size={18} /></button>}
             </div>
@@ -289,7 +292,7 @@ export default function ArchivoHistoricoClient({ company }: Props) {
               Documento: <strong>{compModal.nombreDocumento || compModal.name}</strong>
             </p>
             <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 14px" }}>
-              Adjunta el .docx con control de cambios (marcas rojas) o cualquier versión comparativa.
+              {t("comparison.instruction")}
             </p>
 
             <div
@@ -308,7 +311,7 @@ export default function ArchivoHistoricoClient({ company }: Props) {
               ) : (
                 <div style={{ fontSize: 13, color: "#94a3b8" }}>
                   <FileText size={20} style={{ marginBottom: 6 }} /><br />
-                  Haz clic para seleccionar archivo (.docx, .pdf, etc.)
+                  {t("comparison.uploadPlaceholder")}
                 </div>
               )}
             </div>
@@ -319,14 +322,14 @@ export default function ArchivoHistoricoClient({ company }: Props) {
             )}
 
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              {!compUploading && <button onClick={() => setCompModal(null)} style={{ border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancelar</button>}
+              {!compUploading && <button onClick={() => setCompModal(null)} style={{ border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>{tc("cancel")}</button>}
               <button
                 onClick={handleCompUpload}
                 disabled={compUploading || !compFile}
                 style={{ background: brand, color: "#fff", border: "none", padding: "7px 18px", borderRadius: 8, cursor: (compUploading || !compFile) ? "default" : "pointer", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, opacity: (!compFile || compUploading) ? 0.6 : 1 }}
               >
                 {compUploading ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Upload size={14} />}
-                {compUploading ? "Subiendo…" : "Adjuntar"}
+                {compUploading ? t("comparison.uploading") : t("comparison.attach")}
               </button>
             </div>
           </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { Globe, Upload, FolderPlus, Folder, FileText, X, Loader2, Trash2, Eye, Download } from "lucide-react";
 import FileIcon from "@/components/FileIcon";
 
@@ -29,14 +30,6 @@ interface Props {
   currentUserId: string;
 }
 
-const TIPOS = [
-  { value: "PROCEDIMIENTO", label: "Procedimiento" },
-  { value: "MANUAL",        label: "Manual" },
-  { value: "INSTRUCTIVO",   label: "Instructivo" },
-  { value: "FORMATO",       label: "Formato" },
-  { value: "POLITICA",      label: "Política" },
-  { value: "OTRO",          label: "Otro" },
-];
 
 function fmtSize(b: number): string {
   if (b < 1024) return `${b} B`;
@@ -49,9 +42,20 @@ function fmtDate(iso: string): string {
 }
 
 export default function ExternosClient({ company, userRole, currentUserId }: Props) {
+  const t  = useTranslations("externos");
+  const tc = useTranslations("common");
   const brand   = company.primaryColor;
   const isAdmin = userRole === "COMPANY_ADMIN";
   const canEdit = userRole === "COMPANY_ADMIN" || userRole === "EDITOR";
+
+  const TIPOS = [
+    { value: "PROCEDIMIENTO", label: t("tipos.PROCEDIMIENTO") },
+    { value: "MANUAL",        label: t("tipos.MANUAL") },
+    { value: "INSTRUCTIVO",   label: t("tipos.INSTRUCTIVO") },
+    { value: "FORMATO",       label: t("tipos.FORMATO") },
+    { value: "POLITICA",      label: t("tipos.POLITICA") },
+    { value: "OTRO",          label: t("tipos.OTRO") },
+  ];
 
   const [folders, setFolders] = useState<ExternalFolder[]>([]);
   const [files,   setFiles]   = useState<ExternalFile[]>([]);
@@ -106,10 +110,10 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
   }
 
   async function handleUpload() {
-    if (!pickedFile) { setUploadError("Selecciona un archivo."); return; }
-    if (!form.folderId) { setUploadError("Selecciona una carpeta."); return; }
-    if (!form.nombreDocumento.trim()) { setUploadError("El nombre del documento es obligatorio."); return; }
-    if (!form.departamento.trim()) { setUploadError("El departamento es obligatorio."); return; }
+    if (!pickedFile) { setUploadError(t("errors.noFile")); return; }
+    if (!form.folderId) { setUploadError(t("errors.noFolder")); return; }
+    if (!form.nombreDocumento.trim()) { setUploadError(t("errors.noNombre")); return; }
+    if (!form.departamento.trim()) { setUploadError(t("errors.noDept")); return; }
 
     setUploading(true);
     setUploadError(null);
@@ -128,7 +132,7 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
       });
       if (!urlRes.ok) {
         const e = await urlRes.json().catch(() => ({}));
-        throw new Error(e.error ?? "No se pudo obtener URL de carga.");
+        throw new Error(e.error ?? t("errors.uploadUrl"));
       }
       const { uploadUrl, storageKey } = await urlRes.json();
 
@@ -139,7 +143,7 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
         body: pickedFile,
         headers: { "Content-Type": pickedFile.type || "application/octet-stream" },
       });
-      if (!putRes.ok) throw new Error("Error al subir el archivo.");
+      if (!putRes.ok) throw new Error(t("errors.uploadFile"));
       setUploadProgress(70);
 
       // 3. Create document record (no reviewers — folder is external)
@@ -162,13 +166,13 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
       });
       if (!createRes.ok) {
         const e = await createRes.json().catch(() => ({}));
-        throw new Error(e.error ?? "Error al registrar el documento.");
+        throw new Error(e.error ?? t("errors.createDoc"));
       }
       setUploadProgress(100);
       setShowUpload(false);
       loadData();
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "Error inesperado.");
+      setUploadError(err instanceof Error ? err.message : t("errors.unexpected"));
     } finally {
       setUploading(false);
     }
@@ -183,21 +187,21 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: newFolderName.trim() }),
       });
-      if (!res.ok) throw new Error("Error al crear la carpeta.");
+      if (!res.ok) throw new Error(t("errors.createFolder"));
       const { folder } = await res.json();
       setFolders((prev) => [...prev, folder]);
       setSelectedFolderId(folder.id);
       setNewFolderName("");
       setShowNewFolder(false);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Error");
+      alert(err instanceof Error ? err.message : t("errors.unexpected"));
     } finally {
       setCreatingFolder(false);
     }
   }
 
   async function deleteFile(fileId: string, fileName: string) {
-    if (!confirm(`¿Eliminar "${fileName}"?`)) return;
+    if (!confirm(t("deleteConfirm", { name: fileName }))) return;
     await fetch(`/api/files/${fileId}`, { method: "DELETE" });
     setFiles((prev) => prev.filter((f) => f.id !== fileId));
   }
@@ -225,8 +229,8 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
       {/* Header */}
       <div style={{ background: brand, color: "#fff", padding: "12px 28px", flexShrink: 0, display: "flex", alignItems: "center", gap: 10 }}>
         <Globe size={18} />
-        <strong style={{ fontSize: 16 }}>Documentos Externos</strong>
-        <span style={{ marginLeft: "auto", fontSize: 12, opacity: 0.75 }}>Subida directa · sin flujo de revisión</span>
+        <strong style={{ fontSize: 16 }}>{t("header")}</strong>
+        <span style={{ marginLeft: "auto", fontSize: 12, opacity: 0.75 }}>{t("headerSub")}</span>
       </div>
 
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
@@ -234,7 +238,7 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
         {/* Left: folder sidebar */}
         <aside style={{ width: 220, background: "#fff", borderRight: "1px solid #e2e8f0", display: "flex", flexDirection: "column", flexShrink: 0 }}>
           <div style={{ padding: "12px 12px 8px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 1 }}>Carpetas</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 1 }}>{t("foldersLabel")}</span>
             {isAdmin && (
               <button
                 onClick={() => setShowNewFolder(true)}
@@ -248,16 +252,16 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
 
           <div style={{ flex: 1, overflowY: "auto", padding: "8px 8px" }}>
             {loading ? (
-              <p style={{ fontSize: 13, color: "#aaa", padding: "8px 4px" }}>Cargando…</p>
+              <p style={{ fontSize: 13, color: "#aaa", padding: "8px 4px" }}>{t("loadingFolders")}</p>
             ) : folders.length === 0 ? (
               <div style={{ padding: "16px 8px", textAlign: "center" }}>
-                <p style={{ fontSize: 13, color: "#aaa", margin: 0 }}>Sin carpetas externas.</p>
+                <p style={{ fontSize: 13, color: "#aaa", margin: 0 }}>{t("noFolders")}</p>
                 {isAdmin && (
                   <button
                     onClick={() => setShowNewFolder(true)}
                     style={{ marginTop: 10, background: brand, color: "#fff", border: "none", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 12 }}
                   >
-                    Crear carpeta
+                    {t("createFolder")}
                   </button>
                 )}
               </div>
@@ -290,8 +294,8 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
               <Globe size={40} strokeWidth={1} />
               <p style={{ margin: 0, fontSize: 14 }}>
                 {folders.length === 0
-                  ? (isAdmin ? "Crea una carpeta externa para empezar." : "No tienes acceso a carpetas externas.")
-                  : "Selecciona una carpeta."}
+                  ? (isAdmin ? t("noFolderAdmin") : t("noFolderUser"))
+                  : t("noFolderSelected")}
               </p>
             </div>
           ) : (
@@ -302,7 +306,7 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
                   <Folder size={20} color={brand} />
                   <h2 style={{ margin: 0, fontSize: 18, color: "#1e293b" }}>{selectedFolder.name}</h2>
                   <span style={{ background: "#e0f2fe", color: "#0369a1", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>
-                    {folderFiles.length} documento{folderFiles.length !== 1 ? "s" : ""}
+                    {t("docCount", { count: folderFiles.length })}
                   </span>
                 </div>
                 {canEdit && (
@@ -311,27 +315,27 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
                     style={{ display: "flex", alignItems: "center", gap: 6, background: brand, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600 }}
                   >
                     <Upload size={15} />
-                    Subir documento
+                    {t("uploadBtn")}
                   </button>
                 )}
               </div>
 
               {/* Notice */}
               <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, padding: "10px 14px", marginBottom: 18, fontSize: 12, color: "#0369a1" }}>
-                Los documentos en carpetas externas se publican directamente sin pasar por flujo de revisión.
+                {t("externalNotice")}
               </div>
 
               {/* Files table */}
               {folderFiles.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "48px 20px", color: "#aaa" }}>
                   <FileText size={36} strokeWidth={1} style={{ marginBottom: 12 }} />
-                  <p style={{ margin: 0, fontSize: 14 }}>Esta carpeta está vacía.</p>
+                  <p style={{ margin: 0, fontSize: 14 }}>{t("emptyFolder")}</p>
                   {canEdit && (
                     <button
                       onClick={openUpload}
                       style={{ marginTop: 14, background: brand, color: "#fff", border: "none", padding: "8px 18px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600 }}
                     >
-                      Subir primer documento
+                      {t("uploadFirst")}
                     </button>
                   )}
                 </div>
@@ -339,7 +343,7 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
                 <table style={{ width: "100%", borderCollapse: "collapse", background: "#fff", borderRadius: 10, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
                   <thead>
                     <tr style={{ borderBottom: "2px solid #f1f5f9" }}>
-                      {["Documento", "Tipo", "Versión", "Subido por", "Fecha", ""].map((h) => (
+                      {[t("tableHeaders.documento"), tc("tipo"), tc("version"), t("tableHeaders.subidoPor"), t("tableHeaders.fecha"), ""].map((h) => (
                         <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5 }}>{h}</th>
                       ))}
                     </tr>
@@ -364,10 +368,10 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
                         <td style={{ padding: "10px 14px", fontSize: 12, color: "#94a3b8" }}>{fmtDate(f.createdAt)}</td>
                         <td style={{ padding: "10px 14px" }}>
                           <div style={{ display: "flex", gap: 6 }}>
-                            <button onClick={() => viewFile(f.id)} title="Ver" style={actionBtnStyle}><Eye size={13} /></button>
-                            <button onClick={() => downloadFile(f.id)} title="Descargar" style={actionBtnStyle}><Download size={13} /></button>
+                            <button onClick={() => viewFile(f.id)} title={tc("ver")} style={actionBtnStyle}><Eye size={13} /></button>
+                            <button onClick={() => downloadFile(f.id)} title={tc("descargar")} style={actionBtnStyle}><Download size={13} /></button>
                             {(isAdmin || f.uploadedBy?.id === currentUserId) && (
-                              <button onClick={() => deleteFile(f.id, f.nombreDocumento)} title="Eliminar" style={{ ...actionBtnStyle, color: "#ef4444", borderColor: "#fecaca" }}><Trash2 size={13} /></button>
+                              <button onClick={() => deleteFile(f.id, f.nombreDocumento)} title={tc("eliminar")} style={{ ...actionBtnStyle, color: "#ef4444", borderColor: "#fecaca" }}><Trash2 size={13} /></button>
                             )}
                           </div>
                         </td>
@@ -386,27 +390,27 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
         <div style={overlayStyle} onClick={() => !uploading && setShowUpload(false)}>
           <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-              <h3 style={{ margin: 0, fontSize: 16, color: "#1e293b" }}>Subir documento externo</h3>
+              <h3 style={{ margin: 0, fontSize: 16, color: "#1e293b" }}>{t("uploadModal.title")}</h3>
               {!uploading && <button onClick={() => setShowUpload(false)} style={{ border: "none", background: "transparent", cursor: "pointer", color: "#94a3b8" }}><X size={18} /></button>}
             </div>
 
             {/* Carpeta */}
             <div style={fieldStyle}>
-              <label style={labelStyle}>Carpeta *</label>
+              <label style={labelStyle}>{t("uploadModal.folderLabel")}</label>
               <select
                 value={form.folderId}
                 onChange={(e) => setForm((p) => ({ ...p, folderId: e.target.value }))}
                 style={inputStyle}
                 disabled={uploading}
               >
-                <option value="">— Selecciona carpeta —</option>
+                <option value="">{t("uploadModal.folderPlaceholder")}</option>
                 {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
               </select>
             </div>
 
             {/* Archivo */}
             <div style={fieldStyle}>
-              <label style={labelStyle}>Archivo *</label>
+              <label style={labelStyle}>{t("uploadModal.fileLabel")}</label>
               <div
                 onClick={() => !uploading && fileInputRef.current?.click()}
                 style={{
@@ -423,7 +427,7 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
                 ) : (
                   <div style={{ fontSize: 13, color: "#94a3b8" }}>
                     <Upload size={20} style={{ marginBottom: 6 }} /><br />
-                    Haz clic para seleccionar archivo
+                    {t("uploadModal.filePrompt")}
                   </div>
                 )}
               </div>
@@ -432,11 +436,11 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
 
             {/* Nombre */}
             <div style={fieldStyle}>
-              <label style={labelStyle}>Nombre del documento *</label>
+              <label style={labelStyle}>{t("uploadModal.nombreLabel")}</label>
               <input
                 value={form.nombreDocumento}
                 onChange={(e) => setForm((p) => ({ ...p, nombreDocumento: e.target.value }))}
-                placeholder="Ej: Manual de Seguridad 2025"
+                placeholder={t("uploadModal.nombrePlaceholder")}
                 style={inputStyle}
                 disabled={uploading}
               />
@@ -445,14 +449,14 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
             {/* Tipo + Departamento row */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
               <div>
-                <label style={labelStyle}>Tipo *</label>
+                <label style={labelStyle}>{t("uploadModal.tipoLabel")}</label>
                 <select value={form.tipoDocumento} onChange={(e) => setForm((p) => ({ ...p, tipoDocumento: e.target.value }))} style={inputStyle} disabled={uploading}>
-                  {TIPOS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  {TIPOS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                 </select>
               </div>
               <div>
-                <label style={labelStyle}>Departamento *</label>
-                <input value={form.departamento} onChange={(e) => setForm((p) => ({ ...p, departamento: e.target.value }))} placeholder="Ej: Operaciones" style={inputStyle} disabled={uploading} />
+                <label style={labelStyle}>{t("uploadModal.deptLabel")}</label>
+                <input value={form.departamento} onChange={(e) => setForm((p) => ({ ...p, departamento: e.target.value }))} placeholder={t("uploadModal.deptPlaceholder")} style={inputStyle} disabled={uploading} />
               </div>
             </div>
 
@@ -465,13 +469,13 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
                 <div style={{ height: 4, background: "#e2e8f0", borderRadius: 2, overflow: "hidden" }}>
                   <div style={{ height: "100%", width: `${uploadProgress}%`, background: brand, transition: "width 0.3s ease" }} />
                 </div>
-                <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 4, textAlign: "center" }}>Subiendo…</p>
+                <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 4, textAlign: "center" }}>{t("uploadModal.uploading")}</p>
               </div>
             )}
 
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               {!uploading && (
-                <button onClick={() => setShowUpload(false)} style={{ border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancelar</button>
+                <button onClick={() => setShowUpload(false)} style={{ border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>{tc("cancel")}</button>
               )}
               <button
                 onClick={handleUpload}
@@ -479,7 +483,7 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
                 style={{ background: brand, color: "#fff", border: "none", padding: "8px 20px", borderRadius: 8, cursor: uploading ? "default" : "pointer", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, opacity: uploading ? 0.7 : 1 }}
               >
                 {uploading ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Upload size={14} />}
-                {uploading ? "Subiendo…" : "Subir"}
+                {uploading ? t("uploadModal.uploading") : t("uploadModal.upload")}
               </button>
             </div>
           </div>
@@ -491,28 +495,28 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
         <div style={overlayStyle} onClick={() => setShowNewFolder(false)}>
           <div style={{ ...modalStyle, maxWidth: 380 }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <h3 style={{ margin: 0, fontSize: 16 }}>Nueva carpeta externa</h3>
+              <h3 style={{ margin: 0, fontSize: 16 }}>{t("folderModal.title")}</h3>
               <button onClick={() => setShowNewFolder(false)} style={{ border: "none", background: "transparent", cursor: "pointer", color: "#94a3b8" }}><X size={18} /></button>
             </div>
             <div style={fieldStyle}>
-              <label style={labelStyle}>Nombre de la carpeta *</label>
+              <label style={labelStyle}>{t("folderModal.nameLabel")}</label>
               <input
                 autoFocus
                 value={newFolderName}
                 onChange={(e) => setNewFolderName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && createFolder()}
-                placeholder="Ej: Normas Externas"
+                placeholder={t("folderModal.namePlaceholder")}
                 style={inputStyle}
               />
             </div>
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
-              <button onClick={() => setShowNewFolder(false)} style={{ border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", padding: "8px 14px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancelar</button>
+              <button onClick={() => setShowNewFolder(false)} style={{ border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", padding: "8px 14px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>{tc("cancel")}</button>
               <button
                 onClick={createFolder}
                 disabled={creatingFolder || !newFolderName.trim()}
                 style={{ background: brand, color: "#fff", border: "none", padding: "8px 18px", borderRadius: 8, cursor: creatingFolder ? "default" : "pointer", fontSize: 13, fontWeight: 600, opacity: (!newFolderName.trim() || creatingFolder) ? 0.6 : 1 }}
               >
-                {creatingFolder ? "Creando…" : "Crear carpeta"}
+                {creatingFolder ? t("folderModal.creating") : t("folderModal.create")}
               </button>
             </div>
           </div>

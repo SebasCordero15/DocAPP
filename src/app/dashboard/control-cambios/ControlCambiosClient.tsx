@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Archive, RotateCcw, Eye, Paperclip, Trash2, X, Upload, Loader2, FileText } from "lucide-react";
 import FileIcon from "@/components/FileIcon";
 
@@ -50,11 +51,6 @@ interface RevAsignada {
   createdBy: { id: string; name: string };
 }
 
-const OUT_TYPE_LABELS: Record<string, string> = {
-  REVISION:     "Revisión",
-  ACTUALIZACION: "Actualización",
-  CORRECCION:   "Corrección",
-};
 const OUT_TYPE_COLORS: Record<string, { bg: string; color: string }> = {
   REVISION:     { bg: "#ede9fe", color: "#5b21b6" },
   ACTUALIZACION: { bg: "#dbeafe", color: "#1e40af" },
@@ -109,6 +105,14 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
   const router = useRouter();
   const brand  = company.primaryColor;
   const isAdmin = userRole === "COMPANY_ADMIN";
+  const t  = useTranslations("controlCambios");
+  const tc = useTranslations("common");
+
+  const OUT_TYPE_LABELS: Record<string, string> = {
+    REVISION:      t("outTypes.REVISION"),
+    ACTUALIZACION: t("outTypes.ACTUALIZACION"),
+    CORRECCION:    t("outTypes.CORRECCION"),
+  };
 
   const [activeTab, setActiveTab] = useState<"cambios" | "revisiones" | "archivo">("cambios");
 
@@ -215,26 +219,26 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
   }
 
   async function handleCompUpload() {
-    if (!compModal || !compFile) { setCompError("Selecciona un archivo."); return; }
+    if (!compModal || !compFile) { setCompError(t("errors.selectFile")); return; }
     setCompUploading(true); setCompError(null);
     try {
       const urlRes = await fetch(`/api/files/${compModal.id}/comparison`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: compFile.name, mimeType: compFile.type || "application/octet-stream", size: compFile.size }),
       });
-      if (!urlRes.ok) throw new Error((await urlRes.json().catch(() => ({}))).error ?? "Error al obtener URL.");
+      if (!urlRes.ok) throw new Error((await urlRes.json().catch(() => ({}))).error ?? t("errors.uploadUrlError"));
       const { uploadUrl, storageKey } = await urlRes.json();
       const putRes = await fetch(uploadUrl, { method: "PUT", body: compFile, headers: { "Content-Type": compFile.type || "application/octet-stream" } });
-      if (!putRes.ok) throw new Error("Error al subir el archivo.");
+      if (!putRes.ok) throw new Error(t("errors.uploadError"));
       const saveRes = await fetch(`/api/files/${compModal.id}/comparison`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ storageKey, name: compFile.name }),
       });
-      if (!saveRes.ok) throw new Error("Error al guardar la comparativa.");
+      if (!saveRes.ok) throw new Error(t("errors.saveComparisonError"));
       setArchFiles((prev) => prev.map((f) => f.id === compModal.id ? { ...f, comparisonStorageKey: storageKey, comparisonName: compFile!.name } : f));
       setCompModal(null); setCompFile(null);
     } catch (err) {
-      setCompError(err instanceof Error ? err.message : "Error inesperado.");
+      setCompError(err instanceof Error ? err.message : t("errors.unexpected"));
     } finally {
       setCompUploading(false);
     }
@@ -270,16 +274,16 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
       {/* Section header */}
       <div style={{ background: brand, color: "#fff", position: "sticky", top: 0, zIndex: 10 }}>
         <div style={{ padding: "12px 28px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <strong style={{ fontSize: 16 }}>Control de Cambios</strong>
-          {activeTab === "cambios" && <span style={{ fontSize: 12, opacity: 0.75 }}>{total} registros</span>}
-          {activeTab === "archivo" && !archLoading && <span style={{ fontSize: 12, opacity: 0.75 }}>{archFiles.length} documento{archFiles.length !== 1 ? "s" : ""} obsoleto{archFiles.length !== 1 ? "s" : ""}</span>}
+          <strong style={{ fontSize: 16 }}>{t("header")}</strong>
+          {activeTab === "cambios" && <span style={{ fontSize: 12, opacity: 0.75 }}>{total} {t("records")}</span>}
+          {activeTab === "archivo" && !archLoading && <span style={{ fontSize: 12, opacity: 0.75 }}>{archFiles.length} {archFiles.length !== 1 ? t("docPlural") : t("docSingular")} {archFiles.length !== 1 ? t("obsoletePlural") : t("obsoleteSingular")}</span>}
         </div>
         {/* Tabs */}
         <div style={{ display: "flex", borderTop: "1px solid rgba(255,255,255,0.15)", paddingLeft: 16 }}>
           {([
-            { key: "cambios"  as const, label: "Registro de Cambios", badge: 0 },
-            ...(isAdmin ? [{ key: "revisiones" as const, label: "Próximas Revisiones", badge: revFiles.length + revAsignadas.length }] : []),
-            { key: "archivo" as const, label: "Archivo Histórico", badge: 0 },
+            { key: "cambios"  as const, label: t("tabs.registro"), badge: 0 },
+            ...(isAdmin ? [{ key: "revisiones" as const, label: t("tabs.proximas"), badge: revFiles.length + revAsignadas.length }] : []),
+            { key: "archivo" as const, label: t("tabs.archivo"), badge: 0 },
           ]).map((tab) => {
             const isActive = activeTab === tab.key;
             return (
@@ -320,39 +324,39 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
           <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px 20px", marginBottom: 20 }}>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 10 }}>
               <div style={{ flex: "2 1 200px" }}>
-                <label style={labelStyle}>Buscar (descripción / tipo / quién)</label>
+                <label style={labelStyle}>{t("filters.searchPlaceholder")}</label>
                 <input
                   type="text" value={q}
                   onChange={(e) => setQ(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && applySearch()}
-                  placeholder="ej. actualización, aprobada…"
+                  placeholder={t("filters.searchHint")}
                   style={inputStyle}
                 />
               </div>
               <div style={{ flex: "1 1 140px" }}>
-                <label style={labelStyle}>Código</label>
-                <input type="text" value={fCodigo} onChange={(e) => setFCodigo(e.target.value)} onKeyDown={(e) => e.key === "Enter" && applySearch()} placeholder="DOC-001" style={inputStyle} />
+                <label style={labelStyle}>{tc("codigo")}</label>
+                <input type="text" value={fCodigo} onChange={(e) => setFCodigo(e.target.value)} onKeyDown={(e) => e.key === "Enter" && applySearch()} placeholder={t("filters.codigoPlaceholder")} style={inputStyle} />
               </div>
               <div style={{ flex: "2 1 180px" }}>
-                <label style={labelStyle}>Nombre del documento</label>
-                <input type="text" value={fNombre} onChange={(e) => setFNombre(e.target.value)} onKeyDown={(e) => e.key === "Enter" && applySearch()} placeholder="Buscar nombre…" style={inputStyle} />
+                <label style={labelStyle}>{tc("nombre")}</label>
+                <input type="text" value={fNombre} onChange={(e) => setFNombre(e.target.value)} onKeyDown={(e) => e.key === "Enter" && applySearch()} placeholder={t("filters.nombrePlaceholder")} style={inputStyle} />
               </div>
             </div>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
               <div style={{ flex: "1 1 130px" }}>
-                <label style={labelStyle}>Desde</label>
+                <label style={labelStyle}>{tc("from")}</label>
                 <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={inputStyle} />
               </div>
               <div style={{ flex: "1 1 130px" }}>
-                <label style={labelStyle}>Hasta</label>
+                <label style={labelStyle}>{tc("to")}</label>
                 <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={inputStyle} />
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 <button onClick={applySearch} style={{ background: brand, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 7, cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
-                  Buscar
+                  {tc("search")}
                 </button>
                 <button onClick={clearFilters} style={{ background: "#f1f5f9", color: "#64748b", border: "1px solid #e2e8f0", padding: "8px 14px", borderRadius: 7, cursor: "pointer", fontSize: 13 }}>
-                  Limpiar
+                  {tc("clear")}
                 </button>
               </div>
             </div>
@@ -361,14 +365,14 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
           {/* Table */}
           <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden" }}>
             {loading ? (
-              <p style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}>Cargando…</p>
+              <p style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}>{tc("loading")}</p>
             ) : entries.length === 0 ? (
-              <p style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}>No hay registros de cambios.</p>
+              <p style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}>{t("emptyRegistro")}</p>
             ) : (
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ borderBottom: "1px solid #f1f5f9" }}>
-                    {["Fecha", "Tipo de cambio", "Documento", "Código", "Versión", "Quién", "Descripción del cambio"].map((h) => (
+                    {[t("table.fecha"), t("table.tipoCambio"), tc("documento"), tc("codigo"), tc("version"), t("table.quien"), t("table.descripcion")].map((h) => (
                       <th key={h} style={{ padding: "10px 18px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5, whiteSpace: "nowrap" }}>
                         {h}
                       </th>
@@ -398,7 +402,7 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
                               color: e.estado === "APPROVED" ? "#166534" : "#dc2626",
                               padding: "1px 6px", borderRadius: 4, fontSize: 10, fontWeight: 700,
                             }}>
-                              {e.estado === "APPROVED" ? "Aprobado" : "Rechazado"}
+                              {e.estado === "APPROVED" ? tc("aprobado") : tc("rechazado")}
                             </span>
                           )}
                         </td>
@@ -424,7 +428,7 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
                           )}
                         </td>
                         <td style={{ padding: "11px 18px", fontSize: 13, color: "#374151" }}>
-                          {e.quien ?? <span style={{ color: "#d1d5db" }}>Sistema</span>}
+                          {e.quien ?? <span style={{ color: "#d1d5db" }}>{tc("sistema")}</span>}
                         </td>
                         <td style={{ padding: "10px 18px", maxWidth: 300 }}>
                           {e.detalle ? (
@@ -455,9 +459,9 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
           {/* Pagination */}
           {pageCount > 1 && (
             <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 20 }}>
-              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} style={pageBtn(page === 1)}>← Ant</button>
-              <span style={{ padding: "6px 12px", fontSize: 13, color: "#64748b" }}>Pág. {page} de {pageCount}</span>
-              <button onClick={() => setPage((p) => Math.min(pageCount, p + 1))} disabled={page === pageCount} style={pageBtn(page === pageCount)}>Sig. →</button>
+              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} style={pageBtn(page === 1)}>{t("prev")}</button>
+              <span style={{ padding: "6px 12px", fontSize: 13, color: "#64748b" }}>{t("pag")} {page} {tc("de")} {pageCount}</span>
+              <button onClick={() => setPage((p) => Math.min(pageCount, p + 1))} disabled={page === pageCount} style={pageBtn(page === pageCount)}>{t("next")}</button>
             </div>
           )}
         </div>
@@ -467,7 +471,7 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
       {activeTab === "revisiones" && (
         <div style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 24px" }}>
           {revLoading ? (
-            <p style={{ textAlign: "center", color: "#94a3b8", padding: 40 }}>Cargando…</p>
+            <p style={{ textAlign: "center", color: "#94a3b8", padding: 40 }}>{tc("loading")}</p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
 
@@ -476,15 +480,15 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
                     <div style={{ background: "#7c3aed", color: "#fff", borderRadius: 6, padding: "4px 14px", fontSize: 13, fontWeight: 700 }}>
-                      Revisiones asignadas
+                      {t("revisionesAsignadas")}
                     </div>
-                    <span style={{ fontSize: 12, color: "#94a3b8" }}>{revAsignadas.length} solicitud{revAsignadas.length !== 1 ? "es" : ""}</span>
+                    <span style={{ fontSize: 12, color: "#94a3b8" }}>{revAsignadas.length} {revAsignadas.length !== 1 ? t("requestPlural") : t("requestSingular")}</span>
                   </div>
                   <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse" }}>
                       <thead>
                         <tr style={{ borderBottom: "1px solid #f1f5f9", background: "#f8fafc" }}>
-                          {["Documento", "Código", "Tipo", "Asignado a", "Paso", "Instrucciones"].map((h) => (
+                          {[tc("documento"), tc("codigo"), t("tableRevisiones.tipo"), t("tableRevisiones.asignado"), tc("paso"), t("tableRevisiones.instrucciones")].map((h) => (
                             <th key={h} style={{ padding: "9px 16px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5, whiteSpace: "nowrap" }}>
                               {h}
                             </th>
@@ -533,15 +537,15 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
               {/* ── Revisiones programadas ── */}
               {revFiles.length === 0 && revAsignadas.length === 0 ? (
                 <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "48px 24px", textAlign: "center", color: "#94a3b8" }}>
-                  <p style={{ fontSize: 15, margin: 0 }}>No hay revisiones programadas ni asignadas.</p>
+                  <p style={{ fontSize: 15, margin: 0 }}>{t("emptyUpcoming")}</p>
                 </div>
               ) : revFiles.length > 0 && (
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
                     <div style={{ background: brand, color: "#fff", borderRadius: 6, padding: "4px 14px", fontSize: 13, fontWeight: 700 }}>
-                      Fechas de revisión programadas
+                      {t("upcomingTitle")}
                     </div>
-                    <span style={{ fontSize: 12, color: "#94a3b8" }}>{revFiles.length} documento{revFiles.length !== 1 ? "s" : ""}</span>
+                    <span style={{ fontSize: 12, color: "#94a3b8" }}>{revFiles.length} {revFiles.length !== 1 ? t("docPlural") : t("docSingular")}</span>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
                     {revGroups.map(({ label, docs }) => {
@@ -559,13 +563,13 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
                             }}>
                               {label}
                             </div>
-                            <span style={{ fontSize: 12, color: "#94a3b8" }}>{docs.length} documento{docs.length !== 1 ? "s" : ""}</span>
+                            <span style={{ fontSize: 12, color: "#94a3b8" }}>{docs.length} {docs.length !== 1 ? t("docPlural") : t("docSingular")}</span>
                           </div>
                           <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden" }}>
                             <table style={{ width: "100%", borderCollapse: "collapse" }}>
                               <thead>
                                 <tr style={{ borderBottom: "1px solid #f1f5f9", background: "#f8fafc" }}>
-                                  {["Fecha de Revisión", "Documento", "Código", "Responsable", "Carpeta"].map((h) => (
+                                  {[t("tableUpcoming.fecha"), tc("documento"), tc("codigo"), t("tableUpcoming.responsable"), t("tableUpcoming.carpeta")].map((h) => (
                                     <th key={h} style={{ padding: "9px 16px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5, whiteSpace: "nowrap" }}>
                                       {h}
                                     </th>
@@ -586,7 +590,7 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
                                           {fmtDate(f.fechaRevision)}
                                         </div>
                                         <div style={{ fontSize: 11, color: urgent ? "#dc2626" : "#94a3b8", marginTop: 1 }}>
-                                          {daysLeft === 0 ? "Hoy" : daysLeft === 1 ? "Mañana" : `En ${daysLeft} días`}
+                                          {daysLeft === 0 ? t("today") : daysLeft === 1 ? t("tomorrow") : `${t("inDays")} ${daysLeft} ${t("days")}`}
                                         </div>
                                       </td>
                                       <td style={{ padding: "11px 16px", fontSize: 13, color: "#1e293b", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -602,7 +606,7 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
                                         {f.encargadoDocumento?.name ?? <span style={{ color: "#d1d5db" }}>—</span>}
                                       </td>
                                       <td style={{ padding: "11px 16px", fontSize: 12, color: "#64748b" }}>
-                                        {f.folder?.name ?? <span style={{ color: "#d1d5db" }}>Raíz</span>}
+                                        {f.folder?.name ?? <span style={{ color: "#d1d5db" }}>{t("root")}</span>}
                                       </td>
                                     </tr>
                                   );
@@ -627,7 +631,7 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
         <div style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 24px" }}>
           {/* Notice */}
           <div style={{ marginBottom: 16, background: "#fefce8", border: "1px solid #fde68a", borderRadius: 8, padding: "9px 14px", fontSize: 12, color: "#92400e" }}>
-            Los documentos obsoletos no aparecen en el dashboard principal ni en el Listado Maestro. Se pueden restaurar en cualquier momento.
+            {t("obsoleteNotice")}
           </div>
 
           {/* Search */}
@@ -635,13 +639,13 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
             <input
               value={archSearch}
               onChange={(e) => setArchSearch(e.target.value)}
-              placeholder="Buscar por nombre, código, carpeta, departamento…"
+              placeholder={t("archSearchPlaceholder")}
               style={{ width: "100%", maxWidth: 440, padding: "8px 14px", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 13, outline: "none", boxSizing: "border-box" }}
             />
           </div>
 
           {archLoading ? (
-            <p style={{ textAlign: "center", color: "#94a3b8", padding: 40 }}>Cargando…</p>
+            <p style={{ textAlign: "center", color: "#94a3b8", padding: 40 }}>{tc("loading")}</p>
           ) : (() => {
             const filtered = archFiles.filter((f) => {
               if (!archSearch) return true;
@@ -651,7 +655,7 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
             if (filtered.length === 0) return (
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 280, color: "#94a3b8", gap: 12 }}>
                 <Archive size={40} strokeWidth={1} />
-                <p style={{ margin: 0, fontSize: 14 }}>{archFiles.length === 0 ? "No hay documentos obsoletos." : "Sin resultados para esa búsqueda."}</p>
+                <p style={{ margin: 0, fontSize: 14 }}>{archFiles.length === 0 ? t("emptyObsolete") : t("noSearchResults")}</p>
               </div>
             );
             return (
@@ -659,7 +663,7 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
                     <tr style={{ borderBottom: "2px solid #f1f5f9", background: "#f8fafc" }}>
-                      {["Documento", "Carpeta", "Tipo", "Versión", "Archivado el", "Comparativa", ""].map((h) => (
+                      {[tc("documento"), tc("carpeta"), tc("tipo"), tc("version"), t("archivedOn"), t("comparativa"), ""].map((h) => (
                         <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5 }}>{h}</th>
                       ))}
                     </tr>
@@ -677,7 +681,7 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
                             </div>
                           </div>
                         </td>
-                        <td style={{ padding: "11px 14px", fontSize: 12, color: "#64748b" }}>{f.folder?.name ?? <span style={{ color: "#cbd5e1" }}>Sin carpeta</span>}</td>
+                        <td style={{ padding: "11px 14px", fontSize: 12, color: "#64748b" }}>{f.folder?.name ?? <span style={{ color: "#cbd5e1" }}>{t("noFolder")}</span>}</td>
                         <td style={{ padding: "11px 14px", fontSize: 12, color: "#64748b" }}>{f.tipoDocumento ?? "—"}</td>
                         <td style={{ padding: "11px 14px" }}>
                           <span style={{ background: "#f1f5f9", color: "#475569", fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 4 }}>{f.versionStr ?? "—"}</span>
@@ -687,7 +691,7 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
                           {f.comparisonStorageKey ? (
                             <div style={{ display: "flex", gap: 5 }}>
                               <button onClick={() => viewComparison(f.id)} style={{ display: "flex", alignItems: "center", gap: 4, background: "#f0fdf4", color: "#15803d", border: "1px solid #bbf7d0", borderRadius: 6, padding: "4px 9px", cursor: "pointer", fontSize: 11, fontWeight: 600 }}>
-                                <Eye size={12} /> Ver
+                                <Eye size={12} /> {tc("ver")}
                               </button>
                               <button onClick={() => { setCompModal(f); setCompFile(null); setCompError(null); }} style={{ background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0", borderRadius: 6, padding: "4px 9px", cursor: "pointer", fontSize: 11 }} title="Reemplazar">
                                 <Upload size={12} />
@@ -698,7 +702,7 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
                             </div>
                           ) : (
                             <button onClick={() => { setCompModal(f); setCompFile(null); setCompError(null); }} style={{ display: "flex", alignItems: "center", gap: 5, background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0", borderRadius: 6, padding: "5px 10px", cursor: "pointer", fontSize: 12 }}>
-                              <Paperclip size={12} /> Adjuntar
+                              <Paperclip size={12} /> {t("attach")}
                             </button>
                           )}
                         </td>
@@ -709,7 +713,7 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
                             style={{ display: "flex", alignItems: "center", gap: 5, background: brand, color: "#fff", border: "none", borderRadius: 7, padding: "6px 12px", cursor: archRestoring === f.id ? "default" : "pointer", fontSize: 12, fontWeight: 600, opacity: archRestoring === f.id ? 0.6 : 1 }}
                           >
                             {archRestoring === f.id ? <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} /> : <RotateCcw size={13} />}
-                            Restaurar
+                            {t("restore")}
                           </button>
                         </td>
                       </tr>
@@ -727,25 +731,25 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
                   <h3 style={{ margin: 0, fontSize: 15, color: "#1e293b", display: "flex", alignItems: "center", gap: 8 }}>
                     <Paperclip size={16} color={brand} />
-                    {compModal.comparisonStorageKey ? "Reemplazar comparativa" : "Adjuntar comparativa"}
+                    {compModal.comparisonStorageKey ? t("replaceComparison") : t("attachComparison")}
                   </h3>
                   {!compUploading && <button onClick={() => setCompModal(null)} style={{ border: "none", background: "transparent", cursor: "pointer", color: "#94a3b8" }}><X size={18} /></button>}
                 </div>
-                <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 14px" }}>Documento: <strong>{compModal.nombreDocumento || compModal.name}</strong></p>
+                <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 14px" }}>{tc("documento")}: <strong>{compModal.nombreDocumento || compModal.name}</strong></p>
                 <div onClick={() => !compUploading && compInputRef.current?.click()} style={{ border: `2px dashed ${compFile ? brand : "#cbd5e1"}`, borderRadius: 8, padding: 16, cursor: compUploading ? "default" : "pointer", textAlign: "center", background: compFile ? "#f0fdf4" : "#f8fafc", marginBottom: 14 }}>
                   {compFile ? (
                     <div style={{ fontSize: 13, color: "#15803d" }}><strong>{compFile.name}</strong><br /><span style={{ fontSize: 11, color: "#64748b" }}>{(compFile.size / 1024).toFixed(1)} KB</span></div>
                   ) : (
-                    <div style={{ fontSize: 13, color: "#94a3b8" }}><FileText size={20} style={{ marginBottom: 6 }} /><br />Haz clic para seleccionar archivo</div>
+                    <div style={{ fontSize: 13, color: "#94a3b8" }}><FileText size={20} style={{ marginBottom: 6 }} /><br />{t("clickToSelect")}</div>
                   )}
                 </div>
                 <input ref={compInputRef} type="file" style={{ display: "none" }} onChange={(e) => setCompFile(e.target.files?.[0] ?? null)} />
                 {compError && <p style={{ margin: "0 0 12px", padding: "8px 12px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6, fontSize: 12, color: "#dc2626" }}>{compError}</p>}
                 <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-                  {!compUploading && <button onClick={() => setCompModal(null)} style={{ border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancelar</button>}
+                  {!compUploading && <button onClick={() => setCompModal(null)} style={{ border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>{tc("cancel")}</button>}
                   <button onClick={handleCompUpload} disabled={compUploading || !compFile} style={{ background: brand, color: "#fff", border: "none", padding: "7px 18px", borderRadius: 8, cursor: (compUploading || !compFile) ? "default" : "pointer", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, opacity: (!compFile || compUploading) ? 0.6 : 1 }}>
                     {compUploading ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Upload size={14} />}
-                    {compUploading ? "Subiendo…" : "Adjuntar"}
+                    {compUploading ? t("uploading") : t("attach")}
                   </button>
                 </div>
               </div>

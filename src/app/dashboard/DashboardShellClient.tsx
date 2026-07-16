@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { useTranslations, useLocale } from "next-intl";
 import {
   Files, ClipboardList, ClipboardCheck, History, FilePlus,
   Users, Shield, Inbox, ScrollText, BarChart2, LogOut,
@@ -30,10 +31,18 @@ export default function DashboardShellClient({
 }: Props) {
   const router   = useRouter();
   const pathname = usePathname();
+  const locale   = useLocale();
+  const t        = useTranslations("shell");
   const brand    = company.primaryColor;
   const font     = company.fontFamily;
   const isAdmin  = userRole === "COMPANY_ADMIN";
   const canCreate = userRole === "COMPANY_ADMIN" || userRole === "EDITOR";
+
+  function switchLocale() {
+    const next = locale === "es" ? "en" : "es";
+    document.cookie = `locale=${next};path=/;max-age=31536000`;
+    router.refresh();
+  }
 
   const [sidebarOpen,   setSidebarOpen]   = useState(true);
   const [pendingTotal,  setPendingTotal]  = useState(0);
@@ -122,24 +131,24 @@ export default function DashboardShellClient({
   const SIDEBAR_W = sidebarOpen ? 240 : 64;
 
   const navItems = [
-    { label: "Documentos",      icon: <Files size={18} />,         href: "/dashboard",                        badge: 0 },
-    { label: "Externos",        icon: <Globe size={18} />,         href: "/dashboard/externos",               badge: 0 },
-    { label: "Listado Maestro", icon: <ClipboardList size={18} />, href: "/dashboard/listado-maestro",        badge: 0 },
-    { label: "Pendientes",      icon: <ClipboardCheck size={18} />, href: "/dashboard/pendientes",            badge: pendingTotal },
-    { label: "Control Cambios", icon: <History size={18} />,       href: "/dashboard/control-cambios",        badge: 0 },
+    { label: t("nav.documentos"),     icon: <Files size={18} />,          href: "/dashboard",                    badge: 0 },
+    { label: t("nav.externos"),       icon: <Globe size={18} />,          href: "/dashboard/externos",           badge: 0 },
+    { label: t("nav.listado"),        icon: <ClipboardList size={18} />,  href: "/dashboard/listado-maestro",    badge: 0 },
+    { label: t("nav.pendientes"),     icon: <ClipboardCheck size={18} />, href: "/dashboard/pendientes",         badge: pendingTotal },
+    { label: t("nav.controlCambios"), icon: <History size={18} />,        href: "/dashboard/control-cambios",    badge: 0 },
     ...(canCreate ? [
-      { label: "Crear Documento", icon: <FilePlus size={18} />,    href: "/dashboard/crear-documento",        badge: 0 },
+      { label: t("nav.crearDoc"),       icon: <FilePlus size={18} />,    href: "/dashboard/crear-documento",    badge: 0 },
     ] : []),
     ...(!isAdmin ? [
-      { label: "Solicitar Cambio",  icon: <FileEdit size={18} />,  href: "/dashboard/solicitar-cambio",       badge: 0 },
-      { label: "Elim. Documento",   icon: <Trash2 size={18} />,    href: "/dashboard/eliminar-documento",     badge: 0 },
+      { label: t("nav.solicitarCambio"), icon: <FileEdit size={18} />,   href: "/dashboard/solicitar-cambio",   badge: 0 },
+      { label: t("nav.eliminarDoc"),     icon: <Trash2 size={18} />,     href: "/dashboard/eliminar-documento", badge: 0 },
     ] : []),
     ...(isAdmin ? [
-      { label: "Equipo",       icon: <Users size={18} />,      href: "/dashboard/team",              badge: 0 },
-      { label: "Permisos",     icon: <Shield size={18} />,     href: "/dashboard/permissions",       badge: 0 },
-      { label: "Solicitudes",  icon: <Inbox size={18} />,      href: "/dashboard/solicitudes",       badge: pendingCRCount },
-      { label: "Reportes",     icon: <BarChart2 size={18} />,  href: "/dashboard/reportes",          badge: 0 },
-      { label: "Historial",    icon: <ScrollText size={18} />, href: "/dashboard/audit",             badge: 0 },
+      { label: t("nav.equipo"),      icon: <Users size={18} />,      href: "/dashboard/team",        badge: 0 },
+      { label: t("nav.permisos"),    icon: <Shield size={18} />,     href: "/dashboard/permissions", badge: 0 },
+      { label: t("nav.solicitudes"), icon: <Inbox size={18} />,      href: "/dashboard/solicitudes", badge: pendingCRCount },
+      { label: t("nav.reportes"),    icon: <BarChart2 size={18} />,  href: "/dashboard/reportes",    badge: 0 },
+      { label: t("nav.historial"),   icon: <ScrollText size={18} />, href: "/dashboard/audit",       badge: 0 },
     ] : []),
   ];
 
@@ -241,14 +250,14 @@ export default function DashboardShellClient({
               </div>
               <div style={{ overflow: "hidden" }}>
                 <div style={{ fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>{userRole.replace("_", " ")}</div>
-                {isAdmin && <div style={{ fontSize: 10, opacity: 0.65 }}>{activeUserCount}/{maxUsers} users</div>}
+                {isAdmin && <div style={{ fontSize: 10, opacity: 0.65 }}>{activeUserCount}/{maxUsers} {t("users")}</div>}
               </div>
             </div>
           )}
           <button
             onClick={logout}
             className="shell-nav"
-            title={!sidebarOpen ? "Sign out" : undefined}
+            title={!sidebarOpen ? t("signOut") : undefined}
             style={{
               width: "100%", display: "flex", alignItems: "center",
               gap: 10, padding: sidebarOpen ? "9px 12px" : "9px 0",
@@ -258,12 +267,39 @@ export default function DashboardShellClient({
             }}
           >
             <LogOut size={16} />
-            {sidebarOpen && <span>Sign out</span>}
+            {sidebarOpen && <span>{t("signOut")}</span>}
           </button>
+
+          {/* Locale switcher */}
+          <button
+            onClick={switchLocale}
+            className="shell-nav"
+            title={t("locale.label")}
+            style={{
+              width: "100%", display: "flex", alignItems: "center",
+              gap: 10, padding: sidebarOpen ? "9px 12px" : "9px 0",
+              justifyContent: sidebarOpen ? "flex-start" : "center",
+              border: "none", background: "transparent",
+              color: "rgba(255,255,255,0.6)", cursor: "pointer", fontSize: 12, marginTop: 2,
+            }}
+          >
+            <Globe size={14} />
+            {sidebarOpen && (
+              <span>
+                <span style={{ fontWeight: locale === "es" ? 700 : 400, color: locale === "es" ? "#fff" : "rgba(255,255,255,0.5)" }}>ES</span>
+                {" / "}
+                <span style={{ fontWeight: locale === "en" ? 700 : 400, color: locale === "en" ? "#fff" : "rgba(255,255,255,0.5)" }}>EN</span>
+              </span>
+            )}
+            {!sidebarOpen && (
+              <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.8)" }}>{locale.toUpperCase()}</span>
+            )}
+          </button>
+
           <button
             onClick={() => setSidebarOpen((o) => !o)}
             className="shell-nav"
-            title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+            title={sidebarOpen ? t("collapseTitle") : t("expandTitle")}
             style={{
               width: "100%", display: "flex", alignItems: "center",
               gap: 10, padding: sidebarOpen ? "9px 12px" : "9px 0",
@@ -273,7 +309,7 @@ export default function DashboardShellClient({
             }}
           >
             {sidebarOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
-            {sidebarOpen && <span>Collapse</span>}
+            {sidebarOpen && <span>{t("collapse")}</span>}
           </button>
         </div>
       </aside>
@@ -288,10 +324,8 @@ export default function DashboardShellClient({
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.6)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div style={{ background: "#fff", borderRadius: 16, padding: "32px 28px", width: 380, maxWidth: "90vw", boxShadow: "0 24px 64px rgba(0,0,0,0.25)", textAlign: "center" }}>
             <div style={{ width: 52, height: 52, borderRadius: "50%", background: "#fef3c7", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: 24 }}>⏱</div>
-            <h3 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 700, color: "#1e293b" }}>Sesión por expirar</h3>
-            <p style={{ margin: "0 0 6px", fontSize: 14, color: "#64748b" }}>
-              Has estado inactivo por un momento.<br />Tu sesión cerrará en:
-            </p>
+            <h3 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 700, color: "#1e293b" }}>{t("idle.title")}</h3>
+            <p style={{ margin: "0 0 6px", fontSize: 14, color: "#64748b" }}>{t("idle.body")}</p>
             <div style={{ fontSize: 36, fontWeight: 800, color: "#dc2626", margin: "12px 0 20px", fontVariantNumeric: "tabular-nums" }}>
               {String(Math.floor(countdown / 60)).padStart(2, "0")}:{String(countdown % 60).padStart(2, "0")}
             </div>
@@ -299,7 +333,7 @@ export default function DashboardShellClient({
               onClick={() => { lastActiveRef.current = Date.now(); setIdleWarning(false); }}
               style={{ width: "100%", padding: "12px", borderRadius: 10, border: "none", background: brand, color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer" }}
             >
-              Continuar sesión
+              {t("idle.continue")}
             </button>
           </div>
         </div>

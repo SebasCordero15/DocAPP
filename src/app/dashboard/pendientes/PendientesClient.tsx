@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { CheckCircle, ClipboardList, X } from "lucide-react";
 import FileIcon from "@/components/FileIcon";
 
@@ -141,40 +142,16 @@ interface Props {
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
-const TASK_TYPE_LABELS: Record<TaskType, string> = {
-  REVIEW: "Revisión", UPDATE: "Actualización", APPROVE: "Aprobación", OTHER: "Otra",
-};
 const TASK_TYPE_COLORS: Record<TaskType, { bg: string; color: string }> = {
   REVIEW:  { bg: "#dbeafe", color: "#1e40af" },
   UPDATE:  { bg: "#fef3c7", color: "#92400e" },
   APPROVE: { bg: "#dcfce7", color: "#166534" },
   OTHER:   { bg: "#f3f4f6", color: "#374151" },
 };
-const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
-  PENDING: "Pendiente", IN_PROGRESS: "En Progreso", COMPLETED: "Completado",
-};
-const DOC_STATUS_LABELS: Record<string, string> = {
-  DRAFT: "Borrador", IN_REVIEW: "En Revisión", REVIEWED: "Revisado",
-};
 const DOC_STATUS_COLORS: Record<string, { bg: string; color: string }> = {
   DRAFT:     { bg: "#fef3c7", color: "#92400e" },
   IN_REVIEW: { bg: "#dbeafe", color: "#1e40af" },
   REVIEWED:  { bg: "#dcfce7", color: "#166534" },
-};
-
-const CR_TYPE_LABELS: Record<string, string> = {
-  NEW_UPLOAD:            "Subida nueva",
-  EDIT_METADATA:         "Edición de metadatos",
-  REPLACE_FILE:          "Reemplazo de archivo",
-  DELETE:                "Solicitud de eliminación",
-  REVISION_DATE_CHANGE:  "Cambio de fecha de revisión",
-  OTHER:                 "Otro",
-  REVISION_REQUEST:      "Propuesta de revisión",
-};
-const CR_STATUS_LABELS: Record<string, string> = {
-  PENDING:  "Pendiente",
-  APPROVED: "Aprobada",
-  REJECTED: "Rechazada",
 };
 const CR_STATUS_COLORS: Record<string, { bg: string; color: string; border: string }> = {
   PENDING:  { bg: "#fef3c7", color: "#92400e",  border: "#fcd34d" },
@@ -188,6 +165,25 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
   const router = useRouter();
   const p = company.primaryColor;
   const isAdmin = userRole === "COMPANY_ADMIN";
+  const t = useTranslations("pendientes");
+  const tc = useTranslations("common");
+
+  const TASK_TYPE_LABELS: Record<TaskType, string> = {
+    REVIEW: t("types.REVISION"), UPDATE: t("types.ACTUALIZACION"), APPROVE: t("actions.approve"), OTHER: t("types.CORRECCION"),
+  };
+  const CR_TYPE_LABELS: Record<string, string> = {
+    NEW_UPLOAD: "New upload", EDIT_METADATA: "Metadata edit",
+    REPLACE_FILE: "File replacement", DELETE: "Deletion request",
+    REVISION_DATE_CHANGE: "Review date change", OTHER: "Other",
+    REVISION_REQUEST: "Review proposal",
+  };
+  const CR_STATUS_LABELS: Record<string, string> = {
+    PENDING: tc("pendiente"), APPROVED: tc("aprobado"), REJECTED: tc("rechazado"),
+  };
+  const DOC_STATUS_LABELS: Record<string, string> = {
+    DRAFT: t("docStatus.DRAFT"), IN_REVIEW: t("docStatus.IN_REVIEW"),
+    REVIEWED: t("docStatus.REVIEWED"), PENDING_APPROVAL: t("docStatus.PENDING_APPROVAL"),
+  };
 
   // ── tab state
   const [mainTab, setMainTab] = useState<MainTab>("acciones");
@@ -233,7 +229,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
     setOpeningDoc(fileId);
     try {
       const res = await fetch(`/api/files/${fileId}/download-url`);
-      if (!res.ok) { alert("No se pudo obtener el enlace del documento"); return; }
+      if (!res.ok) { alert("Could not get the document link"); return; }
       const { url } = await res.json();
       window.open(url, "_blank");
     } finally {
@@ -345,7 +341,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
       if (!upRes.ok) { setOutError("Error al subir el archivo"); setOutSubmitting(false); return; }
       storageKey = sk; fileName = outFile.name; mimeType = outFile.type; size = outFile.size;
     } else if (needsUpload && !outFile) {
-      setOutError("Se requiere un archivo"); setOutSubmitting(false); return;
+      setOutError(t("errors.uploadUrlError")); setOutSubmitting(false); return;
     }
 
     const metadata: Record<string, string> = {};
@@ -399,7 +395,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
 
   async function submitCorrection() {
     if (!correctModal) return;
-    if (!correctInstructions.trim()) { setCorrectError("El cambio a realizar es obligatorio"); return; }
+    if (!correctInstructions.trim()) { setCorrectError(t("errors.unexpectedError")); return; }
     setCorrectSubmitting(true); setCorrectError(""); setCorrectProgress(0);
 
     let storageKey: string | null = null;
@@ -591,7 +587,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
   const submitChainAction = async () => {
     if (!chainModal) return;
     const needsNote = chainModal.action === "RETURN_TO_PREVIOUS" || chainModal.action === "REJECT";
-    if (needsNote && !chainNotes.trim()) { setChainError("Se requiere una nota"); return; }
+    if (needsNote && !chainNotes.trim()) { setChainError(t("errors.noteRequired")); return; }
     setChainWorking(true); setChainError("");
     const res = await fetch(`/api/review-chain/${chainModal.taskId}`, {
       method: "POST",
@@ -620,7 +616,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
   };
 
   const submitAssign = async () => {
-    if (!assignForm.assignedToUserId) { setAssignError("Selecciona un usuario"); return; }
+    if (!assignForm.assignedToUserId) { setAssignError(t("errors.selectUser")); return; }
     setSubmittingAssign(true);
     setAssignError("");
     const body: Record<string, unknown> = {
@@ -660,8 +656,8 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
   // ─── Rendered sections ──────────────────────────────────────────────────────
 
   const docTabs = [
-    { key: "en_revision" as DocTab, label: "En Revisión",         count: docCounts.enRevision, color: p },
-    { key: "atrasadas"   as DocTab, label: "Revisiones Atrasadas", count: docCounts.atrasadas,  color: "#dc2626" },
+    { key: "en_revision" as DocTab, label: t("docTabs.enRevision"),  count: docCounts.enRevision, color: p },
+    { key: "atrasadas"   as DocTab, label: t("docTabs.atrasadas"),    count: docCounts.atrasadas,  color: "#dc2626" },
   ];
 
   const tasksToShow = mainTab === "equipo" ? teamTasks : myTasks;
@@ -712,28 +708,28 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
       {/* Main tabs */}
       <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 32px", display: "flex", gap: 0 }}>
         {([
-          { key: "acciones"    as MainTab, label: "Acciones",            badge: myTasks.length + rejectedCount },
-          { key: "seguimiento" as MainTab, label: "Seguimiento",         badge: pipelineCounts.EN_ESPERA },
-          ...(isAdmin ? [{ key: "equipo" as MainTab, label: "Equipo", badge: teamTasks.length }] : []),
-        ]).map((t) => (
+          { key: "acciones"    as MainTab, label: t("tabs.acciones"),    badge: myTasks.length + rejectedCount },
+          { key: "seguimiento" as MainTab, label: t("tabs.seguimiento"), badge: pipelineCounts.EN_ESPERA },
+          ...(isAdmin ? [{ key: "equipo" as MainTab, label: t("tabs.equipo"), badge: teamTasks.length }] : []),
+        ]).map((tab) => (
           <button
-            key={t.key}
+            key={tab.key}
             className="main-tab"
-            onClick={() => setMainTab(t.key)}
+            onClick={() => setMainTab(tab.key)}
             style={{
-              color: mainTab === t.key ? p : "#94a3b8",
-              borderBottomColor: mainTab === t.key ? p : "transparent",
+              color: mainTab === tab.key ? p : "#94a3b8",
+              borderBottomColor: mainTab === tab.key ? p : "transparent",
               display: "flex", alignItems: "center", gap: 7,
             }}
           >
-            {t.label}
-            {t.badge > 0 && (
+            {tab.label}
+            {tab.badge > 0 && (
               <span style={{
-                background: mainTab === t.key ? p : "#e2e8f0",
-                color: mainTab === t.key ? "#fff" : "#64748b",
+                background: mainTab === tab.key ? p : "#e2e8f0",
+                color: mainTab === tab.key ? "#fff" : "#64748b",
                 borderRadius: 20, padding: "1px 7px", fontSize: 11, fontWeight: 700,
               }}>
-                {t.badge}
+                {tab.badge}
               </span>
             )}
           </button>
@@ -748,12 +744,12 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <div>
                 <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#1e293b" }}>
-                  {mainTab === "acciones" ? "Mis Tareas Asignadas" : "Tareas del Equipo"}
+                  {mainTab === "acciones" ? t("sections.myTasks") : t("sections.teamTasks")}
                 </h2>
                 <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94a3b8" }}>
                   {mainTab === "acciones"
-                    ? "Tareas asignadas específicamente a ti"
-                    : "Todas las tareas abiertas en la empresa"}
+                    ? t("sections.myTasksDesc")
+                    : t("sections.teamTasksDesc")}
                 </p>
               </div>
 
@@ -761,11 +757,11 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
               {isAdmin && mainTab === "equipo" && (
                 <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                   <select className="select-input" value={filterUser} onChange={(e) => setFilterUser(e.target.value)}>
-                    <option value="">Todos los usuarios</option>
+                    <option value="">{t("filters.allUsers")}</option>
                     {companyUsers.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
                   </select>
                   <select className="select-input" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
-                    <option value="">Todos los tipos</option>
+                    <option value="">{t("filters.allTypes")}</option>
                     {(["REVIEW","UPDATE","APPROVE","OTHER"] as TaskType[]).map((t) => (
                       <option key={t} value={t}>{TASK_TYPE_LABELS[t]}</option>
                     ))}
@@ -780,7 +776,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
               <div style={{ textAlign: "center", padding: "48px 0", color: "#94a3b8" }}>
                 <div style={{ marginBottom: 10 }}><CheckCircle size={40} color="#22c55e" /></div>
                 <div style={{ fontSize: 15, fontWeight: 600 }}>
-                  {mainTab === "acciones" ? "No tienes tareas pendientes" : "No hay tareas abiertas en el equipo"}
+                  {mainTab === "acciones" ? t("emptyMyTasks") : t("emptyTeamTasks")}
                 </div>
               </div>
             ) : (
@@ -791,43 +787,43 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                   const rep = sorted[0];
                   const or = rep.outgoingRequest!;
                   const docName = rep.file.nombreDocumento || rep.file.name;
-                  const OUT_TYPE_LABELS_LOC: Record<string, string> = { ACTUALIZACION: "Actualización", REVISION: "Revisión", CORRECCION: "Corrección" };
+                  const OUT_TYPE_LABELS_LOC: Record<string, string> = { ACTUALIZACION: t("types.ACTUALIZACION"), REVISION: t("types.REVISION"), CORRECCION: t("types.CORRECCION") };
                   const OUT_TYPE_COLORS_LOC: Record<string, { bg: string; color: string }> = {
                     ACTUALIZACION: { bg: "#dbeafe", color: "#1e40af" },
                     REVISION:      { bg: "#ede9fe", color: "#5b21b6" },
                     CORRECCION:    { bg: "#fef3c7", color: "#92400e" },
                   };
-                  const tc = OUT_TYPE_COLORS_LOC[or.type] ?? { bg: "#f3f4f6", color: "#374151" };
+                  const typeColor = OUT_TYPE_COLORS_LOC[or.type] ?? { bg: "#f3f4f6", color: "#374151" };
                   const overallDone = sorted.every((t) => t.status === "COMPLETED");
                   const anyOverdue  = !overallDone && sorted.some((t) => t.isOverdue);
                   return (
-                    <div key={or.id} className="card" style={{ borderLeft: `4px solid ${anyOverdue ? "#dc2626" : tc.color}` }}>
+                    <div key={or.id} className="card" style={{ borderLeft: `4px solid ${anyOverdue ? "#dc2626" : typeColor.color}` }}>
                       <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
                         <FileIcon mimeType={rep.file.mimeType} size={30} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           {/* Title row */}
                           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
                             <span style={{ fontWeight: 700, fontSize: 15, color: "#1e293b" }}>{docName}</span>
-                            <span style={{ background: tc.bg, color: tc.color, borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>
+                            <span style={{ background: typeColor.bg, color: typeColor.color, borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>
                               {OUT_TYPE_LABELS_LOC[or.type] ?? or.type}
                             </span>
                             <span style={{ background: "#fef3c7", color: "#92400e", borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>
-                              Solicitud saliente
+                              {t("outgoingBadge")}
                             </span>
                             <span style={{
                               background: overallDone ? "#dcfce7" : anyOverdue ? "#fee2e2" : "#f1f5f9",
                               color:      overallDone ? "#166534" : anyOverdue ? "#dc2626" : "#64748b",
                               borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: anyOverdue ? 700 : 400,
                             }}>
-                              {overallDone ? "Completada" : anyOverdue ? "Retrasado" : "En progreso"}
+                              {overallDone ? t("completed") : anyOverdue ? t("overdue") : t("stepStatus.inProgress")}
                             </span>
                           </div>
                           {/* Meta */}
                           <div style={{ display: "flex", gap: 14, fontSize: 12, color: "#64748b", flexWrap: "wrap", marginBottom: 10 }}>
-                            {rep.file.codigo && <span>Código: <b>{rep.file.codigo}</b></span>}
-                            <span>Asignado por: <b>{rep.assignedBy.name}</b></span>
-                            {rep.file.folder && <span>Carpeta: {rep.file.folder.name}</span>}
-                            {rep.dueDate && <span>Vence: <b>{new Date(rep.dueDate).toLocaleDateString("es-MX")}</b></span>}
+                            {rep.file.codigo && <span>{t("meta.codigo")} <b>{rep.file.codigo}</b></span>}
+                            <span>{t("meta.assignedBy")} <b>{rep.assignedBy.name}</b></span>
+                            {rep.file.folder && <span>{t("meta.folder")} {rep.file.folder.name}</span>}
+                            {rep.dueDate && <span>{t("meta.due")} <b>{new Date(rep.dueDate).toLocaleDateString("es-MX")}</b></span>}
                           </div>
                           {/* Step timeline — shows all steps (known + pending placeholders) */}
                           <div style={{ display: "flex", alignItems: "center", gap: 0, flexWrap: "wrap" }}>
@@ -857,10 +853,10 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                                   </div>
                                   <div style={{ fontSize: 12 }}>
                                     <div style={{ fontWeight: active ? 700 : 500, color: textColor }}>
-                                      {task ? task.assignedTo.name : `Paso ${stepNum}`}
+                                      {task ? task.assignedTo.name : `Step ${stepNum}`}
                                     </div>
                                     <div style={{ fontSize: 10, color: done ? "#22c55e" : active ? p : "#94a3b8" }}>
-                                      {done ? "Completado" : active ? "En progreso" : future ? "Siguiente" : "Pendiente"}
+                                      {done ? t("stepStatus.completed") : active ? t("stepStatus.inProgress") : future ? t("stepStatus.next") : t("stepStatus.pending")}
                                     </div>
                                   </div>
                                   {!isLast && (
@@ -882,14 +878,14 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                                   ✍
                                 </div>
                                 <div style={{ fontSize: 12 }}>
-                                  <div style={{ fontWeight: 700, color: "#92400e" }}>Revisión admin</div>
-                                  <div style={{ fontSize: 10, color: "#f59e0b" }}>Aprobación pendiente</div>
+                                  <div style={{ fontWeight: 700, color: "#92400e" }}>{t("adminReview")}</div>
+                                  <div style={{ fontSize: 10, color: "#f59e0b" }}>{t("awaitingApproval")}</div>
                                 </div>
                               </div>
                             )}
                           </div>
                           <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
-                            Paso {or.currentStep} de {or.totalSteps}{or.status === "PENDING_APPROVAL" ? " · Esperando aprobación del admin" : ""}
+                            Paso {or.currentStep} {t("of")} {or.totalSteps}{or.status === "PENDING_APPROVAL" ? ` · ${t("waitingAdmin")}` : ""}
                           </div>
                           {/* Notes from any task */}
                           {sorted.find((t) => t.notes) && (
@@ -904,17 +900,17 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                             <>
                               <button className="action-btn" style={{ background: "#f1f5f9", color: "#475569" }}
                                 onClick={() => openPreview({ id: rep.file.id, name: docName, mimeType: rep.file.mimeType })}>
-                                Ver
+                                {tc("ver")}
                               </button>
                               <button className="action-btn" style={{ background: "#f1f5f9", color: "#475569", opacity: openingDoc === rep.file.id ? 0.5 : 1 }}
                                 disabled={openingDoc === rep.file.id} onClick={() => openDoc(rep.file.id)}>
-                                {openingDoc === rep.file.id ? "…" : "Descargar"}
+                                {openingDoc === rep.file.id ? "…" : tc("descargar")}
                               </button>
                             </>
                           ) : (
                             <button className="action-btn" style={{ background: "#f1f5f9", color: "#475569", opacity: openingDoc === rep.file.id ? 0.5 : 1 }}
                               disabled={openingDoc === rep.file.id} onClick={() => openDoc(rep.file.id)}>
-                              {openingDoc === rep.file.id ? "…" : "Ver doc"}
+                              {openingDoc === rep.file.id ? "…" : t("viewDoc")}
                             </button>
                           )}
                         </div>
@@ -925,14 +921,14 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
 
                 {/* ── Standalone / Acciones tasks ── */}
                 {(mainTab === "acciones" ? tasksToShow : equipoStandalone).map((task) => {
-                  const tc = TASK_TYPE_COLORS[task.type];
+                  const typeColor = TASK_TYPE_COLORS[task.type];
                   const isCompleting = completing === task.id;
                   const canComplete = task.assignedTo.id === userId || task.assignedBy.id === userId;
                   const isChainTask = !!task.reviewChainId && task.stepOrder !== null;
                   const isMyChainTurn = isChainTask && task.assignedTo.id === userId;
                   const isOutTask = !!task.outgoingRequestId && !!task.outgoingRequest;
                   const isMyOutTurn = isOutTask && task.assignedTo.id === userId;
-                  const OUT_TYPE_LABELS: Record<string, string> = { ACTUALIZACION: "Actualización", REVISION: "Revisión", CORRECCION: "Corrección" };
+                  const OUT_TYPE_LABELS: Record<string, string> = { ACTUALIZACION: t("types.ACTUALIZACION"), REVISION: t("types.REVISION"), CORRECCION: t("types.CORRECCION") };
                   const docName = task.file.nombreDocumento || task.file.name;
                   return (
                     <div key={task.id} className="card" style={{ borderLeft: task.isOverdue ? "4px solid #dc2626" : isChainTask ? `4px solid #7c3aed` : `4px solid ${p}` }}>
@@ -945,7 +941,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                             <span style={{ fontWeight: 700, fontSize: 15, color: "#1e293b" }}>{docName}</span>
                             {/* Only show generic type chip when not an outgoing task (outgoing chip below already names the type) */}
                             {!isOutTask && (
-                              <span style={{ background: tc.bg, color: tc.color, borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                              <span style={{ background: typeColor.bg, color: typeColor.color, borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
                                 {TASK_TYPE_LABELS[task.type]}
                               </span>
                             )}
@@ -956,33 +952,33 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                             )}
                             {isOutTask && task.outgoingRequest && (
                               <span style={{ background: "#fef3c7", color: "#92400e", borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>
-                                Solicitud saliente · {OUT_TYPE_LABELS[task.outgoingRequest.type]}
+                                {t("outgoingBadge")} · {OUT_TYPE_LABELS[task.outgoingRequest.type]}
                               </span>
                             )}
                             {task.isOverdue && (
-                              <span style={{ background: "#fee2e2", color: "#dc2626", borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>Retrasado</span>
+                              <span style={{ background: "#fee2e2", color: "#dc2626", borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>{t("overdue")}</span>
                             )}
                             {/* Action-required chip */}
                             {task.status !== "COMPLETED" && task.assignedTo.id === userId && (
                               <span style={{ background: "#dcfce7", color: "#166534", borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
-                                {isChainTask ? "Aprobar / Devolver / Rechazar"
-                                  : isOutTask ? "Subir respuesta"
-                                  : "Completar tarea"}
+                                {isChainTask ? t("actions.approveChip")
+                                  : isOutTask ? t("actions.uploadChip")
+                                  : t("actions.complete")}
                               </span>
                             )}
                           </div>
 
                           {/* Meta row */}
                           <div style={{ display: "flex", gap: 14, fontSize: 12, color: "#64748b", flexWrap: "wrap" }}>
-                            {task.file.codigo && <span>Código: <b>{task.file.codigo}</b></span>}
-                            <span>Asignado por: <b>{task.assignedBy.name}</b></span>
-                            {mainTab === "equipo" && <span>Asignado a: <b>{task.assignedTo.name}</b></span>}
+                            {task.file.codigo && <span>{t("meta.codigo")} <b>{task.file.codigo}</b></span>}
+                            <span>{t("meta.assignedBy")} <b>{task.assignedBy.name}</b></span>
+                            {mainTab === "equipo" && <span>{t("meta.assignedTo")} <b>{task.assignedTo.name}</b></span>}
                             {task.dueDate && (
                               <span style={{ color: task.isOverdue ? "#dc2626" : "#64748b", fontWeight: task.isOverdue ? 700 : 400 }}>
-                                Vence: <b>{new Date(task.dueDate).toLocaleDateString("es-MX")}</b>
+                                {t("meta.due")} <b>{new Date(task.dueDate).toLocaleDateString("es-MX")}</b>
                               </span>
                             )}
-                            {task.file.folder && <span>Carpeta: {task.file.folder.name}</span>}
+                            {task.file.folder && <span>{t("meta.folder")} {task.file.folder.name}</span>}
                           </div>
 
                           {task.notes && (
@@ -992,7 +988,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                           )}
                           {task.rejectionNote && (
                             <div style={{ marginTop: 8, padding: "8px 12px", background: "#fff7ed", borderRadius: 6, fontSize: 12, color: "#92400e", borderLeft: "3px solid #f59e0b" }}>
-                              <span style={{ fontWeight: 700 }}>Motivo de devolución:</span> {task.rejectionNote}
+                              <span style={{ fontWeight: 700 }}>{t("meta.returnReason")}</span> {task.rejectionNote}
                             </div>
                           )}
                         </div>
@@ -1003,17 +999,17 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                             <>
                               <button className="action-btn" style={{ background: "#f1f5f9", color: "#475569" }}
                                 onClick={() => openPreview({ id: task.file.id, name: task.file.nombreDocumento || task.file.name, mimeType: task.file.mimeType })}>
-                                Ver
+                                {tc("ver")}
                               </button>
                               <button className="action-btn" style={{ background: "#f1f5f9", color: "#475569", opacity: openingDoc === task.file.id ? 0.5 : 1 }}
                                 disabled={openingDoc === task.file.id} onClick={() => openDoc(task.file.id)}>
-                                {openingDoc === task.file.id ? "…" : "Descargar"}
+                                {openingDoc === task.file.id ? "…" : tc("descargar")}
                               </button>
                             </>
                           ) : (
                             <button className="action-btn" style={{ background: "#f1f5f9", color: "#475569", opacity: openingDoc === task.file.id ? 0.5 : 1 }}
                               disabled={openingDoc === task.file.id} onClick={() => openDoc(task.file.id)}>
-                              {openingDoc === task.file.id ? "…" : "Ver doc"}
+                              {openingDoc === task.file.id ? "…" : t("viewDoc")}
                             </button>
                           )}
 
@@ -1021,17 +1017,17 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                             <>
                               <button className="action-btn" style={{ background: "#dcfce7", color: "#166534" }}
                                 onClick={() => { setChainNotes(""); setChainError(""); setChainModal({ taskId: task.id, action: "APPROVE", docName, stepOrder: task.stepOrder!, fileId: task.file.id, mimeType: task.file.mimeType, fileName: task.file.name }); }}>
-                                Aprobar
+                                {t("actions.approve")}
                               </button>
                               {(task.stepOrder ?? 1) > 1 && (
                                 <button className="action-btn" style={{ background: "#fff7ed", color: "#d97706" }}
                                   onClick={() => { setChainNotes(""); setChainError(""); setChainModal({ taskId: task.id, action: "RETURN_TO_PREVIOUS", docName, stepOrder: task.stepOrder!, fileId: task.file.id, mimeType: task.file.mimeType, fileName: task.file.name }); }}>
-                                  Devolver
+                                  {t("actions.return")}
                                 </button>
                               )}
                               <button className="action-btn" style={{ background: "#fee2e2", color: "#dc2626" }}
                                 onClick={() => { setChainNotes(""); setChainError(""); setChainModal({ taskId: task.id, action: "REJECT", docName, stepOrder: task.stepOrder!, fileId: task.file.id, mimeType: task.file.mimeType, fileName: task.file.name }); }}>
-                                Rechazar
+                                {t("actions.reject")}
                               </button>
                             </>
                           )}
@@ -1039,14 +1035,14 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                           {isMyOutTurn && task.status !== "COMPLETED" && (
                             <button className="action-btn" style={{ background: "#fef3c7", color: "#92400e" }}
                               onClick={() => openOutModal(task)}>
-                              Responder
+                              {t("actions.respond")}
                             </button>
                           )}
 
                           {!isChainTask && !isOutTask && canComplete && task.status !== "COMPLETED" && (
                             <button className="action-btn" style={{ background: "#dcfce7", color: "#166534", opacity: isCompleting ? 0.5 : 1 }}
                               disabled={isCompleting} onClick={() => completeTask(task.id)}>
-                              {isCompleting ? "…" : "Completar"}
+                              {isCompleting ? "…" : t("actions.complete")}
                             </button>
                           )}
                         </div>
@@ -1063,15 +1059,15 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
         {mainTab === "seguimiento" && (
           <section style={{ marginBottom: 48 }}>
             <div style={{ marginBottom: 8 }}>
-              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#1e293b" }}>Mis Documentos</h2>
-              <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94a3b8" }}>Documentos que subiste o eres responsable</p>
+              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#1e293b" }}>{t("sections.myDocs")}</h2>
+              <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94a3b8" }}>{t("sections.myDocsDesc")}</p>
             </div>
 
             {/* Status tabs */}
             <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
               {([
-                { key: "EN_ESPERA" as const, label: "En espera",  description: "Pendiente de revisión o aprobación", color: p },
-                { key: "REVISADOS" as const, label: "Revisados",   description: "Ciclo completo terminado",            color: "#16a34a" },
+                { key: "EN_ESPERA" as const, label: t("pipeline.waiting"), description: t("pipeline.waitingDesc"), color: p },
+                { key: "REVISADOS" as const, label: t("pipeline.reviewed"), description: t("pipeline.reviewedDesc"), color: "#16a34a" },
               ]).map((s) => (
                 <button
                   key={s.key}
@@ -1107,7 +1103,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                 <div style={{ textAlign: "center", padding: "48px 0", color: "#94a3b8" }}>
                   <div style={{ marginBottom: 8 }}><ClipboardList size={36} color="#cbd5e1" /></div>
                   <div style={{ fontSize: 14, fontWeight: 600 }}>
-                    {pipelineStatus === "EN_ESPERA" ? "No tienes documentos esperando revisión" : "Aún no tienes documentos revisados"}
+                    {pipelineStatus === "EN_ESPERA" ? t("pipeline.emptyWaiting") : t("pipeline.emptyReviewed")}
                   </div>
                 </div>
               );
@@ -1120,9 +1116,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                   REVIEWED:         { bg: "#dcfce7",   color: "#166534" },
                   PENDING_APPROVAL: { bg: "#fef3c7",   color: "#92400e" },
                 };
-                const statusLabels: Record<string, string> = {
-                  DRAFT: "Borrador", IN_REVIEW: "En Revisión", REVIEWED: "Revisado", PENDING_APPROVAL: "Esperando Admin",
-                };
+                const statusLabels: Record<string, string> = DOC_STATUS_LABELS;
                 const sc = statusColors[f.status] ?? statusColors.DRAFT;
                 return (
                   <div key={f.id} className="card" style={{ borderLeft: `4px solid ${sc.color}`, marginBottom: 10 }}>
@@ -1138,10 +1132,10 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                         </div>
                         {/* Meta */}
                         <div style={{ display: "flex", gap: 12, fontSize: 12, color: "#64748b", flexWrap: "wrap", marginBottom: chain ? 10 : 0 }}>
-                          {f.codigo && <span>Código: <b>{f.codigo}</b></span>}
-                          {f.versionStr && <span>Versión: <b>{f.versionStr}</b></span>}
-                          {f.folder && <span>Carpeta: {f.folder.name}</span>}
-                          <span>Actualizado: {new Date(f.updatedAt).toLocaleDateString("es-CR", { day: "2-digit", month: "short" })}</span>
+                          {f.codigo && <span>{t("meta.codigo")} <b>{f.codigo}</b></span>}
+                          {f.versionStr && <span>{tc("version")}: <b>{f.versionStr}</b></span>}
+                          {f.folder && <span>{t("meta.folder")} {f.folder.name}</span>}
+                          <span>Updated: {new Date(f.updatedAt).toLocaleDateString("es-CR", { day: "2-digit", month: "short" })}</span>
                         </div>
                         {/* Review chain steps */}
                         {chain && (
@@ -1167,7 +1161,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                                   <div style={{ fontSize: 11 }}>
                                     <div style={{ fontWeight: active ? 700 : 500, color: textColor }}>{step.assignedTo.name}</div>
                                     <div style={{ fontSize: 10, color: done ? "#22c55e" : active ? p : "#94a3b8" }}>
-                                      {done ? "Listo" : active ? "Revisando…" : "Pendiente"}
+                                      {done ? t("docStatus.ready") : active ? t("docStatus.reviewing") : t("stepStatus.pending")}
                                     </div>
                                   </div>
                                   {idx < chain.steps.length - 1 && (
@@ -1179,6 +1173,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                             <div style={{ marginLeft: 8, fontSize: 11, color: "#94a3b8" }}>
                               Paso {chain.currentStep}/{chain.totalSteps}
                             </div>
+
                           </div>
                         )}
                       </div>
@@ -1187,12 +1182,12 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                         {isViewable(f.mimeType) ? (
                           <button className="action-btn" style={{ background: "#f1f5f9", color: "#475569" }}
                             onClick={() => openPreview({ id: f.id, name: docName, mimeType: f.mimeType })}>
-                            Ver
+                            {tc("ver")}
                           </button>
                         ) : (
                           <button className="action-btn" style={{ background: "#f1f5f9", color: "#475569", opacity: openingDoc === f.id ? 0.5 : 1 }}
                             disabled={openingDoc === f.id} onClick={() => openDoc(f.id)}>
-                            {openingDoc === f.id ? "…" : "Ver doc"}
+                            {openingDoc === f.id ? "…" : t("viewDoc")}
                           </button>
                         )}
                       </div>
@@ -1209,9 +1204,9 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
           <section style={{ marginBottom: 48 }}>
             <div style={{ marginBottom: 16, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
               <div>
-                <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#dc2626" }}>Rechazados / Devueltos</h2>
+                <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#dc2626" }}>{t("rejected.heading")}</h2>
                 <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94a3b8" }}>
-                  Documentos que fueron rechazados o devueltos con observaciones
+                  {t("rejected.desc")}
                 </p>
               </div>
               {rejectedCount > 0 && (
@@ -1219,7 +1214,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                   onClick={clearAllDismissed}
                   style={{ background: "#fee2e2", color: "#dc2626", border: "1px solid #fca5a5", borderRadius: 7, padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0, marginTop: 2 }}
                 >
-                  Limpiar todo
+                  {t("rejected.clearAll")}
                 </button>
               )}
             </div>
@@ -1235,24 +1230,24 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                   const rejectedBy = chain.rejectingStep?.assignedTo?.name ?? "Revisor";
                   return (
                     <div key={chain.id} style={{ background: "#fff", border: "1px solid #fca5a5", borderLeft: "4px solid #dc2626", borderRadius: 10, padding: "14px 18px", marginBottom: 10, position: "relative" }}>
-                      <button onClick={() => dismissItem(chain.id)} title="Descartar" style={{ position: "absolute", top: 8, right: 10, background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 18, lineHeight: 1, padding: 2 }}>×</button>
+                      <button onClick={() => dismissItem(chain.id)} title="Dismiss" style={{ position: "absolute", top: 8, right: 10, background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 18, lineHeight: 1, padding: 2 }}>×</button>
                       <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
                         {f && <FileIcon mimeType={f.mimeType} size={28} />}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
                             <span style={{ fontWeight: 700, fontSize: 14, color: "#1e293b" }}>{docName}</span>
                             <span style={{ background: "#fee2e2", color: "#dc2626", borderRadius: 5, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>
-                              Cadena rechazada
+                              Chain rejected
                             </span>
                           </div>
                           <div style={{ display: "flex", gap: 12, fontSize: 12, color: "#64748b", flexWrap: "wrap" }}>
-                            {f?.codigo && <span>Código: <b>{f.codigo}</b></span>}
-                            <span>Rechazado por: <b>{rejectedBy}</b></span>
-                            <span>Fecha: <b>{new Date(chain.updatedAt).toLocaleDateString("es-MX")}</b></span>
+                            {f?.codigo && <span>{t("meta.codigo")} <b>{f.codigo}</b></span>}
+                            <span>Rejected by: <b>{rejectedBy}</b></span>
+                            <span>Date: <b>{new Date(chain.updatedAt).toLocaleDateString("es-MX")}</b></span>
                           </div>
                           {reason && (
                             <div style={{ marginTop: 8, padding: "7px 12px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6, fontSize: 12, color: "#dc2626" }}>
-                              <b>Motivo:</b> {reason}
+                              <b>Reason:</b> {reason}
                             </div>
                           )}
                         </div>
@@ -1264,7 +1259,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                               disabled={openingDoc === f.id}
                               onClick={() => openDoc(f.id)}
                             >
-                              {openingDoc === f.id ? "…" : "Ver documento"}
+                              {openingDoc === f.id ? "…" : t("actions.viewDoc")}
                             </button>
                           </div>
                         )}
@@ -1279,14 +1274,14 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                   const rejectedBy = cr.reviewedBy?.name ?? "Administrador";
                   return (
                     <div key={cr.id} style={{ background: "#fff", border: "1px solid #fca5a5", borderLeft: "4px solid #f97316", borderRadius: 10, padding: "14px 18px", marginBottom: 10, position: "relative" }}>
-                      <button onClick={() => dismissItem(cr.id)} title="Descartar" style={{ position: "absolute", top: 8, right: 10, background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 18, lineHeight: 1, padding: 2 }}>×</button>
+                      <button onClick={() => dismissItem(cr.id)} title="Dismiss" style={{ position: "absolute", top: 8, right: 10, background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 18, lineHeight: 1, padding: 2 }}>×</button>
                       <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
                         {f && <FileIcon mimeType={f.mimeType} size={28} />}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
                             <span style={{ fontWeight: 700, fontSize: 14, color: "#1e293b" }}>{docName}</span>
                             <span style={{ background: "#fff7ed", color: "#c2410c", borderRadius: 5, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>
-                              Solicitud rechazada
+                              {t("rejected.crRejected")}
                             </span>
                             <span style={{ background: "#f1f5f9", color: "#475569", borderRadius: 5, padding: "1px 7px", fontSize: 11 }}>
                               {CR_TYPE_LABELS[cr.type] ?? cr.type}
@@ -1294,8 +1289,8 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                           </div>
                           <div style={{ display: "flex", gap: 12, fontSize: 12, color: "#64748b", flexWrap: "wrap" }}>
                             {f?.codigo && <span>Código: <b>{f.codigo}</b></span>}
-                            <span>Rechazado por: <b>{rejectedBy}</b></span>
-                            {cr.reviewedAt && <span>Fecha: <b>{new Date(cr.reviewedAt).toLocaleDateString("es-MX")}</b></span>}
+                            <span>Rejected by: <b>{rejectedBy}</b></span>
+                            {cr.reviewedAt && <span>Date: <b>{new Date(cr.reviewedAt).toLocaleDateString("es-MX")}</b></span>}
                           </div>
                           {cr.adminNotes && (
                             <div style={{ marginTop: 8, padding: "7px 12px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6, fontSize: 12, color: "#dc2626" }}>
@@ -1311,7 +1306,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                               disabled={openingDoc === f.id}
                               onClick={() => openDoc(f.id)}
                             >
-                              {openingDoc === f.id ? "…" : "Ver documento"}
+                              {openingDoc === f.id ? "…" : t("actions.viewDoc")}
                             </button>
                           </div>
                         )}
@@ -1327,14 +1322,14 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                   const typeLabel = { ACTUALIZACION: "Actualización", REVISION: "Revisión", CORRECCION: "Corrección" }[o.type] ?? o.type;
                   return (
                     <div key={o.id} style={{ background: "#fff", border: "1px solid #fed7aa", borderLeft: "4px solid #f97316", borderRadius: 10, padding: "14px 18px", marginBottom: 10, position: "relative" }}>
-                      <button onClick={() => dismissItem(o.id)} title="Descartar" style={{ position: "absolute", top: 8, right: 10, background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 18, lineHeight: 1, padding: 2 }}>×</button>
+                      <button onClick={() => dismissItem(o.id)} title="Dismiss" style={{ position: "absolute", top: 8, right: 10, background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 18, lineHeight: 1, padding: 2 }}>×</button>
                       <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
                         {f && <FileIcon mimeType={f.mimeType} size={28} />}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
                             <span style={{ fontWeight: 700, fontSize: 14, color: "#1e293b" }}>{docName}</span>
                             <span style={{ background: "#fff7ed", color: "#c2410c", borderRadius: 5, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>
-                              Devuelta — pendiente corrección
+                              Returned — pending correction
                             </span>
                             <span style={{ background: "#f1f5f9", color: "#475569", borderRadius: 5, padding: "1px 7px", fontSize: 11 }}>
                               {typeLabel}
@@ -1342,12 +1337,12 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                           </div>
                           <div style={{ display: "flex", gap: 12, fontSize: 12, color: "#64748b", flexWrap: "wrap" }}>
                             {f?.codigo && <span>Código: <b>{f.codigo}</b></span>}
-                            <span>Devuelta por: <b>{returnedBy}</b></span>
-                            {o.finalReviewedAt && <span>Fecha: <b>{new Date(o.finalReviewedAt).toLocaleDateString("es-MX")}</b></span>}
+                            <span>Returned by: <b>{returnedBy}</b></span>
+                            {o.finalReviewedAt && <span>Date: <b>{new Date(o.finalReviewedAt).toLocaleDateString("es-MX")}</b></span>}
                           </div>
                           {o.finalNotes && (
                             <div style={{ marginTop: 8, padding: "7px 12px", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 6, fontSize: 12, color: "#c2410c" }}>
-                              <b>Nota del admin:</b> {o.finalNotes}
+                              <b>Admin note:</b> {o.finalNotes}
                             </div>
                           )}
                         </div>
@@ -1376,14 +1371,14 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                   const typeLabel = { ACTUALIZACION: "Actualización", REVISION: "Revisión", CORRECCION: "Corrección" }[o.type] ?? o.type;
                   return (
                     <div key={o.id} style={{ background: "#fff", border: "1px solid #fca5a5", borderLeft: "4px solid #8b5cf6", borderRadius: 10, padding: "14px 18px", marginBottom: 10, position: "relative" }}>
-                      <button onClick={() => dismissItem(o.id)} title="Descartar" style={{ position: "absolute", top: 8, right: 10, background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 18, lineHeight: 1, padding: 2 }}>×</button>
+                      <button onClick={() => dismissItem(o.id)} title="Dismiss" style={{ position: "absolute", top: 8, right: 10, background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 18, lineHeight: 1, padding: 2 }}>×</button>
                       <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
                         {f && <FileIcon mimeType={f.mimeType} size={28} />}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
                             <span style={{ fontWeight: 700, fontSize: 14, color: "#1e293b" }}>{docName}</span>
                             <span style={{ background: "#ede9fe", color: "#6d28d9", borderRadius: 5, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>
-                              Solicitud saliente rechazada
+                              Outgoing request rejected
                             </span>
                             <span style={{ background: "#f1f5f9", color: "#475569", borderRadius: 5, padding: "1px 7px", fontSize: 11 }}>
                               {typeLabel}
@@ -1391,8 +1386,8 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                           </div>
                           <div style={{ display: "flex", gap: 12, fontSize: 12, color: "#64748b", flexWrap: "wrap" }}>
                             {f?.codigo && <span>Código: <b>{f.codigo}</b></span>}
-                            <span>Rechazado por: <b>{rejectedBy}</b></span>
-                            {o.finalReviewedAt && <span>Fecha: <b>{new Date(o.finalReviewedAt).toLocaleDateString("es-MX")}</b></span>}
+                            <span>Rejected by: <b>{rejectedBy}</b></span>
+                            {o.finalReviewedAt && <span>Date: <b>{new Date(o.finalReviewedAt).toLocaleDateString("es-MX")}</b></span>}
                           </div>
                           {o.finalNotes && (
                             <div style={{ marginTop: 8, padding: "7px 12px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6, fontSize: 12, color: "#dc2626" }}>
@@ -1429,9 +1424,9 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
           return (
             <section style={{ marginTop: 48 }}>
               <div style={{ marginBottom: 16 }}>
-                <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#1e293b" }}>Mis Solicitudes</h2>
+                <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#1e293b" }}>My Requests</h2>
                 <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94a3b8" }}>
-                  Solicitudes de eliminación y propuestas de revisión enviadas al admin
+                  Deletion requests and review proposals submitted to the admin
                 </p>
               </div>
               {mySolicitudes.map((cr) => {
@@ -1453,18 +1448,18 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                         </div>
                         <div style={{ display: "flex", gap: 14, fontSize: 12, color: "#64748b", flexWrap: "wrap" }}>
                           {cr.file?.codigo && <span>Código: <b>{cr.file.codigo}</b></span>}
-                          <span>Enviada: <b>{new Date(cr.createdAt).toLocaleDateString("es-MX")}</b></span>
-                          {cr.reviewedAt && <span>Revisada: <b>{new Date(cr.reviewedAt).toLocaleDateString("es-MX")}</b></span>}
+                          <span>Sent: <b>{new Date(cr.createdAt).toLocaleDateString("es-MX")}</b></span>
+                          {cr.reviewedAt && <span>Reviewed: <b>{new Date(cr.reviewedAt).toLocaleDateString("es-MX")}</b></span>}
                         </div>
                         {cr.status === "APPROVED" && (
                           <div style={{ marginTop: 8, padding: "7px 12px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 6, fontSize: 12, color: "#166534" }}>
-                            {cr.type === "DELETE" ? "El documento fue eliminado." : "Aprobada — el admin iniciará el proceso de cambio."}
+                            {cr.type === "DELETE" ? "The document was deleted." : "Approved — the admin will initiate the change process."}
                             {cr.adminNotes && <span> <b>Nota:</b> {cr.adminNotes}</span>}
                           </div>
                         )}
                         {cr.status === "REJECTED" && cr.adminNotes && (
                           <div style={{ marginTop: 8, padding: "7px 12px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6, fontSize: 12, color: "#dc2626" }}>
-                            <b>Rechazada — Motivo:</b> {cr.adminNotes}
+                            <b>Rejected — Reason:</b> {cr.adminNotes}
                           </div>
                         )}
                       </div>
@@ -1486,7 +1481,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
           <div className="modal-box" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#1e293b" }}>
-                Responder solicitud — {outModal.outgoingRequest.type === "ACTUALIZACION" ? "Actualización" : outModal.outgoingRequest.type === "REVISION" ? "Revisión" : "Corrección"}
+                Respond to request — {outModal.outgoingRequest.type === "ACTUALIZACION" ? t("types.ACTUALIZACION") : outModal.outgoingRequest.type === "REVISION" ? t("types.REVISION") : t("types.CORRECCION")}
               </h3>
               {!outSubmitting && (
                 <button onClick={() => setOutModal(null)} style={{ background: "#f1f5f9", border: "none", borderRadius: 6, padding: "4px 8px", cursor: "pointer", color: "#64748b" }}><X size={14} /></button>
@@ -1495,37 +1490,37 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
 
             <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13 }}>
               <b>{outModal.docName}</b>
-              {outModal.currentVersion && <span style={{ color: "#94a3b8", marginLeft: 8 }}>Versión actual: {outModal.currentVersion}</span>}
+              {outModal.currentVersion && <span style={{ color: "#94a3b8", marginLeft: 8 }}>Current version: {outModal.currentVersion}</span>}
             </div>
 
             {outModal.outgoingRequest.instructions && (
               <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#1e40af" }}>
-                <b>Instrucciones:</b> {outModal.outgoingRequest.instructions}
+                <b>Instructions:</b> {outModal.outgoingRequest.instructions}
               </div>
             )}
 
             {/* Step 2: show step 1 result */}
             {outModal.outgoingRequest.totalSteps === 2 && outModal.outgoingRequest.step1OutcomeType && (
               <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#166534" }}>
-                <b>Resultado del paso anterior:</b>{" "}
-                {outModal.outgoingRequest.step1OutcomeType === "no_changes" ? "Sin cambios necesarios"
-                  : outModal.outgoingRequest.step1OutcomeType === "new_version" ? `Nueva versión (${outModal.outgoingRequest.step1VersionStr ?? "—"})`
-                  : "Corrección aplicada"}
+                <b>Previous step result:</b>{" "}
+                {outModal.outgoingRequest.step1OutcomeType === "no_changes" ? "No changes needed"
+                  : outModal.outgoingRequest.step1OutcomeType === "new_version" ? `New version (${outModal.outgoingRequest.step1VersionStr ?? "—"})`
+                  : "Correction applied"}
               </div>
             )}
 
             {/* Outcome selection */}
             {outModal.outgoingRequest.type === "REVISION" && (
               <div style={{ marginBottom: 16 }}>
-                <label style={ls}>Resultado de la revisión</label>
+                <label style={ls}>Review result</label>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, cursor: "pointer" }}>
                     <input type="radio" name="outcome" checked={outOutcome === "no_changes"} onChange={() => setOutOutcome("no_changes")} />
-                    El documento está correcto, no requiere cambios
+                    Document is correct, no changes needed
                   </label>
                   <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, cursor: "pointer" }}>
                     <input type="radio" name="outcome" checked={outOutcome === "new_version"} onChange={() => setOutOutcome("new_version")} />
-                    Se requieren cambios — subir nueva versión
+                    Changes needed — upload new version
                   </label>
                 </div>
               </div>
@@ -1549,7 +1544,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
             {/* Version label */}
             {(outOutcome === "new_version" || outModal.outgoingRequest.type === "ACTUALIZACION") && (
               <div style={{ marginBottom: 16 }}>
-                <label style={ls}>Etiqueta de versión (ej. v1.2)</label>
+                <label style={ls}>Version label (e.g. v1.2)</label>
                 <input
                   style={inputS}
                   value={outVersionStr}
@@ -1564,14 +1559,14 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
               <>
                 {outModal.outgoingRequest.correctionFields?.nombre && (
                   <div style={{ marginBottom: 12 }}>
-                    <label style={ls}>Nombre del documento corregido</label>
-                    <input style={inputS} value={outNombreDoc} onChange={(e) => setOutNombreDoc(e.target.value)} placeholder="Nuevo nombre del documento" />
+                    <label style={ls}>Corrected document name</label>
+                    <input style={inputS} value={outNombreDoc} onChange={(e) => setOutNombreDoc(e.target.value)} placeholder="New document name" />
                   </div>
                 )}
                 {outModal.outgoingRequest.correctionFields?.area && (
                   <div style={{ marginBottom: 12 }}>
-                    <label style={ls}>Área / departamento</label>
-                    <input style={inputS} value={outDepartamento} onChange={(e) => setOutDepartamento(e.target.value)} placeholder="Área o departamento" />
+                    <label style={ls}>Area / department</label>
+                    <input style={inputS} value={outDepartamento} onChange={(e) => setOutDepartamento(e.target.value)} placeholder="Area or department" />
                   </div>
                 )}
               </>
@@ -1585,10 +1580,10 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                 disabled={outSubmitting}
                 style={{ flex: 1, background: "#d97706", color: "#fff", border: "none", padding: "11px", borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: "pointer", opacity: outSubmitting ? 0.7 : 1 }}
               >
-                {outSubmitting ? "Enviando…" : "Enviar respuesta"}
+                {outSubmitting ? "Sending…" : "Send response"}
               </button>
               <button onClick={() => !outSubmitting && setOutModal(null)} disabled={outSubmitting} style={{ background: "#f1f5f9", color: "#64748b", border: "none", padding: "11px 16px", borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
-                Cancelar
+                {tc("cancel")}
               </button>
             </div>
           </div>
@@ -1601,7 +1596,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: chainModal.action === "APPROVE" ? "#166534" : chainModal.action === "REJECT" ? "#dc2626" : "#d97706" }}>
-                {chainModal.action === "APPROVE" ? "Aprobar revisión" : chainModal.action === "REJECT" ? "Rechazar documento" : "Devolver al revisor anterior"}
+                {chainModal.action === "APPROVE" ? t("chainModal.approve") : chainModal.action === "REJECT" ? t("chainModal.reject") : t("chainModal.return")}
               </h3>
               {!chainWorking && (
                 <button onClick={() => setChainModal(null)} style={{ background: "#f1f5f9", border: "none", borderRadius: 6, padding: "4px 8px", cursor: "pointer", display: "flex", alignItems: "center", color: "#64748b" }}><X size={14} /></button>
@@ -1609,42 +1604,42 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
             </div>
 
             <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#374151", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-              <span><b>{chainModal.docName}</b> — Paso {chainModal.stepOrder}</span>
+              <span><b>{chainModal.docName}</b> — Step {chainModal.stepOrder}</span>
               <button
                 onClick={() => openPreview({ id: chainModal.fileId, name: chainModal.fileName, mimeType: chainModal.mimeType })}
                 disabled={!!openingDoc}
                 style={{ background: "#e0f2fe", color: "#0369a1", border: "none", borderRadius: 6, padding: "4px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap" }}
               >
-                Ver documento
+                {t("actions.viewDoc")}
               </button>
             </div>
 
             {chainModal.action === "APPROVE" && (
               <p style={{ fontSize: 13, color: "#64748b", margin: "0 0 16px" }}>
                 {chainModal.stepOrder === (tasksToShow.find(t => t.id === chainModal.taskId)?.chainTotalSteps ?? 1)
-                  ? "Eres el último revisor. Al aprobar, el documento pasará a aprobación final del administrador."
-                  : "Al aprobar, el documento avanza al siguiente revisor en la cadena."}
+                  ? t("chainModal.lastReviewer")
+                  : t("chainModal.nextReviewer")}
               </p>
             )}
             {chainModal.action === "RETURN_TO_PREVIOUS" && (
               <p style={{ fontSize: 13, color: "#92400e", margin: "0 0 12px" }}>
-                El revisor anterior recibirá el documento de vuelta con tu nota.
+                {t("chainModal.returnNote")}
               </p>
             )}
             {chainModal.action === "REJECT" && (
               <p style={{ fontSize: 13, color: "#dc2626", margin: "0 0 12px" }}>
-                El documento volverá al estado Borrador y se notificará al creador. Esta acción termina la cadena de revisión.
+                {t("chainModal.rejectNote")}
               </p>
             )}
 
             {(chainModal.action === "RETURN_TO_PREVIOUS" || chainModal.action === "REJECT") && (
               <div style={{ marginBottom: 16 }}>
-                <label style={{ ...ls, textTransform: "none" }}>Nota <span style={{ color: "#dc2626" }}>*</span></label>
+                <label style={{ ...ls, textTransform: "none" }}>{t("chainModal.noteLabel")} <span style={{ color: "#dc2626" }}>*</span></label>
                 <textarea
                   style={{ ...inputS, height: 90, resize: "vertical" }}
                   value={chainNotes}
                   onChange={(e) => setChainNotes(e.target.value)}
-                  placeholder={chainModal.action === "REJECT" ? "Explica por qué se rechaza el documento…" : "Indica qué debe corregir el revisor anterior…"}
+                  placeholder={chainModal.action === "REJECT" ? t("chainModal.rejectPlaceholder") : t("chainModal.returnPlaceholder")}
                   autoFocus
                 />
               </div>
@@ -1652,12 +1647,12 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
 
             {chainModal.action === "APPROVE" && (
               <div style={{ marginBottom: 16 }}>
-                <label style={{ ...ls, textTransform: "none" }}>Comentario <span style={{ color: "#94a3b8", fontWeight: 400 }}>(opcional)</span></label>
+                <label style={{ ...ls, textTransform: "none" }}>{t("chainModal.commentLabel")} <span style={{ color: "#94a3b8", fontWeight: 400 }}>{t("chainModal.commentOptional")}</span></label>
                 <textarea
                   style={{ ...inputS, height: 70, resize: "vertical" }}
                   value={chainNotes}
                   onChange={(e) => setChainNotes(e.target.value)}
-                  placeholder="Observaciones para el registro de auditoría…"
+                  placeholder={t("chainModal.commentPlaceholder")}
                 />
               </div>
             )}
@@ -1674,10 +1669,10 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                   color: "#fff", opacity: chainWorking ? 0.7 : 1,
                 }}
               >
-                {chainWorking ? "Procesando…" : chainModal.action === "APPROVE" ? "Confirmar aprobación" : chainModal.action === "REJECT" ? "Rechazar documento" : "Devolver al anterior"}
+                {chainWorking ? t("chainModal.processing") : chainModal.action === "APPROVE" ? t("chainModal.confirmApprove") : chainModal.action === "REJECT" ? t("chainModal.confirmReject") : t("chainModal.confirmReturn")}
               </button>
               <button onClick={() => !chainWorking && setChainModal(null)} disabled={chainWorking} style={{ background: "#f1f5f9", color: "#64748b", border: "none", padding: "11px 16px", borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
-                Cancelar
+                {tc("cancel")}
               </button>
             </div>
           </div>
@@ -1692,7 +1687,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0 }}>
               {officeDownloadUrl && (
                 <button onClick={() => window.open(officeDownloadUrl, "_blank")} style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>
-                  Descargar
+                  {tc("descargar")}
                 </button>
               )}
               <button onClick={() => { setOfficeViewerFile(null); setOfficeViewerSheets([]); setOfficeDownloadUrl(null); }} style={{ background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", padding: "5px 10px", borderRadius: 6, cursor: "pointer", display: "flex" }}>
@@ -1711,7 +1706,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
           )}
           <div style={{ flex: 1, overflow: "auto", background: "#f8fafc" }}>
             {officeViewerLoading ? (
-              <div style={{ height: "100%", display: "grid", placeItems: "center", color: "#475569", fontSize: 14 }}>Cargando documento…</div>
+              <div style={{ height: "100%", display: "grid", placeItems: "center", color: "#475569", fontSize: 14 }}>{tc("loading")}</div>
             ) : officeViewerSheets.length > 0 ? (
               <div style={{ padding: isWord(officeViewerFile.mimeType) ? "32px 60px" : "16px 20px", maxWidth: isWord(officeViewerFile.mimeType) ? 860 : undefined, margin: "0 auto", background: "#fff", minHeight: "100%" }}>
                 <style>{`
@@ -1731,8 +1726,8 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
               </div>
             ) : (
               <div style={{ padding: "60px 40px", textAlign: "center", color: "#475569" }}>
-                <p style={{ margin: "0 0 8px", fontWeight: 600 }}>No se puede previsualizar</p>
-                {officeDownloadUrl && <button onClick={() => window.open(officeDownloadUrl, "_blank")} style={{ background: p, color: "#fff", border: "none", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 14 }}>Descargar</button>}
+                <p style={{ margin: "0 0 8px", fontWeight: 600 }}>Cannot preview</p>
+                {officeDownloadUrl && <button onClick={() => window.open(officeDownloadUrl, "_blank")} style={{ background: p, color: "#fff", border: "none", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 14 }}>{tc("descargar")}</button>}
               </div>
             )}
           </div>
@@ -1750,11 +1745,11 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
           </div>
           <div style={{ flex: 1, overflow: "hidden" }}>
             {pdfLoading ? (
-              <div style={{ height: "100%", display: "grid", placeItems: "center", color: "#fff" }}>Cargando PDF…</div>
+              <div style={{ height: "100%", display: "grid", placeItems: "center", color: "#fff" }}>{tc("loading")}</div>
             ) : pdfViewerUrl ? (
               <iframe src={pdfViewerUrl} style={{ width: "100%", height: "100%", border: "none" }} title={pdfViewerFile.name} />
             ) : (
-              <div style={{ height: "100%", display: "grid", placeItems: "center", color: "#94a3b8" }}>No se pudo cargar el PDF.</div>
+              <div style={{ height: "100%", display: "grid", placeItems: "center", color: "#94a3b8" }}>Could not load PDF.</div>
             )}
           </div>
         </div>
@@ -1765,21 +1760,21 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
         <div className="modal-backdrop" onClick={() => setShowAssign(false)}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#1e293b" }}>Asignar tarea</h3>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#1e293b" }}>Assign task</h3>
               <button onClick={() => setShowAssign(false)} style={{ background: "#f1f5f9", border: "none", borderRadius: 6, padding: "4px 8px", cursor: "pointer", display: "flex", alignItems: "center", color: "#64748b" }}><X size={14} /></button>
             </div>
 
             {assignForm.docName && (
               <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, padding: "8px 12px", marginBottom: 16, fontSize: 13, color: "#0369a1" }}>
-                Documento: <b>{assignForm.docName}</b>
+                Document: <b>{assignForm.docName}</b>
               </div>
             )}
 
             {!assignForm.fileId && (
               <div style={{ marginBottom: 14 }}>
-                <label style={ls}>Documento (ID)</label>
+                <label style={ls}>Document (ID)</label>
                 <input
-                  style={inputS} placeholder="Pega el ID del documento o usa los botones de la lista"
+                  style={inputS} placeholder="Paste the document ID or use the list buttons"
                   value={assignForm.fileId}
                   onChange={(e) => setAssignForm((f) => ({ ...f, fileId: e.target.value }))}
                 />
@@ -1787,15 +1782,15 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
             )}
 
             <div style={{ marginBottom: 14 }}>
-              <label style={ls}>Asignar a</label>
+              <label style={ls}>Assign to</label>
               <select style={inputS} value={assignForm.assignedToUserId} onChange={(e) => setAssignForm((f) => ({ ...f, assignedToUserId: e.target.value }))}>
-                <option value="">Selecciona un usuario…</option>
+                <option value="">Select a user…</option>
                 {companyUsers.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.email})</option>)}
               </select>
             </div>
 
             <div style={{ marginBottom: 14 }}>
-              <label style={ls}>Tipo de tarea</label>
+              <label style={ls}>Task type</label>
               <select style={inputS} value={assignForm.type} onChange={(e) => setAssignForm((f) => ({ ...f, type: e.target.value as TaskType }))}>
                 {(["REVIEW","UPDATE","APPROVE","OTHER"] as TaskType[]).map((t) => (
                   <option key={t} value={t}>{TASK_TYPE_LABELS[t]}</option>
@@ -1804,17 +1799,17 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
             </div>
 
             <div style={{ marginBottom: 14 }}>
-              <label style={ls}>Fecha límite <span style={{ color: "#94a3b8", fontWeight: 400 }}>(opcional)</span></label>
+              <label style={ls}>Deadline <span style={{ color: "#94a3b8", fontWeight: 400 }}>(optional)</span></label>
               <input type="date" style={inputS} value={assignForm.dueDate} onChange={(e) => setAssignForm((f) => ({ ...f, dueDate: e.target.value }))} />
             </div>
 
             <div style={{ marginBottom: 16 }}>
-              <label style={ls}>Notas / instrucciones <span style={{ color: "#94a3b8", fontWeight: 400 }}>(opcional)</span></label>
+              <label style={ls}>Notes / instructions <span style={{ color: "#94a3b8", fontWeight: 400 }}>(optional)</span></label>
               <textarea
                 style={{ ...inputS, height: 80, resize: "vertical" }}
                 value={assignForm.notes}
                 onChange={(e) => setAssignForm((f) => ({ ...f, notes: e.target.value }))}
-                placeholder="Instrucciones para el usuario asignado…"
+                placeholder="Instructions for the assigned user…"
               />
             </div>
 
@@ -1826,10 +1821,10 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                 style={{ marginTop: 2, width: 15, height: 15, flexShrink: 0, cursor: "pointer" }}
               />
               <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#1e293b" }}>Aprobar cambios automáticamente al completar</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#1e293b" }}>Auto-approve changes on completion</div>
                 <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
-                  Si está activo, al marcar la tarea como completada los cambios se aplican directamente.
-                  Si no, el usuario deberá enviar una solicitud de aprobación.
+                  If enabled, marking the task complete applies changes directly.
+                  Otherwise, the user must submit an approval request.
                 </div>
               </div>
             </label>
@@ -1842,10 +1837,10 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                 disabled={submittingAssign}
                 style={{ flex: 1, background: p, color: "#fff", border: "none", padding: "11px", borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: "pointer", opacity: submittingAssign ? 0.7 : 1 }}
               >
-                {submittingAssign ? "Asignando…" : "Asignar tarea"}
+                {submittingAssign ? "Assigning…" : "Assign task"}
               </button>
               <button onClick={() => setShowAssign(false)} style={{ background: "#f1f5f9", color: "#64748b", border: "none", padding: "11px 16px", borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
-                Cancelar
+                {tc("cancel")}
               </button>
             </div>
           </div>
@@ -1859,7 +1854,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
           <div style={{ background: "#fff", borderRadius: 12, padding: 28, width: "100%", maxWidth: 520, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#1e293b" }}>Corregir y reenviar</h3>
+                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#1e293b" }}>Correct and resubmit</h3>
                 <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b" }}>{correctModal.docName}</p>
               </div>
               {!correctSubmitting && (
@@ -1869,7 +1864,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
 
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#475569", marginBottom: 6 }}>
-                Cambio a realizar <span style={{ color: "#dc2626" }}>*</span>
+                Change to make <span style={{ color: "#dc2626" }}>*</span>
               </label>
               <textarea
                 rows={4}
@@ -1885,7 +1880,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
             {(correctModal.type === "ACTUALIZACION" || correctModal.type === "CORRECCION") && (
               <div style={{ marginBottom: 16 }}>
                 <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#475569", marginBottom: 6 }}>
-                  Archivo corregido <span style={{ fontSize: 11, fontWeight: 400, color: "#94a3b8" }}>(opcional — reemplaza el anterior)</span>
+                  Corrected file <span style={{ fontSize: 11, fontWeight: 400, color: "#94a3b8" }}>(optional — replaces the previous one)</span>
                 </label>
                 <div
                   onClick={() => !correctSubmitting && correctFileRef.current?.click()}
@@ -1909,7 +1904,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                       )}
                     </div>
                   ) : (
-                    <span style={{ fontSize: 12, color: "#94a3b8" }}>Haz clic para seleccionar un archivo</span>
+                    <span style={{ fontSize: 12, color: "#94a3b8" }}>Click to select a file</span>
                   )}
                 </div>
                 <input
@@ -1936,7 +1931,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                 <div style={{ height: 4, background: "#e2e8f0", borderRadius: 2, overflow: "hidden" }}>
                   <div style={{ height: "100%", width: `${correctProgress}%`, background: "#f97316", transition: "width 0.3s ease" }} />
                 </div>
-                <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 4, textAlign: "center" }}>Subiendo archivo…</p>
+                <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 4, textAlign: "center" }}>Uploading file…</p>
               </div>
             )}
 
@@ -1946,14 +1941,14 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
 
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               {!correctSubmitting && (
-                <button onClick={() => { setCorrectModal(null); setCorrectFile(null); setCorrectVersionStr(""); }} style={{ border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", padding: "9px 18px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancelar</button>
+                <button onClick={() => { setCorrectModal(null); setCorrectFile(null); setCorrectVersionStr(""); }} style={{ border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", padding: "9px 18px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>{tc("cancel")}</button>
               )}
               <button
                 onClick={submitCorrection}
                 disabled={correctSubmitting || !correctInstructions.trim()}
                 style={{ background: "#f97316", color: "#fff", border: "none", padding: "9px 22px", borderRadius: 8, cursor: correctSubmitting ? "default" : "pointer", fontSize: 13, fontWeight: 700, opacity: (correctSubmitting || !correctInstructions.trim()) ? 0.65 : 1 }}
               >
-                {correctSubmitting ? (correctFile ? "Subiendo…" : "Enviando…") : "Reenviar para aprobación"}
+                {correctSubmitting ? (correctFile ? "Uploading…" : "Sending…") : "Resubmit for approval"}
               </button>
             </div>
           </div>

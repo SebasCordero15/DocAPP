@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Trash2, CheckCircle, Search, X } from "lucide-react";
 import FileIcon from "@/components/FileIcon";
 
@@ -18,6 +19,8 @@ interface Props {
 export default function EliminarDocumentoClient({ company }: Props) {
   const p = company.primaryColor;
   const router = useRouter();
+  const t  = useTranslations("eliminar");
+  const tc = useTranslations("common");
 
   const [docs,        setDocs]        = useState<DocOption[]>([]);
   const [loading,     setLoading]     = useState(true);
@@ -42,7 +45,7 @@ export default function EliminarDocumentoClient({ company }: Props) {
   });
 
   async function submit() {
-    if (!selected) { setError("Selecciona un documento"); return; }
+    if (!selected) { setError(t("step1")); return; }
     setSubmitting(true); setError(null);
     const res = await fetch(`/api/files/${selected.id}`, { method: "DELETE" });
     const data = await res.json().catch(() => ({}));
@@ -52,9 +55,9 @@ export default function EliminarDocumentoClient({ company }: Props) {
     } else if (res.ok) {
       setSuccess(true);
     } else if (res.status === 403) {
-      setError("No tienes permisos para solicitar la eliminación de este documento. Se requiere permiso de edición.");
+      setError(t("noPermission"));
     } else {
-      setError(data.error ?? "Error al enviar la solicitud");
+      setError(data.error ?? t("step1"));
     }
   }
 
@@ -74,10 +77,10 @@ export default function EliminarDocumentoClient({ company }: Props) {
       <div style={{ background: p, color: "#fff", padding: "20px 32px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <Trash2 size={20} />
-          <strong style={{ fontSize: 17 }}>Solicitar Eliminación de Documento</strong>
+          <strong style={{ fontSize: 17 }}>{t("header")}</strong>
         </div>
         <p style={{ margin: "4px 0 0", fontSize: 13, opacity: 0.8 }}>
-          El administrador revisará tu solicitud antes de eliminar el documento.
+          {t("headerDesc")}
         </p>
       </div>
 
@@ -87,17 +90,17 @@ export default function EliminarDocumentoClient({ company }: Props) {
           <div style={{ textAlign: "center", padding: "60px 0" }}>
             <CheckCircle size={56} color="#22c55e" style={{ marginBottom: 16 }} />
             <div style={{ fontSize: 20, fontWeight: 700, color: "#1e293b", marginBottom: 8 }}>
-              Solicitud enviada
+              {t("successTitle")}
             </div>
             <p style={{ fontSize: 14, color: "#64748b", marginBottom: 28 }}>
-              El administrador revisará tu solicitud. Te notificaremos cuando sea procesada.
+              {t("successMsg")}
             </p>
             <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
               <button className="btn" onClick={() => { setSuccess(false); setSelected(null); setMotivo(""); }} style={{ background: "#f1f5f9", color: "#475569" }}>
-                Nueva solicitud
+                {t("newRequest")}
               </button>
               <button className="btn" onClick={() => router.push("/dashboard/pendientes")} style={{ background: p, color: "#fff" }}>
-                Ver en Pendientes
+                {t("viewPendientes")}
               </button>
             </div>
           </div>
@@ -106,7 +109,7 @@ export default function EliminarDocumentoClient({ company }: Props) {
             {/* Step 1: Select document */}
             <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "24px", marginBottom: 20 }}>
               <h3 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 700, color: "#1e293b" }}>
-                1. Selecciona el documento
+                {t("step1")}
               </h3>
 
               {selected ? (
@@ -132,16 +135,16 @@ export default function EliminarDocumentoClient({ company }: Props) {
                       className="form-input"
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
-                      placeholder="Buscar por nombre o código…"
+                      placeholder={t("searchPlaceholder")}
                       style={{ paddingLeft: 36 }}
                     />
                   </div>
                   <div style={{ border: "1px solid #e2e8f0", borderRadius: 9, overflow: "hidden", maxHeight: 280, overflowY: "auto" }}>
                     {loading ? (
-                      <div style={{ padding: "24px", textAlign: "center", color: "#94a3b8", fontSize: 13 }}>Cargando documentos…</div>
+                      <div style={{ padding: "24px", textAlign: "center", color: "#94a3b8", fontSize: 13 }}>{tc("loading")}</div>
                     ) : filtered.length === 0 ? (
                       <div style={{ padding: "24px", textAlign: "center", color: "#94a3b8", fontSize: 13 }}>
-                        {docs.length === 0 ? "No tienes documentos asignados" : "Sin resultados"}
+                        {docs.length === 0 ? t("emptyDocs") : t("emptySearch")}
                       </div>
                     ) : filtered.map((doc) => (
                       <div
@@ -170,14 +173,14 @@ export default function EliminarDocumentoClient({ company }: Props) {
             {selected && (
               <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "24px", marginBottom: 20 }}>
                 <h3 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 700, color: "#1e293b" }}>
-                  2. Motivo (opcional)
+                  {t("step2")}
                 </h3>
                 <textarea
                   className="form-input"
                   rows={4}
                   value={motivo}
                   onChange={(e) => setMotivo(e.target.value)}
-                  placeholder="¿Por qué deseas eliminar este documento?"
+                  placeholder={t("reasonPlaceholder")}
                   style={{ resize: "vertical" }}
                 />
               </div>
@@ -186,7 +189,7 @@ export default function EliminarDocumentoClient({ company }: Props) {
             {/* Warning */}
             {selected && (
               <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 10, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#92400e" }}>
-                El administrador deberá aprobar esta solicitud. Si es aprobada, el documento será eliminado permanentemente.
+                {t("warning")}
               </div>
             )}
 
@@ -198,7 +201,7 @@ export default function EliminarDocumentoClient({ company }: Props) {
 
             <div style={{ display: "flex", gap: 10 }}>
               <button className="btn" onClick={() => router.push("/dashboard")} style={{ background: "#f1f5f9", color: "#475569" }}>
-                Cancelar
+                {tc("cancel")}
               </button>
               <button
                 className="btn"
@@ -206,7 +209,7 @@ export default function EliminarDocumentoClient({ company }: Props) {
                 onClick={submit}
                 style={{ background: "#dc2626", color: "#fff" }}
               >
-                {submitting ? "Enviando…" : <><Trash2 size={14} style={{ marginRight: 6 }} />Enviar solicitud de eliminación</>}
+                {submitting ? t("submitting") : <><Trash2 size={14} style={{ marginRight: 6 }} />{t("submitBtn")}</>}
               </button>
             </div>
           </>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import * as XLSX from "xlsx";
 import FileIcon from "@/components/FileIcon";
 
@@ -88,8 +89,29 @@ const EMPTY_FORM: EditForm = {
 
 export default function ListadoMaestroClient({ company, userRole }: Props) {
   const router = useRouter();
+  const t  = useTranslations("listadoMaestro");
+  const tc = useTranslations("common");
   const brand = company.primaryColor;
   const canEdit = userRole === "COMPANY_ADMIN" || userRole === "EDITOR";
+
+  const STATUS_LABELS: Record<string, string> = {
+    PENDING:          t("statusLabels.PENDING"),
+    IN_PROGRESS:      t("statusLabels.IN_PROGRESS"),
+    PENDING_APPROVAL: t("statusLabels.PENDING_APPROVAL"),
+    APPROVED:         t("statusLabels.APPROVED"),
+    REJECTED:         t("statusLabels.REJECTED"),
+    CANCELLED:        t("statusLabels.CANCELLED"),
+  };
+  const TYPE_LABELS: Record<string, string> = {
+    ACTUALIZACION: t("typeLabels.ACTUALIZACION"),
+    REVISION:      t("typeLabels.REVISION"),
+    CORRECCION:    t("typeLabels.CORRECCION"),
+  };
+  const OUTCOME_LABELS: Record<string, string> = {
+    no_changes: t("outcomeLabels.no_changes"),
+    new_version: t("outcomeLabels.new_version"),
+    corrected:   t("outcomeLabels.corrected"),
+  };
 
   // ── data ──────────────────────────────────────────────────────────────────
   const [files, setFiles] = useState<LMFile[]>([]);
@@ -262,20 +284,20 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
 
   function exportExcel() {
     const rows = sorted.map((f) => ({
-      "Código":                  f.codigo ?? "",
-      "Nombre del documento":    f.nombreDocumento ?? f.name,
-      "Versión":                 f.versionStr ?? "",
-      "Fecha de emisión":        fmtDate(f.fechaEmision),
-      "Fecha de revisión":       fmtDate(f.fechaRevision),
-      "Fecha de actualización":  fmtDate(f.fechaActualizacion),
-      "Control de cambios":      f.controlCambios ?? "",
-      "Encargado de documento":  f.encargadoDocumento?.name ?? "",
-      "Carpeta":                 f.folder?.name ?? "Raíz",
-      "Archivo":                 f.name,
+      [t("excelColumns.codigo")]:         f.codigo ?? "",
+      [t("excelColumns.nombre")]:         f.nombreDocumento ?? f.name,
+      [t("excelColumns.version")]:        f.versionStr ?? "",
+      [t("excelColumns.fechaEmision")]:   fmtDate(f.fechaEmision),
+      [t("excelColumns.fechaRevision")]:  fmtDate(f.fechaRevision),
+      [t("excelColumns.fechaActualizacion")]: fmtDate(f.fechaActualizacion),
+      [t("excelColumns.controlCambios")]: f.controlCambios ?? "",
+      [t("excelColumns.encargado")]:      f.encargadoDocumento?.name ?? "",
+      [t("excelColumns.carpeta")]:        f.folder?.name ?? tc("carpeta"),
+      [t("excelColumns.archivo")]:        f.name,
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Listado Maestro");
+    XLSX.utils.book_append_sheet(wb, ws, t("header"));
     XLSX.writeFile(wb, `listado-maestro-${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
 
@@ -316,7 +338,7 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
 
       {/* Section header */}
       <div style={{ background: brand, color: "#fff", padding: "12px 28px", position: "sticky", top: 0, zIndex: 10 }}>
-        <strong style={{ fontSize: 16 }}>Listado Maestro</strong>
+        <strong style={{ fontSize: 16 }}>{t("header")}</strong>
       </div>
 
       <div style={{ maxWidth: 1400, margin: "0 auto", padding: "28px 28px" }}>
@@ -324,58 +346,58 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
         {/* ── Filters ── */}
         <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "20px 24px", marginBottom: 20 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-            <strong style={{ fontSize: 13, color: "#374151" }}>Filtros</strong>
+            <strong style={{ fontSize: 13, color: "#374151" }}>{t("filters")}</strong>
             <div style={{ display: "flex", gap: 10 }}>
               {hasFilters && (
-                <button onClick={clearFilters} style={{ ...ghostBtn, fontSize: 12 }}>Limpiar filtros</button>
+                <button onClick={clearFilters} style={{ ...ghostBtn, fontSize: 12 }}>{t("clearFilters")}</button>
               )}
               <button onClick={exportExcel} style={{ background: "#16a34a", color: "#fff", border: "none", padding: "6px 16px", borderRadius: 7, cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
-                ↓ Exportar Excel
+                ↓ {t("exportExcel")}
               </button>
             </div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
             <div>
-              <label style={lbl}>Código</label>
-              <input value={fCodigo} onChange={(e) => setFCodigo(e.target.value)} placeholder="Buscar código…" style={inp} />
+              <label style={lbl}>{tc("codigo")}</label>
+              <input value={fCodigo} onChange={(e) => setFCodigo(e.target.value)} placeholder={t("filterPlaceholders.codigo")} style={inp} />
             </div>
             <div>
-              <label style={lbl}>Nombre del documento</label>
-              <input value={fNombre} onChange={(e) => setFNombre(e.target.value)} placeholder="Buscar nombre…" style={inp} />
+              <label style={lbl}>{t("filterLabels.nombre")}</label>
+              <input value={fNombre} onChange={(e) => setFNombre(e.target.value)} placeholder={t("filterPlaceholders.nombre")} style={inp} />
             </div>
             <div>
-              <label style={lbl}>Versión</label>
-              <input value={fVersion} onChange={(e) => setFVersion(e.target.value)} placeholder="v1.0…" style={inp} />
+              <label style={lbl}>{tc("version")}</label>
+              <input value={fVersion} onChange={(e) => setFVersion(e.target.value)} placeholder={t("filterPlaceholders.version")} style={inp} />
             </div>
             <div>
-              <label style={lbl}>Encargado</label>
+              <label style={lbl}>{t("filterLabels.encargado")}</label>
               <select value={fEncargado} onChange={(e) => setFEncargado(e.target.value)} style={inp}>
-                <option value="">Todos</option>
+                <option value="">{t("filterLabels.todos")}</option>
                 {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
             </div>
             <div>
-              <label style={lbl}>Emisión desde</label>
+              <label style={lbl}>{t("filterLabels.emisionFrom")}</label>
               <input type="date" value={fEmisionFrom} onChange={(e) => setFEmisionFrom(e.target.value)} style={inp} />
             </div>
             <div>
-              <label style={lbl}>Emisión hasta</label>
+              <label style={lbl}>{t("filterLabels.emisionTo")}</label>
               <input type="date" value={fEmisionTo} onChange={(e) => setFEmisionTo(e.target.value)} style={inp} />
             </div>
             <div>
-              <label style={lbl}>Revisión desde</label>
+              <label style={lbl}>{t("filterLabels.revisionFrom")}</label>
               <input type="date" value={fRevisionFrom} onChange={(e) => setFRevisionFrom(e.target.value)} style={inp} />
             </div>
             <div>
-              <label style={lbl}>Revisión hasta</label>
+              <label style={lbl}>{t("filterLabels.revisionTo")}</label>
               <input type="date" value={fRevisionTo} onChange={(e) => setFRevisionTo(e.target.value)} style={inp} />
             </div>
             <div>
-              <label style={lbl}>Actualización desde</label>
+              <label style={lbl}>{t("filterLabels.actFrom")}</label>
               <input type="date" value={fActFrom} onChange={(e) => setFActFrom(e.target.value)} style={inp} />
             </div>
             <div>
-              <label style={lbl}>Actualización hasta</label>
+              <label style={lbl}>{t("filterLabels.actTo")}</label>
               <input type="date" value={fActTo} onChange={(e) => setFActTo(e.target.value)} style={inp} />
             </div>
           </div>
@@ -385,31 +407,31 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
         <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
           <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span style={{ fontSize: 13, color: "#64748b" }}>
-              {loading ? "Cargando…" : `${sorted.length} documento${sorted.length !== 1 ? "s" : ""}`}
+              {loading ? t("loadingDocs") : t("docCount", { count: sorted.length })}
             </span>
           </div>
 
           {loading ? (
-            <div style={{ padding: "48px", textAlign: "center", color: "#94a3b8" }}>Cargando…</div>
+            <div style={{ padding: "48px", textAlign: "center", color: "#94a3b8" }}>{t("loadingDocs")}</div>
           ) : sorted.length === 0 ? (
             <div style={{ padding: "48px", textAlign: "center", color: "#94a3b8" }}>
-              <p style={{ margin: 0, fontSize: 15 }}>No se encontraron documentos.</p>
-              {hasFilters && <p style={{ margin: "8px 0 0", fontSize: 13 }}>Prueba ajustando los filtros.</p>}
+              <p style={{ margin: 0, fontSize: 15 }}>{t("emptyDocs")}</p>
+              {hasFilters && <p style={{ margin: "8px 0 0", fontSize: 13 }}>{t("emptyFiltersHint")}</p>}
             </div>
           ) : (
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: "2px solid #e2e8f0", background: "#f8fafc" }}>
-                    <SortTh label="Código" k="codigo" />
-                    <SortTh label="Nombre del documento" k="nombre" />
-                    <SortTh label="Versión" k="version" />
-                    <SortTh label="Fecha de emisión" k="fechaEmision" />
-                    <SortTh label="Fecha de revisión" k="fechaRevision" />
-                    <SortTh label="Fecha de actualización" k="fechaActualizacion" />
-                    <th style={th}>Control de cambios</th>
-                    <SortTh label="Encargado" k="encargado" />
-                    <th style={th}>Acciones</th>
+                    <SortTh label={tc("codigo")} k="codigo" />
+                    <SortTh label={t("tableHeaders.nombre")} k="nombre" />
+                    <SortTh label={tc("version")} k="version" />
+                    <SortTh label={t("tableHeaders.fechaEmision")} k="fechaEmision" />
+                    <SortTh label={t("tableHeaders.fechaRevision")} k="fechaRevision" />
+                    <SortTh label={t("tableHeaders.fechaActualizacion")} k="fechaActualizacion" />
+                    <th style={th}>{t("tableHeaders.controlCambios")}</th>
+                    <SortTh label={t("tableHeaders.encargado")} k="encargado" />
+                    <th style={th}>{t("tableHeaders.acciones")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -435,17 +457,17 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
                           {f.folder && <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>{f.folder.name}</div>}
                           {f.lastReviewedAt && (
                             <div style={{ fontSize: 10, color: "#7c3aed", marginTop: 2 }}>
-                              Última rev.: {fmtDate(f.lastReviewedAt)}
+                              {t("rowLabels.lastReview")} {fmtDate(f.lastReviewedAt)}
                             </div>
                           )}
                           {f.lastAccessedAt && (
                             <div style={{ fontSize: 10, color: "#0891b2", marginTop: 1 }}>
-                              Último acceso: {fmtDate(f.lastAccessedAt)}{f.lastAccessedBy ? ` · ${f.lastAccessedBy.name}` : ""}
+                              {t("rowLabels.lastAccess")} {fmtDate(f.lastAccessedAt)}{f.lastAccessedBy ? ` · ${f.lastAccessedBy.name}` : ""}
                             </div>
                           )}
                           {f.lastEditedAt && (
                             <div style={{ fontSize: 10, color: "#d97706", marginTop: 1 }}>
-                              Último editor: {f.lastEditedBy?.name ?? "—"} · {fmtDate(f.lastEditedAt)}
+                              {t("rowLabels.lastEditor")} {f.lastEditedBy?.name ?? "—"} · {fmtDate(f.lastEditedAt)}
                             </div>
                           )}
                         </td>
@@ -467,14 +489,14 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
                         </td>
                         <td style={td}>
                           <div style={{ display: "flex", gap: 6, flexWrap: "nowrap" }}>
-                            <button onClick={() => downloadFile(f.id)} style={{ ...ghostBtn, fontSize: 11, padding: "3px 8px" }}>↓ Ver</button>
-                            <button onClick={() => openFlowModal(f)} style={{ ...ghostBtn, fontSize: 11, padding: "3px 8px", color: "#5b21b6" }}>Flujo</button>
+                            <button onClick={() => downloadFile(f.id)} style={{ ...ghostBtn, fontSize: 11, padding: "3px 8px" }}>{t("actions.view")}</button>
+                            <button onClick={() => openFlowModal(f)} style={{ ...ghostBtn, fontSize: 11, padding: "3px 8px", color: "#5b21b6" }}>{t("actions.flow")}</button>
                             {canEdit && (
                               <button
                                 onClick={() => editingId === f.id ? setEditingId(null) : startEdit(f)}
                                 style={{ ...ghostBtn, fontSize: 11, padding: "3px 8px", color: editingId === f.id ? "#dc2626" : "#374151" }}
                               >
-                                {editingId === f.id ? "Cancelar" : "Editar"}
+                                {editingId === f.id ? tc("cancel") : t("actions.edit")}
                               </button>
                             )}
                           </div>
@@ -487,44 +509,44 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
                           <td colSpan={9} style={{ padding: "16px 20px" }}>
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
                               <div>
-                                <label style={lbl}>Código</label>
+                                <label style={lbl}>{tc("codigo")}</label>
                                 <input value={editForm.codigo} onChange={(e) => setEditForm({ ...editForm, codigo: e.target.value })} style={inp} placeholder="DOC-001" />
                               </div>
                               <div>
-                                <label style={lbl}>Nombre del documento</label>
+                                <label style={lbl}>{t("filterLabels.nombre")}</label>
                                 <input value={editForm.nombreDocumento} onChange={(e) => setEditForm({ ...editForm, nombreDocumento: e.target.value })} style={inp} placeholder={f.name} />
                               </div>
                               <div>
-                                <label style={lbl}>Versión</label>
+                                <label style={lbl}>{tc("version")}</label>
                                 <input value={editForm.versionStr} onChange={(e) => setEditForm({ ...editForm, versionStr: e.target.value })} style={inp} placeholder="v1.0" />
                               </div>
                               <div>
-                                <label style={lbl}>Encargado</label>
+                                <label style={lbl}>{t("filterLabels.encargado")}</label>
                                 <select value={editForm.encargadoDocumentoId} onChange={(e) => setEditForm({ ...editForm, encargadoDocumentoId: e.target.value })} style={inp}>
-                                  <option value="">Sin asignar</option>
+                                  <option value="">{t("editLabels.sinAsignar")}</option>
                                   {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
                                 </select>
                               </div>
                               <div>
-                                <label style={lbl}>Fecha de emisión</label>
+                                <label style={lbl}>{t("tableHeaders.fechaEmision")}</label>
                                 <input type="date" value={editForm.fechaEmision} onChange={(e) => setEditForm({ ...editForm, fechaEmision: e.target.value })} style={inp} />
                               </div>
                               <div>
-                                <label style={lbl}>Fecha de revisión</label>
+                                <label style={lbl}>{t("tableHeaders.fechaRevision")}</label>
                                 <input type="date" value={editForm.fechaRevision} onChange={(e) => setEditForm({ ...editForm, fechaRevision: e.target.value })} style={inp} />
                               </div>
                               <div>
-                                <label style={lbl}>Fecha de actualización</label>
+                                <label style={lbl}>{t("tableHeaders.fechaActualizacion")}</label>
                                 <input type="date" value={editForm.fechaActualizacion} onChange={(e) => setEditForm({ ...editForm, fechaActualizacion: e.target.value })} style={inp} />
                               </div>
                               <div style={{ gridColumn: "span 2" }}>
-                                <label style={lbl}>Control de cambios</label>
+                                <label style={lbl}>{t("tableHeaders.controlCambios")}</label>
                                 <textarea
                                   value={editForm.controlCambios}
                                   onChange={(e) => setEditForm({ ...editForm, controlCambios: e.target.value })}
                                   rows={3}
                                   style={{ ...inp, resize: "vertical" }}
-                                  placeholder="Descripción de cambios…"
+                                  placeholder={t("filterPlaceholders.changeLogs")}
                                 />
                               </div>
                             </div>
@@ -534,9 +556,9 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
                                 disabled={saving}
                                 style={{ background: brand, color: "#fff", border: "none", padding: "7px 18px", borderRadius: 7, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
                               >
-                                {saving ? "Guardando…" : "Guardar"}
+                                {saving ? t("actions.saving") : t("actions.save")}
                               </button>
-                              <button onClick={() => setEditingId(null)} style={ghostBtn}>Cancelar</button>
+                              <button onClick={() => setEditingId(null)} style={ghostBtn}>{tc("cancel")}</button>
                             </div>
                           </td>
                         </tr>
@@ -560,7 +582,7 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
         <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 680, maxHeight: "88vh", overflowY: "auto", padding: 28, position: "relative" }}>
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 }}>
             <div>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#1e293b" }}>Flujo de revisión</h2>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#1e293b" }}>{t("flowModal.title")}</h2>
               <p style={{ margin: "4px 0 0", fontSize: 13, color: "#64748b" }}>
                 {flowFile.nombreDocumento ?? flowFile.name}{flowFile.codigo ? ` · ${flowFile.codigo}` : ""}
               </p>
@@ -569,9 +591,9 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
           </div>
 
           {flowLoading ? (
-            <p style={{ textAlign: "center", color: "#94a3b8", padding: "40px 0" }}>Cargando…</p>
+            <p style={{ textAlign: "center", color: "#94a3b8", padding: "40px 0" }}>{t("flowModal.loading")}</p>
           ) : flowRequests.length === 0 ? (
-            <p style={{ textAlign: "center", color: "#94a3b8", padding: "40px 0", fontSize: 14 }}>No hay solicitudes de cambio registradas para este documento.</p>
+            <p style={{ textAlign: "center", color: "#94a3b8", padding: "40px 0", fontSize: 14 }}>{t("flowModal.empty")}</p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               {[...flowRequests].reverse().map((r) => {
@@ -579,11 +601,6 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
                   ACTUALIZACION: { bg: "#dbeafe", color: "#1e40af" },
                   REVISION:      { bg: "#ede9fe", color: "#5b21b6" },
                   CORRECCION:    { bg: "#fef3c7", color: "#92400e" },
-                };
-                const STATUS_LABELS: Record<string, string> = {
-                  PENDING: "Pendiente", IN_PROGRESS: "En progreso",
-                  PENDING_APPROVAL: "Pend. aprobación", APPROVED: "Aprobada",
-                  REJECTED: "Rechazada", CANCELLED: "Cancelada",
                 };
                 const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
                   PENDING:          { bg: "#f1f5f9", color: "#64748b" },
@@ -593,20 +610,12 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
                   REJECTED:         { bg: "#fee2e2", color: "#dc2626" },
                   CANCELLED:        { bg: "#f3f4f6", color: "#94a3b8" },
                 };
-                const TYPE_LABELS: Record<string, string> = {
-                  ACTUALIZACION: "Actualización", REVISION: "Revisión", CORRECCION: "Corrección",
-                };
-                const OUTCOME_LABELS: Record<string, string> = {
-                  no_changes: "Sin cambios necesarios",
-                  new_version: "Nueva versión subida",
-                  corrected: "Corrección aplicada",
-                };
-                const tc = TYPE_COLORS[r.type] ?? { bg: "#f3f4f6", color: "#374151" };
+                const typeColor = TYPE_COLORS[r.type] ?? { bg: "#f3f4f6", color: "#374151" };
                 const sc = STATUS_COLORS[r.status] ?? { bg: "#f3f4f6", color: "#374151" };
                 return (
                   <div key={r.id} style={{ border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px 18px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-                      <span style={{ background: tc.bg, color: tc.color, borderRadius: 5, padding: "2px 9px", fontSize: 11, fontWeight: 700 }}>{TYPE_LABELS[r.type] ?? r.type}</span>
+                      <span style={{ background: typeColor.bg, color: typeColor.color, borderRadius: 5, padding: "2px 9px", fontSize: 11, fontWeight: 700 }}>{TYPE_LABELS[r.type] ?? r.type}</span>
                       <span style={{ background: sc.bg, color: sc.color, borderRadius: 5, padding: "2px 9px", fontSize: 11, fontWeight: 700 }}>{STATUS_LABELS[r.status] ?? r.status}</span>
                       {r.pendingVersionStr && r.status === "APPROVED" && (
                         <code style={{ background: "#f0fdf4", color: "#166534", padding: "1px 7px", borderRadius: 4, fontSize: 11 }}>{r.pendingVersionStr}</code>
@@ -616,34 +625,34 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
 
                     {r.instructions && (
                       <div style={{ marginBottom: 10 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", marginBottom: 3 }}>Cambio a realizar</div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", marginBottom: 3 }}>{t("flowModal.changeTask")}</div>
                         <div style={{ fontSize: 13, color: "#374151", whiteSpace: "pre-wrap", background: "#f8fafc", borderRadius: 6, padding: "8px 10px" }}>{r.instructions}</div>
                       </div>
                     )}
 
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: r.finalNotes ? 8 : 0 }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase" }}>Asignados:</span>
-                      {r.tasks.map((t) => (
-                        <span key={t.id} style={{
-                          background: t.status === "COMPLETED" ? "#dcfce7" : "#f1f5f9",
-                          color: t.status === "COMPLETED" ? "#166534" : "#475569",
+                      <span style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase" }}>{t("flowModal.assigned")}</span>
+                      {r.tasks.map((task) => (
+                        <span key={task.id} style={{
+                          background: task.status === "COMPLETED" ? "#dcfce7" : "#f1f5f9",
+                          color: task.status === "COMPLETED" ? "#166534" : "#475569",
                           borderRadius: 4, padding: "2px 8px", fontSize: 12,
                         }}>
-                          {t.stepOrder}. {t.assignedTo.name}
+                          {task.stepOrder}. {task.assignedTo.name}
                         </span>
                       ))}
                     </div>
 
                     {r.outcomeType && r.status === "APPROVED" && (
                       <div style={{ fontSize: 12, color: "#166534", marginTop: 6 }}>
-                        Resultado: <b>{OUTCOME_LABELS[r.outcomeType] ?? r.outcomeType}</b>
-                        {r.finalReviewedAt && <span style={{ color: "#94a3b8", marginLeft: 8 }}>· aprobado {fmtDate(r.finalReviewedAt)}</span>}
+                        {t("flowModal.result")} <b>{OUTCOME_LABELS[r.outcomeType] ?? r.outcomeType}</b>
+                        {r.finalReviewedAt && <span style={{ color: "#94a3b8", marginLeft: 8 }}>· {t("flowModal.approvedOn")} {fmtDate(r.finalReviewedAt)}</span>}
                       </div>
                     )}
 
                     {r.finalNotes && (
                       <div style={{ fontSize: 12, color: "#64748b", marginTop: 6, background: "#f8fafc", borderRadius: 6, padding: "6px 10px" }}>
-                        <b>Nota final:</b> {r.finalNotes}
+                        <b>{t("flowModal.finalNote")}</b> {r.finalNotes}
                       </div>
                     )}
                   </div>

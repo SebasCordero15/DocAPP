@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import FileIcon from "@/components/FileIcon";
 
 // ─── types ────────────────────────────────────────────────────────────────────
@@ -127,19 +128,19 @@ function AccessBadge({ level }: { level: string | null }) {
         fontWeight: 600,
       }}
     >
-      {{ MANAGE: "Gestión total", EDIT: "Editar", READ: "Solo lectura", NONE: "Sin acceso" }[level] ?? level}
+      {{ MANAGE: "Full management", EDIT: "Edit", READ: "Read only", NONE: "No access" }[level] ?? level}
     </span>
   );
 }
 
 // Human-readable source label.
 function SourceLabel({ source }: { source: string }) {
-  if (source === "admin") return <span style={{ fontSize: 12, color: "#6d28d9" }}>Rol de admin</span>;
-  if (source === "direct") return <span style={{ fontSize: 12, color: "#059669" }}>Permiso directo</span>;
+  if (source === "admin") return <span style={{ fontSize: 12, color: "#6d28d9" }}>Admin role</span>;
+  if (source === "direct") return <span style={{ fontSize: 12, color: "#059669" }}>Direct permission</span>;
   if (source === "none")   return <span style={{ fontSize: 12, color: "#aaa" }}>—</span>;
   // "folder:FolderName"
   const name = source.replace(/^folder:/, "");
-  return <span style={{ fontSize: 12, color: "#d97706" }}>↑ Carpeta: {name}</span>;
+  return <span style={{ fontSize: 12, color: "#d97706" }}>↑ Folder: {name}</span>;
 }
 
 // ─── main component ───────────────────────────────────────────────────────────
@@ -147,6 +148,8 @@ function SourceLabel({ source }: { source: string }) {
 export default function PermissionsClient({ company }: Props) {
   const router = useRouter();
   const brand = company.primaryColor;
+  const t  = useTranslations("permisos");
+  const tc = useTranslations("common");
 
   const [folders, setFolders] = useState<FolderFlat[]>([]);
   const [files, setFiles] = useState<FileFlat[]>([]);
@@ -226,7 +229,7 @@ export default function PermissionsClient({ company }: Props) {
     <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "#f5f7fa" }}>
       {/* Section header */}
       <div style={{ background: brand, color: "#fff", padding: "12px 28px", flexShrink: 0 }}>
-        <strong style={{ fontSize: 16 }}>Permisos</strong>
+        <strong style={{ fontSize: 16 }}>{t("header")}</strong>
       </div>
 
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
@@ -255,20 +258,20 @@ export default function PermissionsClient({ company }: Props) {
                   transition: "all 0.15s",
                 }}
               >
-                {tab === "normal" ? "Documentos" : "Externos"}
+                {tab === "normal" ? t("tabs.docs") : t("tabs.externos")}
               </button>
             ))}
           </div>
 
           <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
             <p style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
-              Carpetas
+              {t("foldersLabel")}
             </p>
 
             {loadingResources ? (
-              <p style={{ fontSize: 13, color: "#aaa" }}>Cargando…</p>
+              <p style={{ fontSize: 13, color: "#aaa" }}>{tc("loading")}</p>
             ) : tree.length === 0 && rootFiles.length === 0 ? (
-              <p style={{ fontSize: 13, color: "#aaa" }}>Sin recursos aún.</p>
+              <p style={{ fontSize: 13, color: "#aaa" }}>{t("emptyResources")}</p>
             ) : (
               <FolderTree
                 nodes={tree}
@@ -291,7 +294,7 @@ export default function PermissionsClient({ company }: Props) {
                     marginBottom: 6,
                   }}
                 >
-                  Archivos
+                  {t("filesLabel")}
                 </p>
                 {activeFiles.map((file) => {
                   const isSelected = selected?.type === "file" && selected.id === file.id;
@@ -344,7 +347,7 @@ export default function PermissionsClient({ company }: Props) {
                 color: "#aaa",
               }}
             >
-              <p style={{ marginTop: 12 }}>Selecciona una carpeta o archivo para gestionar sus permisos.</p>
+              <p style={{ marginTop: 12 }}>{t("selectPrompt")}</p>
             </div>
           ) : (
             <>
@@ -358,19 +361,19 @@ export default function PermissionsClient({ company }: Props) {
 
               {/* Legend */}
               <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "10px 16px", marginBottom: 20, fontSize: 12, color: "#64748b", lineHeight: 1.6 }}>
-                <strong style={{ color: "#374151" }}>Cómo funcionan los permisos:</strong> cada usuario tiene un{" "}
-                <strong>rol base</strong> (EDITOR, VIEWER, etc.) que aplica a todo. Puedes añadir un{" "}
-                <strong>permiso explícito</strong> en esta carpeta/archivo para sobrescribir ese rol.
-                Si eliges <em>Heredar</em>, se elimina el permiso explícito y el acceso se hereda del rol base o carpeta padre.
+                <strong style={{ color: "#374151" }}>{t("legend.heading")}</strong> Each user has a{" "}
+                <strong>{t("legend.rolBase")}</strong> (EDITOR, VIEWER, etc.) that applies to everything. You can add an{" "}
+                <strong>{t("legend.explicit")}</strong> on this folder/file to override that role.
+                Choosing <em>{t("legend.inherit")}</em> removes the explicit permission and access is inherited from the base role or parent folder.
               </div>
 
               {loadingEntries ? (
-                <p style={{ color: "#aaa" }}>Cargando…</p>
+                <p style={{ color: "#aaa" }}>{tc("loading")}</p>
               ) : (
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
                     <tr style={{ borderBottom: "2px solid #eee" }}>
-                      {["Usuario", "Rol base", "Permiso explícito", "Acceso efectivo", "Origen", "Asignar acceso"].map(
+                      {[t("cols.user"), t("cols.rolBase"), t("cols.explicit"), t("cols.effective"), t("cols.source"), t("cols.assign")].map(
                         (h) => (
                           <th
                             key={h}
@@ -460,7 +463,7 @@ export default function PermissionsClient({ company }: Props) {
                           <td style={styles.td}>
                             {isAdmin ? (
                               <span style={{ fontSize: 12, color: "#aaa" }}>
-                                Siempre MANAGE
+                                {t("levels.alwaysManage")}
                               </span>
                             ) : (
                               <select
@@ -479,11 +482,11 @@ export default function PermissionsClient({ company }: Props) {
                                   background: "#fff",
                                 }}
                               >
-                                <option value="INHERIT">— Heredar del rol base</option>
-                                <option value="NONE">Sin acceso</option>
-                                <option value="READ">Solo lectura</option>
-                                <option value="EDIT">Editar</option>
-                                <option value="MANAGE">Gestión total</option>
+                                <option value="INHERIT">{t("options.inherit")}</option>
+                                <option value="NONE">{t("options.NONE")}</option>
+                                <option value="READ">{t("options.READ")}</option>
+                                <option value="EDIT">{t("options.EDIT")}</option>
+                                <option value="MANAGE">{t("options.MANAGE")}</option>
                               </select>
                             )}
                           </td>

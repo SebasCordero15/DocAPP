@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { Copy, Check, KeyRound, Pencil, X, UserPlus, Send } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -33,17 +34,6 @@ interface Props {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(diff / 60_000);
-  if (m < 1) return "ahora";
-  if (m < 60) return `hace ${m}m`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `hace ${h}h`;
-  const d = Math.floor(h / 24);
-  if (d < 30) return `hace ${d}d`;
-  return new Date(iso).toLocaleDateString("es-CR", { day: "2-digit", month: "2-digit", year: "numeric" });
-}
 
 const ROLE_COLORS: Record<Role, { bg: string; fg: string }> = {
   COMPANY_ADMIN: { bg: "#fef3c7", fg: "#92400e" },
@@ -51,15 +41,11 @@ const ROLE_COLORS: Record<Role, { bg: string; fg: string }> = {
   VIEWER:        { bg: "#f3f4f6", fg: "#374151" },
 };
 
-const ROLE_LABELS: Record<Role, string> = {
-  COMPANY_ADMIN: "Admin",
-  EDITOR:        "Editor",
-  VIEWER:        "Lector",
-};
 
 // ─── CopyButton ───────────────────────────────────────────────────────────────
 
 function CopyButton({ text }: { text: string }) {
+  const t = useTranslations("team");
   const [copied, setCopied] = useState(false);
   function copy() {
     navigator.clipboard.writeText(text);
@@ -73,7 +59,7 @@ function CopyButton({ text }: { text: string }) {
       style={{ display: "flex", alignItems: "center", gap: 5, background: copied ? "#f0fdf4" : "#fff", color: copied ? "#16a34a" : "#374151", border: `1px solid ${copied ? "#bbf7d0" : "#d1d5db"}`, padding: "6px 12px", borderRadius: 7, cursor: "pointer", fontSize: 13, fontWeight: 600, flexShrink: 0 }}
     >
       {copied ? <Check size={14} /> : <Copy size={14} />}
-      {copied ? "¡Copiado!" : "Copiar"}
+      {copied ? t("tempPw.copied") : t("tempPw.copy")}
     </button>
   );
 }
@@ -81,16 +67,17 @@ function CopyButton({ text }: { text: string }) {
 // ─── TempPasswordBox ──────────────────────────────────────────────────────────
 
 function TempPasswordBox({ password, userName, userEmail, onClose }: { password: string; userName: string; userEmail: string; onClose: () => void }) {
+  const t = useTranslations("team");
   return (
     <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 10, padding: "16px 18px", marginTop: 16 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
         <p style={{ margin: 0, color: "#92400e", fontWeight: 700, fontSize: 13 }}>
-          ✓ Contraseña temporal generada para {userName}
+          {t("tempPw.title", { name: userName })}
         </p>
         <button type="button" onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", padding: 0 }}><X size={16} /></button>
       </div>
       <p style={{ margin: "0 0 12px", color: "#64748b", fontSize: 12 }}>
-        Esta contraseña se muestra <strong>una sola vez</strong>. Compártela con {userEmail} de forma segura. El usuario deberá cambiarla al iniciar sesión.
+        {t("tempPw.desc", { email: userEmail })}
       </p>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <code style={{ flex: 1, background: "#fff", border: "1px solid #fed7aa", borderRadius: 7, padding: "10px 14px", fontSize: 16, fontWeight: 700, letterSpacing: 2, color: "#1e293b" }}>
@@ -105,6 +92,8 @@ function TempPasswordBox({ password, userName, userEmail, onClose }: { password:
 // ─── ResetPasswordModal ───────────────────────────────────────────────────────
 
 function ResetPasswordModal({ user, onClose }: { user: TeamUser; onClose: () => void }) {
+  const t  = useTranslations("team");
+  const tc = useTranslations("common");
   const [useCustom,  setUseCustom]  = useState(false);
   const [customPw,   setCustomPw]   = useState("");
   const [saving,     setSaving]     = useState(false);
@@ -121,7 +110,7 @@ function ResetPasswordModal({ user, onClose }: { user: TeamUser; onClose: () => 
     });
     const d = await res.json();
     if (!res.ok) {
-      setError(d.error ?? "Error al restablecer contraseña");
+      setError(d.error ?? t("resetModal.errorGeneric"));
     } else {
       setTempPw(d.tempPassword);
     }
@@ -134,7 +123,7 @@ function ResetPasswordModal({ user, onClose }: { user: TeamUser; onClose: () => 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <KeyRound size={19} color="#d97706" />
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Restablecer contraseña</h3>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>{t("resetModal.title")}</h3>
           </div>
           <button onClick={onClose} style={iconBtn}><X size={18} /></button>
         </div>
@@ -142,36 +131,36 @@ function ResetPasswordModal({ user, onClose }: { user: TeamUser; onClose: () => 
         {!tempPw ? (
           <>
             <p style={{ color: "#64748b", fontSize: 13, margin: "0 0 16px" }}>
-              Restableciendo contraseña de <strong>{user.name}</strong> ({user.email}).
+              {t("resetModal.desc", { name: user.name, email: user.email })}
             </p>
             <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, marginBottom: 14 }}>
               <input type="checkbox" checked={useCustom} onChange={(e) => setUseCustom(e.target.checked)} />
-              Especificar contraseña manualmente
+              {t("labels.specifyManual")}
             </label>
             {useCustom && (
               <div style={{ marginBottom: 14 }}>
-                <label style={lbl}>Contraseña temporal</label>
+                <label style={lbl}>{t("labels.tempPwLabel")}</label>
                 <input
                   type="text"
                   value={customPw}
                   onChange={(e) => setCustomPw(e.target.value)}
-                  placeholder="Mín. 8 chars · mayúscula · minúscula · número"
+                  placeholder={t("labels.tempPwPlaceholder")}
                   style={inp}
                 />
               </div>
             )}
             {error && <p style={{ color: "#dc2626", fontSize: 13, marginBottom: 10 }}>{error}</p>}
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button onClick={onClose} style={cancelBtn}>Cancelar</button>
+              <button onClick={onClose} style={cancelBtn}>{tc("cancel")}</button>
               <button onClick={doReset} disabled={saving || (useCustom && !customPw)} style={{ ...actionBtn, background: "#d97706", opacity: (saving || (useCustom && !customPw)) ? 0.6 : 1 }}>
-                {saving ? "…" : "Restablecer"}
+                {saving ? "…" : t("actions.reset")}
               </button>
             </div>
           </>
         ) : (
           <>
             <TempPasswordBox password={tempPw} userName={user.name} userEmail={user.email} onClose={onClose} />
-            <button onClick={onClose} style={{ ...actionBtn, marginTop: 16, display: "block", width: "100%" }}>Cerrar</button>
+            <button onClick={onClose} style={{ ...actionBtn, marginTop: 16, display: "block", width: "100%" }}>{t("actions.close")}</button>
           </>
         )}
       </div>
@@ -182,6 +171,8 @@ function ResetPasswordModal({ user, onClose }: { user: TeamUser; onClose: () => 
 // ─── EditUserModal ────────────────────────────────────────────────────────────
 
 function EditUserModal({ user, onSave, onClose }: { user: TeamUser; onSave: (u: Partial<TeamUser>) => void; onClose: () => void }) {
+  const t  = useTranslations("team");
+  const tc = useTranslations("common");
   const [name,  setName]  = useState(user.name);
   const [role,  setRole]  = useState<Role>(user.role);
   const [saving, setSaving] = useState(false);
@@ -200,7 +191,7 @@ function EditUserModal({ user, onSave, onClose }: { user: TeamUser; onSave: (u: 
     });
     const d = await res.json();
     if (!res.ok) {
-      setError(d.error ?? "Error al guardar");
+      setError(d.error ?? t("editModal.errorGeneric"));
     } else {
       onSave({ name, role, ...d.user });
       onClose();
@@ -214,34 +205,34 @@ function EditUserModal({ user, onSave, onClose }: { user: TeamUser; onSave: (u: 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <Pencil size={17} color="#2563eb" />
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Editar usuario</h3>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>{t("editModal.title")}</h3>
           </div>
           <button onClick={onClose} style={iconBtn}><X size={18} /></button>
         </div>
 
         <div style={{ marginBottom: 14 }}>
-          <label style={lbl}>Nombre</label>
+          <label style={lbl}>{t("tableHeaders.name")}</label>
           <input type="text" value={name} onChange={(e) => setName(e.target.value)} required style={inp} />
         </div>
         <div style={{ marginBottom: 14 }}>
-          <label style={lbl}>Correo (no editable)</label>
+          <label style={lbl}>{t("labels.emailReadonly")}</label>
           <input type="email" value={user.email} disabled style={{ ...inp, color: "#94a3b8", background: "#f8fafc" }} />
         </div>
         <div style={{ marginBottom: 20 }}>
-          <label style={lbl}>Rol base</label>
+          <label style={lbl}>{t("labels.baseRole")}</label>
           <select value={role} onChange={(e) => setRole(e.target.value as Role)} style={inp}>
-            <option value="VIEWER">Lector (solo lectura)</option>
-            <option value="EDITOR">Editor (puede subir y editar)</option>
-            <option value="COMPANY_ADMIN">Admin de empresa</option>
+            <option value="VIEWER">{t("roleOptions.viewer")}</option>
+            <option value="EDITOR">{t("roleOptions.editor")}</option>
+            <option value="COMPANY_ADMIN">{t("roleOptions.admin")}</option>
           </select>
         </div>
 
         {error && <p style={{ color: "#dc2626", fontSize: 13, marginBottom: 12 }}>{error}</p>}
 
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <button onClick={onClose} style={cancelBtn}>Cancelar</button>
+          <button onClick={onClose} style={cancelBtn}>{tc("cancel")}</button>
           <button onClick={save} disabled={saving || !name.trim()} style={{ ...actionBtn, opacity: (saving || !name.trim()) ? 0.6 : 1 }}>
-            {saving ? "Guardando…" : "Guardar"}
+            {saving ? t("actions.saving") : t("actions.save")}
           </button>
         </div>
       </div>
@@ -252,7 +243,27 @@ function EditUserModal({ user, onSave, onClose }: { user: TeamUser; onSave: (u: 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 export default function TeamClient({ currentUserId, company }: Props) {
+  const t  = useTranslations("team");
+  const tc = useTranslations("common");
   const brand = company.primaryColor;
+
+  const ROLE_LABELS: Record<Role, string> = {
+    COMPANY_ADMIN: t("roleLabels.COMPANY_ADMIN"),
+    EDITOR:        t("roleLabels.EDITOR"),
+    VIEWER:        t("roleLabels.VIEWER"),
+  };
+
+  function fmtTimeAgo(iso: string): string {
+    const diff = Date.now() - new Date(iso).getTime();
+    const m = Math.floor(diff / 60_000);
+    if (m < 1) return t("timeAgo.now");
+    if (m < 60) return t("timeAgo.mins", { n: m });
+    const h = Math.floor(m / 60);
+    if (h < 24) return t("timeAgo.hours", { n: h });
+    const d = Math.floor(h / 24);
+    if (d < 30) return t("timeAgo.days", { n: d });
+    return new Date(iso).toLocaleDateString(undefined, { day: "2-digit", month: "2-digit", year: "numeric" });
+  }
 
   const [users,           setUsers]           = useState<TeamUser[]>([]);
   const [invites,         setInvites]         = useState<PendingInvite[]>([]);
@@ -313,10 +324,10 @@ export default function TeamClient({ currentUserId, company }: Props) {
       if (res.ok) {
         setUsers((prev) => prev.map((u) => u.id === d.user.id ? { ...u, ...d.user } : u));
       } else {
-        setMutateError((e) => ({ ...e, [id]: d.error ?? "Error al actualizar" }));
+        setMutateError((e) => ({ ...e, [id]: d.error ?? t("errors.update") }));
       }
     } catch {
-      setMutateError((e) => ({ ...e, [id]: "Error de conexión" }));
+      setMutateError((e) => ({ ...e, [id]: t("errors.connection") }));
     } finally {
       setMutating((m) => ({ ...m, [id]: false }));
     }
@@ -334,7 +345,7 @@ export default function TeamClient({ currentUserId, company }: Props) {
     });
     const d = await res.json();
     if (!res.ok) {
-      setInviteError(d.error ?? "Error al enviar invitación");
+      setInviteError(d.error ?? t("errors.sendInvite"));
     } else {
       setInviteResult({ inviteUrl: d.inviteUrl, emailSent: d.emailSent });
       setInviteEmail("");
@@ -356,7 +367,7 @@ export default function TeamClient({ currentUserId, company }: Props) {
     });
     const d = await res.json();
     if (!res.ok) {
-      setDcError(d.error ?? "Error al crear usuario");
+      setDcError(d.error ?? t("errors.createUser"));
     } else {
       setDcResult({ tempPassword: d.tempPassword, user: d.user });
       setDcName("");
@@ -386,7 +397,7 @@ export default function TeamClient({ currentUserId, company }: Props) {
     <div style={{ flex: 1, overflowY: "auto", background: "#f1f5f9", fontFamily: `'${company.fontFamily}', Inter, system-ui, sans-serif` }}>
       {/* Section header */}
       <div style={{ background: brand, color: "#fff", padding: "12px 28px", position: "sticky", top: 0, zIndex: 10 }}>
-        <strong style={{ fontSize: 16 }}>Equipo</strong>
+        <strong style={{ fontSize: 16 }}>{t("header")}</strong>
       </div>
 
       <div style={{ maxWidth: 960, margin: "0 auto", padding: "32px 28px" }}>
@@ -394,16 +405,16 @@ export default function TeamClient({ currentUserId, company }: Props) {
         {/* ── Page title + add button ── */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#1e293b" }}>Equipo</h1>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#1e293b" }}>{t("pageTitle")}</h1>
             <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 14 }}>
               <span style={{ fontWeight: 700, color: atLimit ? "#dc2626" : "#374151" }}>
-                Usuarios: {activeUserCount} / {maxUsers}
+                {t("userCount", { active: activeUserCount, max: maxUsers })}
               </span>
-              {invites.length > 0 && ` · ${invites.length} invitación${invites.length !== 1 ? "es" : ""} pendiente${invites.length !== 1 ? "s" : ""}`}
+              {invites.length > 0 && t("pendingInvites", { count: invites.length })}
             </p>
             {atLimit && (
               <p style={{ margin: "4px 0 0", fontSize: 13, color: "#dc2626" }}>
-                Límite de usuarios alcanzado. Desactiva un usuario o contacta soporte para ampliar el plan.
+                {t("atLimitMsg")}
               </p>
             )}
           </div>
@@ -411,7 +422,7 @@ export default function TeamClient({ currentUserId, company }: Props) {
             onClick={() => showCreate ? setShowCreate(false) : openCreate()}
             style={{ display: "flex", alignItems: "center", gap: 6, background: showCreate ? "#f1f5f9" : brand, color: showCreate ? "#64748b" : "#fff", border: showCreate ? "1px solid #e2e8f0" : "none", padding: "9px 18px", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 14 }}
           >
-            {showCreate ? <><X size={15} /> Cancelar</> : <><UserPlus size={15} /> Agregar usuario</>}
+            {showCreate ? <><X size={15} /> {tc("cancel")}</> : <><UserPlus size={15} /> {t("addUser")}</>}
           </button>
         </div>
 
@@ -420,7 +431,7 @@ export default function TeamClient({ currentUserId, company }: Props) {
           <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "22px 24px", marginBottom: 24 }}>
             {/* Mode tabs */}
             <div style={{ display: "flex", gap: 0, borderBottom: "2px solid #e2e8f0", marginBottom: 20 }}>
-              {([["direct", <><UserPlus size={13} /> Crear con contraseña temporal</>], ["invite", <><Send size={13} /> Enviar enlace de invitación</>]] as const).map(([mode, label]) => (
+              {([["direct", <><UserPlus size={13} /> {t("tabDirect")}</>], ["invite", <><Send size={13} /> {t("tabInvite")}</>]] as const).map(([mode, label]) => (
                 <button
                   key={mode}
                   type="button"
@@ -436,29 +447,29 @@ export default function TeamClient({ currentUserId, company }: Props) {
             {createMode === "direct" && (
               <>
                 <p style={{ margin: "0 0 16px", fontSize: 13, color: "#64748b" }}>
-                  Crea el usuario inmediatamente con una contraseña temporal que puedes compartir directamente (sin necesitar correo electrónico).
+                  {t("directDesc")}
                 </p>
                 <form onSubmit={createDirect}>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
                     <div>
-                      <label style={lbl}>Nombre completo *</label>
+                      <label style={lbl}>{t("labels.fullName")}</label>
                       <input type="text" required value={dcName} onChange={(e) => setDcName(e.target.value)} placeholder="Juan Pérez" style={inp} />
                     </div>
                     <div>
-                      <label style={lbl}>Correo electrónico *</label>
+                      <label style={lbl}>{t("labels.email")}</label>
                       <input type="email" required value={dcEmail} onChange={(e) => setDcEmail(e.target.value)} placeholder="juan@empresa.com" style={inp} />
                     </div>
                     <div>
-                      <label style={lbl}>Rol</label>
+                      <label style={lbl}>{t("labels.role")}</label>
                       <select value={dcRole} onChange={(e) => setDcRole(e.target.value as Role)} style={inp}>
-                        <option value="VIEWER">Lector (solo lectura)</option>
-                        <option value="EDITOR">Editor (puede subir y editar)</option>
-                        <option value="COMPANY_ADMIN">Admin de empresa</option>
+                        <option value="VIEWER">{t("roleOptions.viewer")}</option>
+                        <option value="EDITOR">{t("roleOptions.editor")}</option>
+                        <option value="COMPANY_ADMIN">{t("roleOptions.admin")}</option>
                       </select>
                     </div>
                     <div style={{ display: "flex", alignItems: "flex-end" }}>
                       <button type="submit" disabled={dcSaving || atLimit} style={{ ...actionBtn, width: "100%", opacity: (dcSaving || atLimit) ? 0.6 : 1 }}>
-                        {dcSaving ? "Creando…" : "Crear usuario"}
+                        {dcSaving ? t("actions.creating") : t("actions.create")}
                       </button>
                     </div>
                   </div>
@@ -480,33 +491,33 @@ export default function TeamClient({ currentUserId, company }: Props) {
             {createMode === "invite" && (
               <>
                 <p style={{ margin: "0 0 16px", fontSize: 13, color: "#64748b" }}>
-                  Envía un enlace de invitación. El usuario hará clic en el enlace y creará su propia contraseña.
+                  {t("inviteDesc")}
                 </p>
                 <form onSubmit={sendInvite} style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
                   <div style={{ flex: "1 1 220px" }}>
-                    <label style={lbl}>Correo electrónico *</label>
+                    <label style={lbl}>{t("labels.email")}</label>
                     <input type="email" required value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="colega@empresa.com" style={inp} />
                   </div>
                   <div style={{ flex: "0 0 180px" }}>
-                    <label style={lbl}>Rol</label>
+                    <label style={lbl}>{t("labels.role")}</label>
                     <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value as Role)} style={inp}>
-                      <option value="VIEWER">Lector</option>
-                      <option value="EDITOR">Editor</option>
-                      <option value="COMPANY_ADMIN">Admin de empresa</option>
+                      <option value="VIEWER">{t("roleOptions.viewerShort")}</option>
+                      <option value="EDITOR">{t("roleOptions.editorShort")}</option>
+                      <option value="COMPANY_ADMIN">{t("roleOptions.admin")}</option>
                     </select>
                   </div>
                   <button type="submit" disabled={inviting || atLimit} style={{ ...actionBtn, opacity: (inviting || atLimit) ? 0.6 : 1 }}>
-                    {inviting ? "Enviando…" : "Enviar invitación"}
+                    {inviting ? t("actions.sending") : t("actions.sendInvite")}
                   </button>
                 </form>
                 {inviteError && <p style={{ color: "#dc2626", fontSize: 13, marginTop: 10 }}>{inviteError}</p>}
                 {inviteResult && (
                   <div style={{ marginTop: 14, background: inviteResult.emailSent ? "#f0fdf4" : "#fff7ed", border: `1px solid ${inviteResult.emailSent ? "#bbf7d0" : "#fed7aa"}`, borderRadius: 8, padding: "12px 16px" }}>
                     {inviteResult.emailSent ? (
-                      <p style={{ margin: 0, color: "#166534", fontSize: 13 }}>✓ Correo de invitación enviado.</p>
+                      <p style={{ margin: 0, color: "#166534", fontSize: 13 }}>{t("inviteSent")}</p>
                     ) : (
                       <>
-                        <p style={{ margin: "0 0 8px", color: "#92400e", fontSize: 13, fontWeight: 600 }}>Correo no enviado (RESEND_API_KEY no configurado) — comparte este enlace manualmente:</p>
+                        <p style={{ margin: "0 0 8px", color: "#92400e", fontSize: 13, fontWeight: 600 }}>{t("inviteNoEmail")}</p>
                         <div style={{ display: "flex", gap: 8 }}>
                           <code style={{ flex: 1, background: "#fff", border: "1px solid #fed7aa", borderRadius: 6, padding: "8px 12px", fontSize: 12, wordBreak: "break-all" }}>
                             {inviteResult.inviteUrl}
@@ -525,9 +536,9 @@ export default function TeamClient({ currentUserId, company }: Props) {
         {/* ── Leyenda de roles ── */}
         <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "16px 24px", marginBottom: 20, display: "flex", gap: 20, flexWrap: "wrap", alignItems: "flex-start" }}>
           {([
-            { role: "COMPANY_ADMIN" as Role, desc: "Acceso completo: gestiona usuarios, permisos, carpetas, aprueba solicitudes y ve todos los documentos." },
-            { role: "EDITOR" as Role,        desc: "Puede subir y editar documentos en carpetas con permiso. Los cambios de metadatos requieren aprobación del Admin." },
-            { role: "VIEWER" as Role,        desc: "Solo lectura en las carpetas o archivos que tenga asignados." },
+            { role: "COMPANY_ADMIN" as Role, desc: t("roleLegend.adminDesc") },
+            { role: "EDITOR" as Role,        desc: t("roleLegend.editorDesc") },
+            { role: "VIEWER" as Role,        desc: t("roleLegend.viewerDesc") },
           ] as const).map(({ role, desc }) => {
             const rc = ROLE_COLORS[role];
             return (
@@ -544,17 +555,17 @@ export default function TeamClient({ currentUserId, company }: Props) {
         {/* ── Users table ── */}
         <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden", marginBottom: 24 }}>
           <div style={{ padding: "16px 24px", borderBottom: "1px solid #f1f5f9" }}>
-            <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#1e293b" }}>Miembros</h2>
+            <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#1e293b" }}>{t("members")}</h2>
           </div>
 
           {loading ? (
-            <div style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>Cargando…</div>
+            <div style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>{t("loading")}</div>
           ) : (
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ borderBottom: "1px solid #f1f5f9" }}>
-                    {["Nombre", "Correo", "Rol", "Estado", "Último acceso", "Acciones"].map((h) => (
+                    {[t("tableHeaders.name"), t("tableHeaders.email"), t("tableHeaders.role"), t("tableHeaders.status"), t("tableHeaders.lastAccess"), t("tableHeaders.actions")].map((h) => (
                       <th key={h} style={{ padding: "10px 18px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5, whiteSpace: "nowrap" }}>{h}</th>
                     ))}
                   </tr>
@@ -569,8 +580,8 @@ export default function TeamClient({ currentUserId, company }: Props) {
                       <tr key={u.id} style={{ borderBottom: "1px solid #f8fafc", opacity: u.isActive ? 1 : 0.6 }}>
                         <td style={{ padding: "12px 18px", fontWeight: 600, color: "#1e293b", whiteSpace: "nowrap" }}>
                           {u.name}
-                          {isSelf && <span style={{ fontSize: 10, background: "#e0f2fe", color: "#0369a1", padding: "1px 5px", borderRadius: 3, marginLeft: 6 }}>Tú</span>}
-                          {u.forcePasswordChange && <span title="Debe cambiar contraseña" style={{ fontSize: 10, background: "#fef3c7", color: "#92400e", padding: "1px 5px", borderRadius: 3, marginLeft: 4 }}>TEMP</span>}
+                          {isSelf && <span style={{ fontSize: 10, background: "#e0f2fe", color: "#0369a1", padding: "1px 5px", borderRadius: 3, marginLeft: 6 }}>{t("status.you")}</span>}
+                          {u.forcePasswordChange && <span title={t("labels.tempPwLabel")} style={{ fontSize: 10, background: "#fef3c7", color: "#92400e", padding: "1px 5px", borderRadius: 3, marginLeft: 4 }}>TEMP</span>}
                         </td>
                         <td style={{ padding: "12px 18px", fontSize: 13, color: "#64748b" }}>{u.email}</td>
                         <td style={{ padding: "12px 18px" }}>
@@ -583,19 +594,19 @@ export default function TeamClient({ currentUserId, company }: Props) {
                               onChange={(e) => patchUser(u.id, { role: e.target.value as Role })}
                               style={{ background: rc.bg, color: rc.fg, border: "1px solid transparent", borderRadius: 4, fontSize: 12, fontWeight: 600, padding: "3px 6px", cursor: "pointer" }}
                             >
-                              <option value="VIEWER">Lector</option>
-                              <option value="EDITOR">Editor</option>
-                              <option value="COMPANY_ADMIN">Admin</option>
+                              <option value="VIEWER">{t("roleOptions.viewerShort")}</option>
+                              <option value="EDITOR">{t("roleOptions.editorShort")}</option>
+                              <option value="COMPANY_ADMIN">{t("roleOptions.adminShort")}</option>
                             </select>
                           )}
                         </td>
                         <td style={{ padding: "12px 18px" }}>
                           <span style={{ color: u.isActive ? "#16a34a" : "#dc2626", fontSize: 13, fontWeight: 600 }}>
-                            {u.isActive ? "Activo" : "Inactivo"}
+                            {u.isActive ? t("status.active") : t("status.inactive")}
                           </span>
                         </td>
                         <td style={{ padding: "12px 18px", fontSize: 13, color: "#64748b", whiteSpace: "nowrap" }}>
-                          {u.lastLoginAt ? timeAgo(u.lastLoginAt) : <span style={{ color: "#d1d5db" }}>Nunca</span>}
+                          {u.lastLoginAt ? fmtTimeAgo(u.lastLoginAt) : <span style={{ color: "#d1d5db" }}>{t("status.never")}</span>}
                         </td>
                         <td style={{ padding: "12px 18px" }}>
                           {!isSelf && (
@@ -606,21 +617,21 @@ export default function TeamClient({ currentUserId, company }: Props) {
                                   onClick={() => setEditTarget(u)}
                                   style={{ display: "flex", alignItems: "center", gap: 4, background: "#f1f5f9", color: "#374151", border: "1px solid #e2e8f0", padding: "4px 10px", borderRadius: 6, cursor: busy ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600 }}
                                 >
-                                  <Pencil size={12} /> Editar
+                                  <Pencil size={12} /> {t("actions.edit")}
                                 </button>
                                 <button
                                   disabled={busy}
                                   onClick={() => setResetTarget(u)}
                                   style={{ display: "flex", alignItems: "center", gap: 4, background: "#fff7ed", color: "#d97706", border: "1px solid #fed7aa", padding: "4px 10px", borderRadius: 6, cursor: busy ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600 }}
                                 >
-                                  <KeyRound size={12} /> Contraseña
+                                  <KeyRound size={12} /> {t("actions.password")}
                                 </button>
                                 <button
                                   disabled={busy}
                                   onClick={() => patchUser(u.id, { isActive: !u.isActive })}
                                   style={{ background: u.isActive ? "#fef2f2" : "#f0fdf4", color: u.isActive ? "#dc2626" : "#16a34a", border: `1px solid ${u.isActive ? "#fecaca" : "#bbf7d0"}`, padding: "4px 10px", borderRadius: 6, cursor: busy ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600, opacity: busy ? 0.5 : 1 }}
                                 >
-                                  {busy ? "…" : u.isActive ? "Desactivar" : "Activar"}
+                                  {busy ? "…" : u.isActive ? t("actions.deactivate") : t("actions.activate")}
                                 </button>
                               </div>
                               {err && <p style={{ margin: "4px 0 0", fontSize: 11, color: "#dc2626" }}>{err}</p>}
@@ -644,13 +655,13 @@ export default function TeamClient({ currentUserId, company }: Props) {
           <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
             <div style={{ padding: "16px 24px", borderBottom: "1px solid #f1f5f9" }}>
               <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#1e293b" }}>
-                Invitaciones pendientes <span style={{ fontSize: 13, fontWeight: 400, color: "#94a3b8" }}>({invites.length})</span>
+                {t("pendingInvitesTitle")} <span style={{ fontSize: 13, fontWeight: 400, color: "#94a3b8" }}>({invites.length})</span>
               </h2>
             </div>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid #f1f5f9" }}>
-                  {["Correo", "Rol", "Enviada", "Expira", ""].map((h) => (
+                  {[t("tableHeaders.email"), t("tableHeaders.role"), t("inviteTableHeaders.sent"), t("inviteTableHeaders.expires"), ""].map((h) => (
                     <th key={h} style={{ padding: "10px 18px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5 }}>{h}</th>
                   ))}
                 </tr>
@@ -664,7 +675,7 @@ export default function TeamClient({ currentUserId, company }: Props) {
                       <td style={{ padding: "11px 18px" }}>
                         <span style={{ background: rc.bg, color: rc.fg, padding: "2px 8px", borderRadius: 4, fontSize: 12, fontWeight: 600 }}>{ROLE_LABELS[inv.role]}</span>
                       </td>
-                      <td style={{ padding: "11px 18px", fontSize: 13, color: "#64748b" }}>{timeAgo(inv.createdAt)}</td>
+                      <td style={{ padding: "11px 18px", fontSize: 13, color: "#64748b" }}>{fmtTimeAgo(inv.createdAt)}</td>
                       <td style={{ padding: "11px 18px", fontSize: 13, color: "#64748b" }}>
                         {new Date(inv.expiresAt).toLocaleDateString("es-CR", { day: "2-digit", month: "2-digit", year: "numeric" })}
                       </td>
@@ -673,7 +684,7 @@ export default function TeamClient({ currentUserId, company }: Props) {
                           onClick={() => revokeInvite(inv.id)}
                           style={{ background: "none", border: "1px solid #fecaca", color: "#dc2626", padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600 }}
                         >
-                          Revocar
+                          {t("actions.revoke")}
                         </button>
                       </td>
                     </tr>
@@ -707,6 +718,8 @@ export default function TeamClient({ currentUserId, company }: Props) {
 interface Department { id: string; name: string; }
 
 function DepartamentosSection({ brand }: { brand: string }) {
+  const t  = useTranslations("team");
+  const tc = useTranslations("common");
   const [depts,    setDepts]    = useState<Department[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [newName,  setNewName]  = useState("");
@@ -733,7 +746,7 @@ function DepartamentosSection({ brand }: { brand: string }) {
       body: JSON.stringify({ name: newName.trim() }),
     });
     const d = await res.json();
-    if (!res.ok) { setError(d.error ?? "Error al crear"); }
+    if (!res.ok) { setError(d.error ?? t("depts.errors.create")); }
     else { setNewName(""); load(); }
     setCreating(false);
   }
@@ -746,7 +759,7 @@ function DepartamentosSection({ brand }: { brand: string }) {
       body: JSON.stringify({ name: editName.trim() }),
     });
     const d = await res.json();
-    if (!res.ok) { setError(d.error ?? "Error al guardar"); }
+    if (!res.ok) { setError(d.error ?? t("depts.errors.save")); }
     else { setEditId(null); load(); }
     setSaving(false);
   }
@@ -755,7 +768,7 @@ function DepartamentosSection({ brand }: { brand: string }) {
     setError("");
     const res = await fetch(`/api/admin/departments/${dept.id}`, { method: "DELETE" });
     const d = await res.json();
-    if (!res.ok) { setError(d.error ?? "No se puede eliminar"); }
+    if (!res.ok) { setError(d.error ?? t("depts.errors.delete")); }
     else { load(); }
   }
 
@@ -763,8 +776,8 @@ function DepartamentosSection({ brand }: { brand: string }) {
     <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
       <div style={{ padding: "18px 24px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#1e293b" }}>Departamentos</h2>
-          <p style={{ margin: "2px 0 0", fontSize: 13, color: "#64748b" }}>Define los departamentos disponibles al crear documentos.</p>
+          <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#1e293b" }}>{t("depts.title")}</h2>
+          <p style={{ margin: "2px 0 0", fontSize: 13, color: "#64748b" }}>{t("depts.desc")}</p>
         </div>
       </div>
 
@@ -775,7 +788,7 @@ function DepartamentosSection({ brand }: { brand: string }) {
             style={{ ...inp, flex: 1 }}
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            placeholder="Nombre del nuevo departamento…"
+            placeholder={t("depts.placeholder")}
             onKeyDown={(e) => e.key === "Enter" && create()}
           />
           <button
@@ -783,7 +796,7 @@ function DepartamentosSection({ brand }: { brand: string }) {
             disabled={creating || !newName.trim()}
             style={{ ...actionBtn, background: brand, opacity: newName.trim() ? 1 : 0.5, whiteSpace: "nowrap" }}
           >
-            {creating ? "Guardando…" : "+ Agregar"}
+            {creating ? t("depts.adding") : t("depts.add")}
           </button>
         </div>
 
@@ -794,9 +807,9 @@ function DepartamentosSection({ brand }: { brand: string }) {
         )}
 
         {loading ? (
-          <p style={{ color: "#94a3b8", fontSize: 14, textAlign: "center", padding: "20px 0" }}>Cargando…</p>
+          <p style={{ color: "#94a3b8", fontSize: 14, textAlign: "center", padding: "20px 0" }}>{t("depts.loading")}</p>
         ) : depts.length === 0 ? (
-          <p style={{ color: "#94a3b8", fontSize: 14, textAlign: "center", padding: "20px 0" }}>No hay departamentos definidos.</p>
+          <p style={{ color: "#94a3b8", fontSize: 14, textAlign: "center", padding: "20px 0" }}>{t("depts.empty")}</p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {depts.map((d) => (
@@ -811,9 +824,9 @@ function DepartamentosSection({ brand }: { brand: string }) {
                       autoFocus
                     />
                     <button onClick={() => save(d.id)} disabled={saving} style={{ ...actionBtn, background: brand, padding: "7px 14px" }}>
-                      {saving ? "…" : "Guardar"}
+                      {saving ? "…" : t("depts.save")}
                     </button>
-                    <button onClick={() => setEditId(null)} style={cancelBtn}>Cancelar</button>
+                    <button onClick={() => setEditId(null)} style={cancelBtn}>{tc("cancel")}</button>
                   </>
                 ) : (
                   <>
@@ -822,13 +835,13 @@ function DepartamentosSection({ brand }: { brand: string }) {
                       onClick={() => { setEditId(d.id); setEditName(d.name); setError(""); }}
                       style={{ background: "none", border: "1px solid #e2e8f0", color: "#64748b", padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600 }}
                     >
-                      Editar
+                      {t("depts.edit")}
                     </button>
                     <button
                       onClick={() => remove(d)}
                       style={{ background: "none", border: "1px solid #fecaca", color: "#dc2626", padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600 }}
                     >
-                      Eliminar
+                      {t("depts.delete")}
                     </button>
                   </>
                 )}

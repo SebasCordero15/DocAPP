@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   Bell, Search, LayoutGrid, List as ListIcon, ChevronLeft, ChevronRight,
   LogOut, Files, Users, Shield, ClipboardList, ScrollText, Plus, Eye,
@@ -84,6 +85,8 @@ function fmtSize(bytes: number) {
 
 export default function DashboardClient({ company, userRole, activeUserCount, maxUsers }: Props) {
   const router = useRouter();
+  const t  = useTranslations("dashboard");
+  const tc = useTranslations("common");
   const brand = company.primaryColor;
   const accent = company.accentColor;
   const font = company.fontFamily;
@@ -558,7 +561,7 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
             <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search files…"
+              placeholder={t("searchPlaceholder")}
               style={{
                 paddingLeft: 32, paddingRight: 10, paddingTop: 7, paddingBottom: 7,
                 border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 13,
@@ -628,26 +631,26 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
           }}>
             <Bell size={18} style={{ flexShrink: 0 }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ fontWeight: 700, fontSize: 14 }}>Tienes pendientes que requieren tu atención</span>
+              <span style={{ fontWeight: 700, fontSize: 14 }}>{t("pendingBanner.heading")}</span>
               <div style={{ display: "flex", gap: 12, marginTop: 4, flexWrap: "wrap" }}>
                 {pendingCounts.enRevision > 0 && (
                   <span style={{ fontSize: 12, background: "rgba(255,255,255,0.22)", borderRadius: 6, padding: "2px 10px", fontWeight: 600 }}>
-                    {pendingCounts.enRevision} tarea{pendingCounts.enRevision !== 1 ? "s" : ""} pendiente{pendingCounts.enRevision !== 1 ? "s" : ""}
+                    {pendingCounts.enRevision} {pendingCounts.enRevision !== 1 ? t("pendingBanner.tasks") : t("pendingBanner.task")} {pendingCounts.enRevision !== 1 ? t("pendingBanner.pendings") : t("pendingBanner.pending")}
                   </span>
                 )}
                 {pendingCounts.atrasadas > 0 && (
                   <span style={{ fontSize: 12, background: "#dc2626", borderRadius: 6, padding: "2px 10px", fontWeight: 700 }}>
-                    ⚠ {pendingCounts.atrasadas} atrasada{pendingCounts.atrasadas !== 1 ? "s" : ""}
+                    ⚠ {pendingCounts.atrasadas} {pendingCounts.atrasadas !== 1 ? t("pendingBanner.overdues") : t("pendingBanner.overdue")}
                   </span>
                 )}
                 {myPendingCR > 0 && (
                   <span style={{ fontSize: 12, background: "rgba(255,255,255,0.22)", borderRadius: 6, padding: "2px 10px", fontWeight: 600 }}>
-                    {myPendingCR} solicitud{myPendingCR !== 1 ? "es" : ""} en revisión
+                    {myPendingCR} {myPendingCR !== 1 ? t("pendingBanner.requests") : t("pendingBanner.request")} {t("pendingBanner.awaitingApproval")}
                   </span>
                 )}
                 {isAdmin && pendingCRCount > 0 && (
                   <span style={{ fontSize: 12, background: "#f59e0b", color: "#1e293b", borderRadius: 6, padding: "2px 10px", fontWeight: 700 }}>
-                    {pendingCRCount} solicitud{pendingCRCount !== 1 ? "es" : ""} por aprobar
+                    {pendingCRCount} {pendingCRCount !== 1 ? t("pendingBanner.requests") : t("pendingBanner.request")} {t("pendingBanner.awaitingApproval")}
                   </span>
                 )}
               </div>
@@ -667,7 +670,7 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
               onClick={() => router.push("/dashboard/pendientes")}
               style={{ background: "#fff", color: brand, border: "none", padding: "8px 20px", borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap" }}
             >
-              Ver Pendientes →
+              {t("pendingBanner.viewLink")}
             </button>
           </div>
         )}
@@ -679,9 +682,9 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
           {!folderId && !loading && (
             <div className="fade-up" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 14, marginBottom: 28 }}>
               {[
-                { label: "Carpetas",             value: subfolders.length, color: brand,     icon: <FolderOpen size={20} /> },
-                { label: "Archivos",             value: files.length,      color: accent,    icon: <Files size={20} /> },
-                { label: "Revisiones pendientes", value: pendingReviews,    color: "#d97706", icon: <Calendar size={20} /> },
+                { label: t("summary.folders"),        value: subfolders.length, color: brand,     icon: <FolderOpen size={20} /> },
+                { label: t("summary.files"),          value: files.length,      color: accent,    icon: <Files size={20} /> },
+                { label: t("summary.pendingReviews"), value: pendingReviews,    color: "#d97706", icon: <Calendar size={20} /> },
               ].map(({ label, value, color, icon }) => (
                 <div key={label} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "18px 20px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -715,14 +718,14 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                     className="action-btn"
                     style={{ display: "flex", alignItems: "center", gap: 6, background: brand, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
                   >
-                    <Plus size={15} /> Nueva Carpeta
+                    <Plus size={15} /> {t("actions.newFolder")}
                   </button>
                   <button
                     onClick={() => router.push("/dashboard/crear-documento")}
                     className="action-btn"
                     style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", color: brand, border: `1.5px solid ${brand}`, padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
                   >
-                    <Plus size={15} /> Crear Documento
+                    <Plus size={15} /> {t("actions.createDoc")}
                   </button>
                 </>
               )}
@@ -741,8 +744,8 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                 onKeyDown={(e) => { if (e.key === "Enter") createFolder(); if (e.key === "Escape") { setShowNewFolder(false); setNewFolderName(""); } }}
                 style={inputStyle}
               />
-              <button onClick={createFolder} disabled={creatingFolder} style={{ background: brand, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}>Crear</button>
-              <button onClick={() => { setShowNewFolder(false); setNewFolderName(""); }} style={cancelBtnStyle}>Cancel</button>
+              <button onClick={createFolder} disabled={creatingFolder} style={{ background: brand, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}>{t("create")}</button>
+              <button onClick={() => { setShowNewFolder(false); setNewFolderName(""); }} style={cancelBtnStyle}>{tc("cancel")}</button>
             </div>
           )}
 
@@ -760,14 +763,14 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
               {searchQuery ? (
                 <>
                   <Search size={40} color="#cbd5e1" />
-                  <p style={{ margin: "16px 0 6px", fontSize: 16, fontWeight: 600, color: "#64748b" }}>No results for "{searchQuery}"</p>
-                  <p style={{ margin: 0, fontSize: 13 }}>Try a different search term.</p>
+                  <p style={{ margin: "16px 0 6px", fontSize: 16, fontWeight: 600, color: "#64748b" }}>{t("emptySearch")} &ldquo;{searchQuery}&rdquo;</p>
+                  <p style={{ margin: 0, fontSize: 13 }}>{t("emptySearchHint")}</p>
                 </>
               ) : (
                 <>
                   <FolderOpen size={48} color="#cbd5e1" />
-                  <p style={{ margin: "16px 0 6px", fontSize: 16, fontWeight: 600, color: "#64748b" }}>This folder is empty</p>
-                  {canEdit && <p style={{ margin: 0, fontSize: 13 }}>Crea una carpeta o usa <strong>Crear Documento</strong> para añadir archivos.</p>}
+                  <p style={{ margin: "16px 0 6px", fontSize: 16, fontWeight: 600, color: "#64748b" }}>{t("emptyFolder")}</p>
+                  {canEdit && <p style={{ margin: 0, fontSize: 13 }}>{t("emptyFolderHint")}</p>}
                 </>
               )}
             </div>
@@ -786,8 +789,8 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                       <input autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
                         onKeyDown={(e) => { if (e.key === "Enter") saveRename(f.id, f.name); if (e.key === "Escape") setRenamingId(null); }}
                         style={{ ...inputStyle, flex: 1 }} />
-                      <button onClick={() => saveRename(f.id, f.name)} style={{ background: brand, color: "#fff", border: "none", padding: "6px 14px", borderRadius: 7, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>Save</button>
-                      <button onClick={() => setRenamingId(null)} style={cancelBtnStyle}>Cancel</button>
+                      <button onClick={() => saveRename(f.id, f.name)} style={{ background: brand, color: "#fff", border: "none", padding: "6px 14px", borderRadius: 7, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>{tc("save")}</button>
+                      <button onClick={() => setRenamingId(null)} style={cancelBtnStyle}>{tc("cancel")}</button>
                     </div>
                   ) : (
                     <>
@@ -818,7 +821,7 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                           {f.codigo && <span style={{ fontSize: 10, fontWeight: 700, background: "#e0f2fe", color: "#0369a1", borderRadius: 4, padding: "1px 6px", flexShrink: 0, whiteSpace: "nowrap" }}>{f.codigo}</span>}
                           {f.status === "PENDING_APPROVAL" && (
                             <span style={{ fontSize: 10, fontWeight: 700, background: "#fef3c7", color: "#92400e", borderRadius: 4, padding: "1px 6px", flexShrink: 0, whiteSpace: "nowrap" }}>
-                              Pendiente de aprobación
+                              {t("pendingApproval")}
                             </span>
                           )}
                         </div>
@@ -879,15 +882,15 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                         )}
                         {isAdmin && allFolders.length > 0 && (
                           <div>
-                            <label style={labelStyle}>Mover a carpeta</label>
+                            <label style={labelStyle}>{t("reviewPanel.moveFolder")}</label>
                             <div style={{ display: "flex", gap: 6 }}>
                               <select value={moveFolderId} onChange={(e) => setMoveFolderId(e.target.value)} style={{ ...inputStyle, width: 160 }}>
-                                <option value="">Sin cambio</option>
+                                <option value="">{t("reviewPanel.noChange")}</option>
                                 {allFolders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
                               </select>
                               {moveFolderId && (
                                 <button onClick={moveFileToFolder} disabled={movingSave} style={{ background: "#7c3aed", color: "#fff", border: "none", padding: "8px 12px", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
-                                  {movingSave ? "…" : "Mover"}
+                                  {movingSave ? "…" : t("reviewPanel.move")}
                                 </button>
                               )}
                             </div>
@@ -895,9 +898,9 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                         )}
                         <div style={{ display: "flex", gap: 8 }}>
                           <button onClick={saveReview} disabled={savingReview} style={{ background: brand, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
-                            {savingReview ? "…" : "Save"}
+                            {savingReview ? "…" : t("reviewPanel.save")}
                           </button>
-                          <button onClick={() => setReviewEditFile(null)} style={cancelBtnStyle}>Cancel</button>
+                          <button onClick={() => setReviewEditFile(null)} style={cancelBtnStyle}>{tc("cancel")}</button>
                         </div>
                       </div>
                     </div>
@@ -913,7 +916,7 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
               {/* Folder grid */}
               {visibleFolders.length > 0 && (
                 <>
-                  <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1 }}>Carpetas</p>
+                  <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1 }}>{t("foldersSectionLabel")}</p>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12, marginBottom: 24 }}>
                     {visibleFolders.map((f) => {
                       const isRenaming = renamingId === f.id;
@@ -930,7 +933,7 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                                 style={{ width: "100%", padding: "5px 8px", border: `1px solid ${brand}`, borderRadius: 6, fontSize: 13, textAlign: "center", boxSizing: "border-box", outline: "none" }}
                               />
                               <div style={{ display: "flex", gap: 4 }}>
-                                <button onClick={() => saveRename(f.id, f.name)} style={{ background: brand, color: "#fff", border: "none", padding: "4px 10px", borderRadius: 5, cursor: "pointer", fontSize: 12, fontWeight: 600 }}>Guardar</button>
+                                <button onClick={() => saveRename(f.id, f.name)} style={{ background: brand, color: "#fff", border: "none", padding: "4px 10px", borderRadius: 5, cursor: "pointer", fontSize: 12, fontWeight: 600 }}>{tc("save")}</button>
                                 <button onClick={() => setRenamingId(null)} style={{ background: "#f1f5f9", color: "#64748b", border: "none", padding: "4px 8px", borderRadius: 5, cursor: "pointer", fontSize: 12 }}>
                                   <X size={11} />
                                 </button>
@@ -954,7 +957,7 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
               {/* File grid */}
               {visibleFiles.length > 0 && (
                 <>
-                  <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1 }}>Archivos</p>
+                  <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1 }}>{t("filesSectionLabel")}</p>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
                     {visibleFiles.map((f) => (
                       <div
@@ -975,7 +978,7 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                         {f.codigo && <span style={{ fontSize: 10, fontWeight: 700, background: "#e0f2fe", color: "#0369a1", borderRadius: 4, padding: "1px 6px", whiteSpace: "nowrap" }}>{f.codigo}</span>}
                         {f.status === "PENDING_APPROVAL" && (
                           <span style={{ fontSize: 10, fontWeight: 700, background: "#fef3c7", color: "#92400e", borderRadius: 4, padding: "1px 7px", whiteSpace: "nowrap" }}>
-                            Pendiente
+                            {t("pendingApproval")}
                           </span>
                         )}
                         <span style={{ fontSize: 11, color: "#94a3b8" }}>{fmtSize(f.size)}</span>
@@ -1093,7 +1096,7 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
           <div style={{ flex: 1, overflow: "auto", background: "#f8fafc" }}>
             {officeViewerLoading ? (
               <div style={{ height: "100%", display: "grid", placeItems: "center", color: "#475569", fontSize: 14 }}>
-                Cargando documento…
+                {t("previewLoading")}
               </div>
             ) : officeViewerSheets.length > 0 ? (
               <div style={{ padding: isWord(officeViewerFile.mimeType) ? "32px 60px" : "16px 20px", maxWidth: isWord(officeViewerFile.mimeType) ? 860 : undefined, margin: "0 auto", background: "#fff", minHeight: "100%" }}>
@@ -1118,11 +1121,11 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
               </div>
             ) : (
               <div style={{ padding: "60px 40px", textAlign: "center", color: "#475569" }}>
-                <p style={{ margin: "0 0 8px", fontWeight: 600, fontSize: 16, color: "#1e293b" }}>No se puede previsualizar</p>
-                <p style={{ margin: "0 0 24px", fontSize: 13 }}>Descarga el archivo para verlo.</p>
+                <p style={{ margin: "0 0 8px", fontWeight: 600, fontSize: 16, color: "#1e293b" }}>{t("previewError")}</p>
+                <p style={{ margin: "0 0 24px", fontSize: 13 }}>{t("previewErrorHint")}</p>
                 {officeDownloadUrl && (
                   <button onClick={() => window.open(officeDownloadUrl, "_blank")} style={{ background: brand, color: "#fff", border: "none", padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 14 }}>
-                    Descargar
+                    {tc("descargar")}
                   </button>
                 )}
               </div>
@@ -1153,7 +1156,7 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
           </div>
           <div style={{ flex: 1, overflow: "hidden" }}>
             {pdfLoading ? (
-              <div style={{ height: "100%", display: "grid", placeItems: "center", color: "#fff" }}>Cargando PDF…</div>
+              <div style={{ height: "100%", display: "grid", placeItems: "center", color: "#fff" }}>{t("pdfLoading")}</div>
             ) : pdfViewerUrl ? (
               <iframe
                 src={pdfViewerUrl}
@@ -1161,7 +1164,7 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                 title={pdfViewerFile.name}
               />
             ) : (
-              <div style={{ height: "100%", display: "grid", placeItems: "center", color: "#94a3b8" }}>No se pudo cargar el PDF.</div>
+              <div style={{ height: "100%", display: "grid", placeItems: "center", color: "#94a3b8" }}>{t("pdfError")}</div>
             )}
           </div>
         </div>
@@ -1174,44 +1177,44 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <UserCheck size={18} color={brand} />
-                <span style={{ fontWeight: 700, fontSize: 16, color: "#1e293b" }}>Solicitar revisión</span>
+                <span style={{ fontWeight: 700, fontSize: 16, color: "#1e293b" }}>{t("peerReview.title")}</span>
               </div>
               <button onClick={() => setPeerReviewFile(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8" }}><X size={18} /></button>
             </div>
             <p style={{ margin: "0 0 18px", fontSize: 13, color: "#64748b" }}>
-              Documento: <strong style={{ color: "#1e293b" }}>{peerReviewFile.nombreDocumento || peerReviewFile.name}</strong>
+              {t("peerReview.docLabel")} <strong style={{ color: "#1e293b" }}>{peerReviewFile.nombreDocumento || peerReviewFile.name}</strong>
             </p>
             <div style={{ marginBottom: 14 }}>
-              <label style={labelStyle}>Asignar a</label>
+              <label style={labelStyle}>{t("peerReview.assignTo")}</label>
               <select
                 value={peerReviewAssignee}
                 onChange={(e) => setPeerReviewAssignee(e.target.value)}
                 style={{ ...inputStyle, width: "100%" }}
               >
-                <option value="">Selecciona un colega…</option>
+                <option value="">{t("peerReview.assignPlaceholder")}</option>
                 {peerReviewUsers.map((u) => (
                   <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
                 ))}
               </select>
             </div>
             <div style={{ marginBottom: 20 }}>
-              <label style={labelStyle}>Mensaje (opcional)</label>
+              <label style={labelStyle}>{t("peerReview.message")}</label>
               <textarea
                 value={peerReviewMessage}
                 onChange={(e) => setPeerReviewMessage(e.target.value)}
-                placeholder="¿Qué debe revisar tu colega?"
+                placeholder={t("peerReview.messagePlaceholder")}
                 rows={3}
                 style={{ ...inputStyle, width: "100%", resize: "vertical" }}
               />
             </div>
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <button onClick={() => setPeerReviewFile(null)} style={cancelBtnStyle}>Cancelar</button>
+              <button onClick={() => setPeerReviewFile(null)} style={cancelBtnStyle}>{tc("cancel")}</button>
               <button
                 onClick={submitPeerReview}
                 disabled={!peerReviewAssignee || submittingPeerReview}
                 style={{ background: brand, color: "#fff", border: "none", padding: "10px 20px", borderRadius: 8, cursor: peerReviewAssignee ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13, opacity: !peerReviewAssignee ? 0.5 : 1 }}
               >
-                {submittingPeerReview ? "Enviando…" : "Solicitar revisión"}
+                {submittingPeerReview ? t("peerReview.submitting") : t("peerReview.submit")}
               </button>
             </div>
           </div>
@@ -1225,12 +1228,12 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
               <h3 style={{ margin: 0, fontSize: 15, color: "#1e293b", display: "flex", alignItems: "center", gap: 8 }}>
                 <Paperclip size={16} color={brand} />
-                {compModalFile.comparisonStorageKey ? "Reemplazar comparativa" : "Adjuntar comparativa"}
+                {compModalFile.comparisonStorageKey ? t("comparison.titleReplace") : t("comparison.titleNew")}
               </h3>
               {!compUploading && <button onClick={() => setCompModalFile(null)} style={{ border: "none", background: "transparent", cursor: "pointer", color: "#94a3b8" }}><X size={18} /></button>}
             </div>
             <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 6px" }}>Documento: <strong>{compModalFile.nombreDocumento || compModalFile.name}</strong></p>
-            <p style={{ fontSize: 12, color: "#94a3b8", margin: "0 0 14px" }}>Adjunta el .docx con control de cambios (marcas rojas) o cualquier versión comparativa.</p>
+            <p style={{ fontSize: 12, color: "#94a3b8", margin: "0 0 14px" }}>{t("comparison.instruction")}</p>
             <div
               onClick={() => !compUploading && compFileInputRef.current?.click()}
               style={{ border: `2px dashed ${compPickedFile ? brand : "#cbd5e1"}`, borderRadius: 8, padding: "14px", cursor: compUploading ? "default" : "pointer", textAlign: "center", background: compPickedFile ? "#f0fdf4" : "#f8fafc", marginBottom: 14 }}
@@ -1238,7 +1241,7 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
               {compPickedFile ? (
                 <div style={{ fontSize: 13, color: "#15803d" }}><strong>{compPickedFile.name}</strong><br /><span style={{ fontSize: 11, color: "#64748b" }}>{(compPickedFile.size / 1024).toFixed(1)} KB</span></div>
               ) : (
-                <div style={{ fontSize: 13, color: "#94a3b8" }}>Haz clic para seleccionar (.docx, .pdf, etc.)</div>
+                <div style={{ fontSize: 13, color: "#94a3b8" }}>{t("comparison.uploadPlaceholder")}</div>
               )}
             </div>
             <input ref={compFileInputRef} type="file" style={{ display: "none" }} onChange={(e) => setCompPickedFile(e.target.files?.[0] ?? null)} />
@@ -1251,7 +1254,7 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                 style={{ background: brand, color: "#fff", border: "none", padding: "7px 18px", borderRadius: 8, cursor: (compUploading || !compPickedFile) ? "default" : "pointer", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, opacity: (!compPickedFile || compUploading) ? 0.6 : 1 }}
               >
                 {compUploading ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Paperclip size={14} />}
-                {compUploading ? "Subiendo…" : "Adjuntar"}
+                {compUploading ? t("comparison.uploading") : t("comparison.attach")}
               </button>
             </div>
           </div>

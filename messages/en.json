@@ -1,0 +1,1081 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving…",
+    "loading": "Loading…",
+    "search": "Search",
+    "clear": "Clear",
+    "from": "From",
+    "to": "To",
+    "empty": "—",
+    "codigo": "Code",
+    "nombre": "Document name",
+    "version": "Version",
+    "documento": "Document",
+    "tipo": "Type",
+    "fecha": "Date",
+    "carpeta": "Folder",
+    "aprobado": "Approved",
+    "rechazado": "Rejected",
+    "pendiente": "Pending",
+    "sistema": "System",
+    "descargar": "Download",
+    "ver": "View",
+    "eliminar": "Delete",
+    "todos": "All",
+    "encargado": "Owner",
+    "paso": "Step",
+    "de": "of",
+    "sin": "None"
+  },
+  "login": {
+    "headline": "Sign in to your workspace",
+    "email": "Email address",
+    "emailPlaceholder": "user@company.com",
+    "password": "Password",
+    "invalidCredentials": "Invalid credentials",
+    "signingIn": "Signing in…",
+    "signIn": "Sign in",
+    "footer": "KE-Control · Reliable Document Management"
+  },
+  "shell": {
+    "nav": {
+      "documentos": "Documents",
+      "externos": "External",
+      "listado": "Master List",
+      "pendientes": "Pending",
+      "controlCambios": "Change Log",
+      "crearDoc": "Create Document",
+      "solicitarCambio": "Request Change",
+      "eliminarDoc": "Del. Document",
+      "equipo": "Team",
+      "permisos": "Permissions",
+      "solicitudes": "Requests",
+      "reportes": "Reports",
+      "historial": "Audit Log"
+    },
+    "users": "users",
+    "signOut": "Sign out",
+    "collapse": "Collapse",
+    "collapseTitle": "Collapse sidebar",
+    "expandTitle": "Expand sidebar",
+    "idle": {
+      "title": "Session expiring",
+      "body": "You have been inactive for a while. Your session will close in:",
+      "continue": "Stay signed in"
+    },
+    "locale": {
+      "es": "ES",
+      "en": "EN",
+      "label": "Language"
+    }
+  },
+  "dashboard": {
+    "searchPlaceholder": "Search files…",
+    "pendingBanner": {
+      "heading": "You have pending items requiring your attention",
+      "task": "task",
+      "tasks": "tasks",
+      "pending": "pending",
+      "pendings": "pending",
+      "overdue": "overdue",
+      "overdues": "overdue",
+      "request": "request",
+      "requests": "requests",
+      "awaitingApproval": "awaiting approval",
+      "viewLink": "View Pending →"
+    },
+    "summary": {
+      "folders": "Folders",
+      "files": "Files",
+      "pendingReviews": "Pending reviews"
+    },
+    "actions": {
+      "newFolder": "New Folder",
+      "createDoc": "Create Document"
+    },
+    "items": {
+      "singular": "item",
+      "plural": "items",
+      "matching": "matching"
+    },
+    "newFolderPlaceholder": "Folder name",
+    "create": "Create",
+    "emptySearch": "No results for",
+    "emptySearchHint": "Try a different search term.",
+    "emptyFolder": "This folder is empty",
+    "emptyFolderHint": "Create a folder or use Create Document to add files.",
+    "renameTitle": "Rename",
+    "trashTitle": "Delete",
+    "foldersSectionLabel": "Folders",
+    "filesSectionLabel": "Files",
+    "pendingApproval": "Pending approval",
+    "dueToday": "Due today",
+    "dueTomorrow": "Due tomorrow",
+    "dueIn": "Due in",
+    "overdue": "Overdue",
+    "days": "days",
+    "colPreview": "No preview available.",
+    "previewLoading": "Loading document…",
+    "previewError": "Cannot preview",
+    "previewErrorHint": "Download the file to view it.",
+    "pdfLoading": "Loading PDF…",
+    "pdfError": "Could not load PDF.",
+    "reviewPanel": {
+      "dueDate": "Due date",
+      "interval": "Repeat every (days)",
+      "assignTo": "Assign to",
+      "unassigned": "Unassigned",
+      "moveFolder": "Move to folder",
+      "noChange": "No change",
+      "move": "Move",
+      "save": "Save"
+    },
+    "peerReview": {
+      "title": "Request review",
+      "docLabel": "Document:",
+      "assignTo": "Assign to",
+      "assignPlaceholder": "Select a colleague…",
+      "message": "Message (optional)",
+      "messagePlaceholder": "What should your colleague review?",
+      "submit": "Request review",
+      "submitting": "Sending…"
+    },
+    "comparison": {
+      "titleNew": "Attach comparison",
+      "titleReplace": "Replace comparison",
+      "docLabel": "Document:",
+      "instruction": "Attach a .docx with tracked changes (red marks) or any comparative version.",
+      "uploadPlaceholder": "Click to select (.docx, .pdf, etc.)",
+      "attach": "Attach",
+      "uploading": "Uploading…"
+    }
+  },
+  "pendientes": {
+    "tabs": {
+      "acciones": "Actions",
+      "seguimiento": "Tracking",
+      "equipo": "Team"
+    },
+    "docTabs": {
+      "enRevision": "In Review",
+      "atrasadas": "Overdue Reviews"
+    },
+    "sections": {
+      "myTasks": "My Assigned Tasks",
+      "myTasksDesc": "Tasks specifically assigned to you",
+      "teamTasks": "Team Tasks",
+      "teamTasksDesc": "All open tasks in the company",
+      "myDocs": "My Documents",
+      "myDocsDesc": "Documents you uploaded or are responsible for"
+    },
+    "filters": {
+      "allUsers": "All users",
+      "allTypes": "All types"
+    },
+    "emptyMyTasks": "You have no pending tasks",
+    "emptyTeamTasks": "No open team tasks",
+    "stepStatus": {
+      "completed": "Completed",
+      "inProgress": "In progress",
+      "next": "Next",
+      "pending": "Pending"
+    },
+    "adminReview": "Admin review",
+    "awaitingApproval": "Awaiting approval",
+    "overdue": "Overdue",
+    "completed": "Completed",
+    "of": "of",
+    "waitingAdmin": "Awaiting admin approval",
+    "outgoingBadge": "Outgoing request",
+    "types": {
+      "ACTUALIZACION": "Update",
+      "REVISION": "Review",
+      "CORRECCION": "Correction"
+    },
+    "actions": {
+      "approve": "Approve",
+      "return": "Return",
+      "reject": "Reject",
+      "respond": "Respond",
+      "complete": "Complete task",
+      "approveChip": "Approve / Return / Reject",
+      "uploadChip": "Upload response",
+      "viewDoc": "View document"
+    },
+    "meta": {
+      "assignedBy": "Assigned by:",
+      "assignedTo": "Assigned to:",
+      "due": "Due:",
+      "folder": "Folder:",
+      "codigo": "Code:",
+      "returnReason": "Return reason:"
+    },
+    "pipeline": {
+      "waiting": "Waiting",
+      "reviewed": "Reviewed",
+      "waitingDesc": "Pending review or approval",
+      "reviewedDesc": "Full cycle completed",
+      "emptyWaiting": "No documents waiting for review",
+      "emptyReviewed": "No reviewed documents yet"
+    },
+    "docStatus": {
+      "DRAFT": "Draft",
+      "IN_REVIEW": "In Review",
+      "REVIEWED": "Reviewed",
+      "PENDING_APPROVAL": "Awaiting Admin",
+      "ready": "Done",
+      "reviewing": "Reviewing…"
+    },
+    "rejected": {
+      "heading": "Rejected / Returned",
+      "desc": "Documents that were rejected or returned with comments",
+      "clearAll": "Clear all",
+      "crRejected": "Change request rejected"
+    },
+    "chainModal": {
+      "approve": "Approve review",
+      "return": "Return to previous reviewer",
+      "reject": "Reject document",
+      "lastReviewer": "You are the last reviewer. Approving will send the document for final admin approval.",
+      "nextReviewer": "Approving advances the document to the next reviewer in the chain.",
+      "returnNote": "The previous reviewer will receive the document back with your note.",
+      "rejectNote": "The document will revert to Draft and the creator will be notified. This ends the review chain.",
+      "noteLabel": "Note",
+      "commentLabel": "Comment",
+      "commentOptional": "(optional)",
+      "rejectPlaceholder": "Explain why the document is being rejected…",
+      "returnPlaceholder": "Indicate what the previous reviewer should fix…",
+      "commentPlaceholder": "Notes for the audit record…",
+      "confirmApprove": "Confirm approval",
+      "confirmReject": "Reject document",
+      "confirmReturn": "Return to previous",
+      "processing": "Processing…"
+    },
+    "errors": {
+      "noteRequired": "A note is required",
+      "actionError": "Error processing action",
+      "selectUser": "Select a user",
+      "assignError": "Error assigning task",
+      "docLinkError": "Could not get document link",
+      "uploadUrlError": "Error getting upload URL",
+      "uploadFileError": "Error uploading file",
+      "correctionError": "Error submitting correction",
+      "unexpectedError": "Unexpected error."
+    },
+    "viewDoc": "View doc"
+  },
+  "solicitudes": {
+    "header": "Requests",
+    "newOutgoing": "New outgoing request",
+    "tabs": {
+      "entrantes": "Incoming",
+      "salientes": "Outgoing"
+    },
+    "infoBanner": "Editor-level users must request approval to upload, edit, or delete documents. Review each request and accept or reject with a reason.",
+    "emptyTitle": "No pending requests",
+    "emptyMsg": "All requests have been reviewed.",
+    "proposedChange": "Proposed change",
+    "approve": "Approve",
+    "reject": "Reject",
+    "processing": "Processing…",
+    "newUploadApproval": {
+      "assignCodigo": "Assign document code",
+      "codigoPlaceholder": "DOC-001",
+      "codigoHelp": "Leave blank to approve without a code.",
+      "versionLabel": "Document version",
+      "versionPlaceholder": "v1.0",
+      "versionHelp": "Leave blank to keep the current version.",
+      "encargadoLabel": "Document owner",
+      "encargadoPlaceholder": "Select owner…",
+      "intervalLabel": "Review interval",
+      "interval1y": "1 year",
+      "interval2y": "2 years",
+      "intervalCustom": "Custom",
+      "intervalCustomPlaceholder": "Days (e.g. 180)"
+    },
+    "confirm": "Confirm",
+    "rejectModal": {
+      "reason": "Reason for rejection",
+      "placeholder": "Explain why this request is being rejected…",
+      "confirm": "Confirm rejection"
+    },
+    "emptyOutgoing": "No outgoing requests",
+    "emptyOutgoingMsg": "Use the \"New outgoing request\" button to ask a user for an update, review, or correction.",
+    "result": {
+      "label": "Result submitted",
+      "noChanges": "No changes needed",
+      "newVersion": "New version uploaded",
+      "corrected": "Correction applied",
+      "versionLabel": "Proposed version:",
+      "metadataChanges": "Metadata changes:",
+      "finalNotes": "Final notes"
+    },
+    "reviewResult": "Review result",
+    "cancelRequest": "Cancel request",
+    "cancelling": "Cancelling…",
+    "reviewModal": {
+      "versionLabel": "Version label (optional)",
+      "versionHelp": "Leave blank to use the label submitted by the user.",
+      "notesLabel": "Notes (required for rejection)",
+      "notesPlaceholder": "Comments for the team…",
+      "return": "Return"
+    },
+    "newOutgoingModal": {
+      "title": "New outgoing request",
+      "docLabel": "Document",
+      "searchPlaceholder": "Search by name or code…",
+      "noResults": "No results",
+      "typeLabel": "Request type",
+      "actualizacionHelp": "Ask the user to upload a more recent version of the document.",
+      "revisionHelp": "Ask the user to review the document and indicate if changes are needed.",
+      "correccionHelp": "Specify which fields or content need to be corrected.",
+      "whatToFix": "What to fix",
+      "fixNombre": "Document name",
+      "fixContenido": "Content / file",
+      "fixArea": "Area / department",
+      "fixCarpeta": "Folder",
+      "fixOtro": "Other:",
+      "contenidoNote": "(user must upload a file)",
+      "fixOtroPlaceholder": "Describe the field to fix…",
+      "instructionsLabel": "Change to make",
+      "instrActualizacion": "Describe the change or update required…",
+      "instrRevision": "Describe the scope and reason for the review…",
+      "instrCorreccion": "Explain in detail what needs to be corrected…",
+      "assigneesLabel": "Assigned to",
+      "selectUserPlaceholder": "Select user…",
+      "addUser": "Add user",
+      "deadline": "Deadline (optional)",
+      "create": "Create request",
+      "creating": "Creating…"
+    },
+    "viewProposal": "View attached proposal",
+    "downloadProposal": "Download proposal",
+    "downloadReview": "Download to review",
+    "downloadCurrent": "Download current version",
+    "revisionType": "Type:",
+    "revisionReason": "Reason:",
+    "cancelConfirm": "Cancel this outgoing request?",
+    "deleteDescription": "Permanently delete this document from the system",
+    "taskChange": "Change upon task completion",
+    "noDetails": "No details available",
+    "newFile": "New file:",
+    "replaceFile": "Replace file with a new version",
+    "errors": {
+      "selectDoc": "Select a document",
+      "selectAssignee": "Select at least one assignee",
+      "instructionsRequired": "The 'Change to make' field is required",
+      "specifyCorrectionFields": "Specify what to correct",
+      "processingRequest": "Error processing the request",
+      "downloadError": "Could not generate the download link",
+      "cancelError": "Error cancelling",
+      "processingReview": "Error processing the review",
+      "createError": "Error creating the request",
+      "fileError": "Could not retrieve the file"
+    },
+    "fieldLabels": {
+      "status": "Status",
+      "codigo": "Code",
+      "nombreDocumento": "Document name",
+      "versionStr": "Version",
+      "fechaEmision": "Issue date",
+      "fechaRevision": "Review date",
+      "fechaActualizacion": "Update date",
+      "controlCambios": "Change control",
+      "encargadoDocumentoId": "Owner"
+    }
+  },
+  "controlCambios": {
+    "header": "Change Log",
+    "records": "records",
+    "docSingular": "document",
+    "docPlural": "documents",
+    "obsoleteSingular": "obsolete",
+    "obsoletePlural": "obsolete",
+    "tabs": {
+      "registro": "Change History",
+      "proximas": "Upcoming Reviews",
+      "archivo": "Historical Archive"
+    },
+    "filters": {
+      "searchPlaceholder": "Search (description / type / who)",
+      "searchHint": "e.g. update, approved…",
+      "codigoPlaceholder": "DOC-001",
+      "nombrePlaceholder": "Search name…"
+    },
+    "table": {
+      "fecha": "Date",
+      "tipoCambio": "Change type",
+      "version": "Version",
+      "quien": "Who",
+      "descripcion": "Change description",
+      "approved": "Approved",
+      "rejected": "Rejected"
+    },
+    "emptyRegistro": "No change records.",
+    "revisionesAsignadas": "Assigned reviews",
+    "requestSingular": "request",
+    "requestPlural": "requests",
+    "tableRevisiones": {
+      "tipo": "Type",
+      "asignado": "Assigned to",
+      "paso": "Step",
+      "instrucciones": "Instructions"
+    },
+    "upcomingTitle": "Scheduled review dates",
+    "tableUpcoming": {
+      "fecha": "Review date",
+      "responsable": "Owner",
+      "carpeta": "Folder"
+    },
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "inDays": "In",
+    "days": "days",
+    "root": "Root",
+    "emptyUpcoming": "No scheduled or assigned reviews.",
+    "obsoleteNotice": "Obsolete documents do not appear in the main dashboard or Master List. They can be restored at any time.",
+    "restore": "Restore",
+    "outTypes": {
+      "REVISION": "Review",
+      "ACTUALIZACION": "Update",
+      "CORRECCION": "Correction"
+    },
+    "pag": "Page",
+    "prev": "← Back",
+    "next": "Next →",
+    "archSearchPlaceholder": "Search by name, code, folder, department…",
+    "emptyObsolete": "No obsolete documents.",
+    "noSearchResults": "No results for that search.",
+    "archivedOn": "Archived on",
+    "comparativa": "Comparison",
+    "noFolder": "No folder",
+    "attach": "Attach",
+    "uploading": "Uploading…",
+    "attachComparison": "Attach comparison",
+    "replaceComparison": "Replace comparison",
+    "clickToSelect": "Click to select a file",
+    "errors": {
+      "selectFile": "Select a file.",
+      "uploadUrlError": "Error getting upload URL.",
+      "uploadError": "Error uploading the file.",
+      "saveComparisonError": "Error saving the comparison.",
+      "unexpected": "Unexpected error."
+    }
+  },
+  "listado": {
+    "header": "Master List",
+    "filters": "Filters",
+    "clearFilters": "Clear filters",
+    "exportExcel": "↓ Export Excel",
+    "filterLabels": {
+      "codigo": "Code",
+      "codigoPlaceholder": "Search code…",
+      "nombre": "Document name",
+      "nombrePlaceholder": "Search name…",
+      "version": "Version",
+      "versionPlaceholder": "v1.0…",
+      "encargado": "Owner",
+      "todos": "All",
+      "emisionFrom": "Issued from",
+      "emisionTo": "Issued to",
+      "revisionFrom": "Reviewed from",
+      "revisionTo": "Reviewed to",
+      "actFrom": "Updated from",
+      "actTo": "Updated to"
+    },
+    "docSingular": "document",
+    "docPlural": "documents",
+    "empty": "No documents found.",
+    "emptyHint": "Try adjusting the filters.",
+    "edit": "Edit",
+    "cancelEdit": "Cancel",
+    "flow": "Flow",
+    "lastReview": "Last review:",
+    "lastAccess": "Last access:",
+    "lastEditor": "Last editor:",
+    "cols": {
+      "codigo": "Document code",
+      "nombre": "Document name",
+      "tipo": "Type",
+      "encargado": "Owner",
+      "emision": "Issue date",
+      "revision": "Review date",
+      "actualizacion": "Update date",
+      "control": "Change log"
+    },
+    "unassigned": "Unassigned",
+    "flowModal": {
+      "title": "Review flow",
+      "emptyDetail": "No details",
+      "empty": "No change requests recorded for this document.",
+      "instructions": "Change to make",
+      "assignees": "Assigned:",
+      "finalNotes": "Final note:",
+      "outcome": "Outcome:",
+      "approved": "approved"
+    }
+  },
+  "crearDoc": {
+    "successTitle": "Document created",
+    "successMsg": "The document was created and sent to the first reviewer.",
+    "successBtn": "Back to dashboard",
+    "header": "Create Document",
+    "steps": {
+      "info": "Info",
+      "file": "File",
+      "reviewers": "Reviewers",
+      "confirm": "Confirm"
+    },
+    "infoSection": "Document information",
+    "fields": {
+      "nombre": "Document name",
+      "nombrePlaceholder": "e.g. Quality Manual 2026",
+      "departamento": "Department",
+      "departamentoPlaceholder": "— Select department —",
+      "noDepts": "The admin can define departments in Team → Departments.",
+      "tipo": "Document type",
+      "tipoOptions": {
+        "Procedimiento": "Procedure",
+        "Manual": "Manual",
+        "Instructivo": "Work instruction",
+        "Formato": "Form",
+        "Política": "Policy",
+        "Otro": "Other"
+      },
+      "version": "Version",
+      "carpeta": "Folder (optional)",
+      "carpetaPlaceholder": "— No folder —"
+    },
+    "nextInfo": "Next: File →",
+    "fileSection": "Attach file",
+    "dropzone": "Click or drag a file here",
+    "dropzoneHint": "PDF, Word, Excel, images…",
+    "changeFile": "Click to change file",
+    "back": "← Back",
+    "nextNormal": "Next: Reviewers →",
+    "nextExternal": "Next: Confirm →",
+    "uploadBtn": "Upload file →",
+    "reviewersSection": "Reviewer chain",
+    "reviewersDesc": "Define who reviews the document and in what order. Each reviewer must approve before it advances to the next.",
+    "addReviewer": "Add reviewer",
+    "reviewerSearch": "Search by name or email…",
+    "orderLabel": "Review order",
+    "emptyReviewers": "Add at least one reviewer to continue.",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove",
+    "confirmSection": "Confirm and create",
+    "confirmLabels": {
+      "nombre": "Name",
+      "tipo": "Type",
+      "archivo": "File",
+      "reviewers": "Reviewer chain",
+      "paso": "Step"
+    },
+    "externalNote": "External folder: the document will be approved directly without reviewers.",
+    "createBtn": "Create document",
+    "creating": "Creating document…",
+    "preparingUpload": "Preparing upload…",
+    "uploadingFile": "Uploading file…",
+    "confirmLabels": {
+      "nombre": "Name",
+      "departamento": "Department",
+      "tipo": "Type",
+      "version": "Version",
+      "carpeta": "Folder",
+      "archivo": "File",
+      "reviewers": "Reviewer chain",
+      "paso": "Step"
+    },
+    "noFolder": "No folder",
+    "errors": {
+      "prepareError": "Error preparing the upload",
+      "uploadError": "Error uploading the file to storage",
+      "createError": "Error creating document"
+    }
+  },
+  "archivo": {
+    "header": "Historical Archive",
+    "docSingular": "document",
+    "docPlural": "documents",
+    "obsoleteSingular": "obsolete",
+    "obsoletePlural": "obsolete",
+    "searchPlaceholder": "Search by name, code, folder, department…",
+    "notice": "Obsolete documents do not appear in the main dashboard or Master List. They can be restored at any time.",
+    "emptyAll": "No obsolete documents.",
+    "emptySearch": "No results for that search.",
+    "cols": {
+      "documento": "Document",
+      "carpeta": "Folder",
+      "tipo": "Type",
+      "version": "Version",
+      "archived": "Archived on",
+      "comparativa": "Comparison"
+    },
+    "noFolder": "No folder",
+    "comparison": {
+      "titleNew": "Attach comparison",
+      "titleReplace": "Replace comparison",
+      "instruction": "Attach a .docx with tracked changes (red marks) or any comparative version.",
+      "uploadPlaceholder": "Click to select file (.docx, .pdf, etc.)",
+      "attach": "Attach",
+      "uploading": "Uploading…",
+      "deleteTitle": "Remove comparison",
+      "replaceTitle": "Replace"
+    },
+    "restore": "Restore"
+  },
+  "audit": {
+    "header": "Access Log",
+    "events": "events",
+    "filters": {
+      "user": "User",
+      "allUsers": "All users",
+      "action": "Action contains",
+      "actionPlaceholder": "e.g. FILE_UPLOAD"
+    },
+    "cols": {
+      "when": "When",
+      "action": "Action",
+      "user": "User",
+      "resource": "Resource",
+      "detail": "Detail"
+    },
+    "empty": "No entries for these filters.",
+    "page": "Page",
+    "prevPage": "← Prev",
+    "nextPage": "Next →"
+  },
+  "eliminar": {
+    "header": "Request Document Deletion",
+    "headerDesc": "The administrator will review your request before deleting the document.",
+    "successTitle": "Request submitted",
+    "successMsg": "The administrator will review your request. We will notify you when it is processed.",
+    "newRequest": "New request",
+    "viewPendientes": "View in Pending",
+    "step1": "1. Select the document",
+    "searchPlaceholder": "Search by name or code…",
+    "emptyDocs": "You have no assigned documents",
+    "emptySearch": "No results",
+    "step2": "2. Reason (optional)",
+    "reasonPlaceholder": "Why do you want to delete this document?",
+    "warning": "The administrator must approve this request. If approved, the document will be permanently deleted.",
+    "noPermission": "You do not have permission to request deletion of this document. Edit permission is required.",
+    "submitBtn": "Submit deletion request",
+    "submitting": "Submitting…"
+  },
+  "permisos": {
+    "header": "Permissions",
+    "tabs": {
+      "docs": "Documents",
+      "externos": "External"
+    },
+    "foldersLabel": "Folders",
+    "filesLabel": "Files",
+    "emptyResources": "No resources yet.",
+    "selectPrompt": "Select a folder or file to manage its permissions.",
+    "legend": {
+      "heading": "How permissions work:",
+      "rolBase": "base role",
+      "explicit": "explicit permission",
+      "inherit": "Inherit"
+    },
+    "cols": {
+      "user": "User",
+      "rolBase": "Base role",
+      "explicit": "Explicit permission",
+      "effective": "Effective access",
+      "source": "Source",
+      "assign": "Assign access"
+    },
+    "sources": {
+      "admin": "Admin role",
+      "direct": "Direct permission",
+      "folder": "↑ Folder:"
+    },
+    "levels": {
+      "MANAGE": "Full management",
+      "EDIT": "Edit",
+      "READ": "Read only",
+      "NONE": "No access",
+      "alwaysManage": "Always MANAGE"
+    },
+    "options": {
+      "inherit": "— Inherit from base role",
+      "NONE": "No access",
+      "READ": "Read only",
+      "EDIT": "Edit",
+      "MANAGE": "Full management"
+    }
+  },
+  "reportes": {
+    "header": "Change Report",
+    "exportCsv": "Export CSV",
+    "filters": {
+      "from": "From",
+      "to": "To",
+      "user": "User",
+      "allUsers": "All users",
+      "apply": "Apply",
+      "clear": "Clear"
+    },
+    "stats": {
+      "uploads": "Uploads",
+      "deletes": "Deletions",
+      "reviews": "Reviews",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "pending": "Pending"
+    },
+    "detailTitle": "Request details",
+    "records": "records",
+    "empty": "No data for the selected period.",
+    "cols": {
+      "fecha": "Date",
+      "tipo": "Type",
+      "documento": "Document",
+      "codigo": "Code",
+      "requestedBy": "Requested by",
+      "estado": "Status",
+      "reviewedBy": "Reviewed by",
+      "notas": "Notes"
+    },
+    "status": {
+      "APPROVED": "Approved",
+      "REJECTED": "Rejected",
+      "PENDING": "Pending"
+    },
+    "types": {
+      "NEW_UPLOAD": "New upload",
+      "EDIT_METADATA": "Metadata edit",
+      "REPLACE_FILE": "File replacement",
+      "DELETE": "Deletion",
+      "REVISION_DATE_CHANGE": "Review date change",
+      "OTHER": "Document change"
+    }
+  },
+  "team": {
+    "header": "Team",
+    "pageTitle": "Team",
+    "userCount": "Users: {active} / {max}",
+    "pendingInvites": "{count, plural, one {· # pending invite} other {· # pending invites}}",
+    "atLimitMsg": "User limit reached. Deactivate a user or contact support to expand your plan.",
+    "addUser": "Add user",
+    "tabDirect": "Create with temporary password",
+    "tabInvite": "Send invitation link",
+    "directDesc": "Create the user immediately with a temporary password you can share directly (without needing email).",
+    "inviteDesc": "Send an invitation link. The user clicks the link and creates their own password.",
+    "labels": {
+      "fullName": "Full name *",
+      "email": "Email *",
+      "emailReadonly": "Email (not editable)",
+      "role": "Role",
+      "baseRole": "Base role",
+      "tempPwLabel": "Temporary password",
+      "tempPwPlaceholder": "Min. 8 chars · uppercase · lowercase · number",
+      "specifyManual": "Specify password manually"
+    },
+    "roleOptions": {
+      "viewer": "Viewer (read-only)",
+      "editor": "Editor (can upload and edit)",
+      "admin": "Company admin",
+      "viewerShort": "Viewer",
+      "editorShort": "Editor",
+      "adminShort": "Admin"
+    },
+    "roleLegend": {
+      "adminDesc": "Full access: manages users, permissions, folders, approves requests and sees all documents.",
+      "editorDesc": "Can upload and edit documents in folders with permission. Metadata changes require Admin approval.",
+      "viewerDesc": "Read-only in assigned folders or files."
+    },
+    "actions": {
+      "creating": "Creating…",
+      "create": "Create user",
+      "sending": "Sending…",
+      "sendInvite": "Send invitation",
+      "reset": "Reset",
+      "close": "Close",
+      "edit": "Edit",
+      "password": "Password",
+      "deactivate": "Deactivate",
+      "activate": "Activate",
+      "revoke": "Revoke",
+      "saving": "Saving…",
+      "save": "Save"
+    },
+    "members": "Members",
+    "tableHeaders": {
+      "name": "Name",
+      "email": "Email",
+      "role": "Role",
+      "status": "Status",
+      "lastAccess": "Last access",
+      "actions": "Actions"
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "never": "Never",
+      "you": "You"
+    },
+    "roleLabels": {
+      "COMPANY_ADMIN": "Admin",
+      "EDITOR": "Editor",
+      "VIEWER": "Viewer"
+    },
+    "pendingInvitesTitle": "Pending invitations",
+    "inviteTableHeaders": {
+      "sent": "Sent",
+      "expires": "Expires"
+    },
+    "inviteSent": "✓ Invitation email sent.",
+    "inviteNoEmail": "Email not sent (RESEND_API_KEY not configured) — share this link manually:",
+    "resetModal": {
+      "title": "Reset password",
+      "desc": "Resetting password for {name} ({email}).",
+      "errorGeneric": "Error resetting password"
+    },
+    "editModal": {
+      "title": "Edit user",
+      "errorGeneric": "Error saving"
+    },
+    "tempPw": {
+      "title": "✓ Temporary password generated for {name}",
+      "desc": "This password is shown only once. Share it with {email} securely. The user must change it upon login.",
+      "copy": "Copy",
+      "copied": "Copied!"
+    },
+    "depts": {
+      "title": "Departments",
+      "desc": "Define departments available when creating documents.",
+      "placeholder": "New department name…",
+      "adding": "Saving…",
+      "add": "+ Add",
+      "loading": "Loading…",
+      "empty": "No departments defined.",
+      "save": "Save",
+      "edit": "Edit",
+      "delete": "Delete",
+      "errors": {
+        "create": "Error creating",
+        "save": "Error saving",
+        "delete": "Cannot delete"
+      }
+    },
+    "timeAgo": {
+      "now": "now",
+      "mins": "{n}m ago",
+      "hours": "{n}h ago",
+      "days": "{n}d ago"
+    },
+    "errors": {
+      "update": "Error updating",
+      "connection": "Connection error",
+      "sendInvite": "Error sending invitation",
+      "createUser": "Error creating user"
+    },
+    "loading": "Loading…"
+  },
+  "solicitar": {
+    "header": "Request Document Change",
+    "headerDesc": "The administrator will review your proposal before starting the change process.",
+    "step1": "1. Document",
+    "step2": "2. Change type",
+    "step3": "3. Reason",
+    "step4": "4. Proposal file",
+    "step4Optional": "(optional)",
+    "step4Desc": "Attach a reference document or draft that the administrator can review.",
+    "attachFile": "Attach file",
+    "loadingDocs": "Loading documents…",
+    "successTitle": "Proposal submitted",
+    "successMsg": "The administrator will review your proposal. If approved, they will start the change process and notify you.",
+    "newRequest": "New request",
+    "viewPendientes": "View in Pending",
+    "types": {
+      "REVISION": "Review",
+      "ACTUALIZACION": "Update",
+      "CORRECCION": "Correction"
+    },
+    "typeDescs": {
+      "REVISION": "Request that the document be reviewed to verify if changes are needed.",
+      "ACTUALIZACION": "Request a more up-to-date version of the document.",
+      "CORRECCION": "Flag an error or inconsistency that needs to be corrected."
+    },
+    "errors": {
+      "noDoc": "Select a document",
+      "noMotivo": "Reason is required",
+      "uploadUrl": "Error preparing file upload",
+      "uploadFile": "Error uploading proposal file",
+      "noPermission": "You do not have permission to request changes on this document. Edit permission is required.",
+      "generic": "Error submitting request"
+    },
+    "confirmLabels": {
+      "nombre": "Name",
+      "codigo": "Code",
+      "version": "Version"
+    },
+    "searchPlaceholder": "Search by name or code…",
+    "emptyDocs": "You have no assigned documents",
+    "emptySearch": "No results",
+    "motivoPlaceholder": "Describe the reason or justification for the requested change…",
+    "uploading": "Uploading file…",
+    "submitting": "Submitting…",
+    "submit": "Submit proposal"
+  },
+  "externos": {
+    "header": "External Documents",
+    "headerSub": "Direct upload · no review flow",
+    "foldersLabel": "Folders",
+    "loadingFolders": "Loading…",
+    "noFolders": "No external folders.",
+    "createFolder": "Create folder",
+    "noFolderSelected": "Select a folder.",
+    "noFolderAdmin": "Create an external folder to start.",
+    "noFolderUser": "You don't have access to external folders.",
+    "uploadBtn": "Upload document",
+    "externalNotice": "Documents in external folders are published directly without going through a review flow.",
+    "emptyFolder": "This folder is empty.",
+    "uploadFirst": "Upload first document",
+    "docCount": "{count, plural, one {# document} other {# documents}}",
+    "tableHeaders": {
+      "documento": "Document",
+      "tipo": "Type",
+      "subidoPor": "Uploaded by",
+      "fecha": "Date"
+    },
+    "uploadModal": {
+      "title": "Upload external document",
+      "folderLabel": "Folder *",
+      "folderPlaceholder": "— Select folder —",
+      "fileLabel": "File *",
+      "filePrompt": "Click to select file",
+      "nombreLabel": "Document name *",
+      "nombrePlaceholder": "E.g.: Security Manual 2025",
+      "tipoLabel": "Type *",
+      "deptLabel": "Department *",
+      "deptPlaceholder": "E.g.: Operations",
+      "uploading": "Uploading…",
+      "upload": "Upload"
+    },
+    "folderModal": {
+      "title": "New external folder",
+      "nameLabel": "Folder name *",
+      "namePlaceholder": "E.g.: External Standards",
+      "creating": "Creating…",
+      "create": "Create folder"
+    },
+    "tipos": {
+      "PROCEDIMIENTO": "Procedure",
+      "MANUAL": "Manual",
+      "INSTRUCTIVO": "Instructions",
+      "FORMATO": "Format",
+      "POLITICA": "Policy",
+      "OTRO": "Other"
+    },
+    "errors": {
+      "noFile": "Select a file.",
+      "noFolder": "Select a folder.",
+      "noNombre": "Document name is required.",
+      "noDept": "Department is required.",
+      "uploadUrl": "Could not get upload URL.",
+      "uploadFile": "Error uploading file.",
+      "createDoc": "Error registering document.",
+      "unexpected": "Unexpected error.",
+      "createFolder": "Error creating folder."
+    },
+    "deleteConfirm": "Delete \"{name}\"?"
+  },
+  "listadoMaestro": {
+    "header": "Master List",
+    "filters": "Filters",
+    "clearFilters": "Clear filters",
+    "exportExcel": "Export Excel",
+    "loadingDocs": "Loading…",
+    "docCount": "{count, plural, one {# document} other {# documents}}",
+    "emptyDocs": "No documents found.",
+    "emptyFiltersHint": "Try adjusting the filters.",
+    "filterLabels": {
+      "nombre": "Document name",
+      "encargado": "Owner",
+      "todos": "All",
+      "emisionFrom": "Issue from",
+      "emisionTo": "Issue to",
+      "revisionFrom": "Review from",
+      "revisionTo": "Review to",
+      "actFrom": "Update from",
+      "actTo": "Update to"
+    },
+    "filterPlaceholders": {
+      "codigo": "Search code…",
+      "nombre": "Search name…",
+      "version": "v1.0…",
+      "changeLogs": "Change description…"
+    },
+    "tableHeaders": {
+      "nombre": "Document name",
+      "fechaEmision": "Issue date",
+      "fechaRevision": "Review date",
+      "fechaActualizacion": "Update date",
+      "controlCambios": "Change log",
+      "encargado": "Owner",
+      "acciones": "Actions"
+    },
+    "rowLabels": {
+      "lastReview": "Last review:",
+      "lastAccess": "Last access:",
+      "lastEditor": "Last editor:"
+    },
+    "actions": {
+      "view": "↓ View",
+      "flow": "Flow",
+      "edit": "Edit",
+      "saving": "Saving…",
+      "save": "Save"
+    },
+    "editLabels": {
+      "sinAsignar": "Unassigned"
+    },
+    "flowModal": {
+      "title": "Review flow",
+      "loading": "Loading…",
+      "empty": "No change requests registered for this document.",
+      "changeTask": "Change to perform",
+      "assigned": "Assigned:",
+      "result": "Result:",
+      "approvedOn": "approved",
+      "finalNote": "Final note:"
+    },
+    "statusLabels": {
+      "PENDING": "Pending",
+      "IN_PROGRESS": "In progress",
+      "PENDING_APPROVAL": "Pend. approval",
+      "APPROVED": "Approved",
+      "REJECTED": "Rejected",
+      "CANCELLED": "Cancelled"
+    },
+    "typeLabels": {
+      "ACTUALIZACION": "Update",
+      "REVISION": "Review",
+      "CORRECCION": "Correction"
+    },
+    "outcomeLabels": {
+      "no_changes": "No changes needed",
+      "new_version": "New version uploaded",
+      "corrected": "Correction applied"
+    },
+    "excelColumns": {
+      "codigo": "Code",
+      "nombre": "Document name",
+      "version": "Version",
+      "fechaEmision": "Issue date",
+      "fechaRevision": "Review date",
+      "fechaActualizacion": "Update date",
+      "controlCambios": "Change log",
+      "encargado": "Document owner",
+      "carpeta": "Folder",
+      "archivo": "File"
+    }
+  }
+}
