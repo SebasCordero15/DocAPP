@@ -118,6 +118,7 @@ export async function POST(
         const baseDate = cr.file?.createdAt ?? now;
         const reviewDate = new Date(baseDate.getTime() + reviewIntervalDays * 24 * 60 * 60 * 1000);
 
+        const newUploadDetail = ["Documento aprobado", adminNotes?.trim()].filter(Boolean).join(" | ");
         await prisma.file.update({
           where: { id: cr.fileId },
           data: {
@@ -128,6 +129,7 @@ export async function POST(
             reviewDueDate:         reviewDate,
             // Ensure fechaEmision is stamped (covers docs created before this fix)
             fechaEmision:          cr.file?.createdAt ?? now,
+            controlCambios:        newUploadDetail,
             ...(assignedCodigo ? { codigo: assignedCodigo } : {}),
             ...(adminVersionStr?.trim() ? { versionStr: adminVersionStr.trim() } : {}),
           },
@@ -136,6 +138,12 @@ export async function POST(
       } else if (cr.type === "EDIT_METADATA" || cr.type === "REVISION_DATE_CHANGE") {
         // proposedFileUpdates: from task-completion; after: from manual edit CRs
         const source = (pc.proposedFileUpdates ?? pc.after) as Record<string, unknown> | undefined;
+        const editTypeDesc = cr.type === "REVISION_DATE_CHANGE" ? "Actualización de fecha de revisión" : "Edición de metadatos";
+        const editBefore = pc.before as Record<string, unknown> | undefined;
+        const editAfter  = pc.after  as Record<string, unknown> | undefined;
+        const editDiff   = (editBefore && editAfter && Object.keys(editAfter).length > 0)
+          ? buildDiff(editBefore, editAfter) : "";
+        const editDetail = [editTypeDesc, editDiff, adminNotes?.trim()].filter(Boolean).join(" | ");
         if (source) {
           const updateData: Record<string, unknown> = {};
           for (const [k, v] of Object.entries(source)) {
@@ -146,11 +154,12 @@ export async function POST(
           if (!updateData.fechaActualizacion) updateData.fechaActualizacion = now;
           updateData.lastEditedAt       = now;
           updateData.lastEditedByUserId = userId;
+          updateData.controlCambios     = editDetail;
           await prisma.file.update({ where: { id: cr.fileId }, data: updateData });
         } else if (adminVersionStr?.trim()) {
           await prisma.file.update({
             where: { id: cr.fileId },
-            data: { versionStr: adminVersionStr.trim(), fechaActualizacion: now, lastEditedAt: now, lastEditedByUserId: userId },
+            data: { versionStr: adminVersionStr.trim(), fechaActualizacion: now, lastEditedAt: now, lastEditedByUserId: userId, controlCambios: editDetail },
           });
         }
 
@@ -187,6 +196,7 @@ export async function POST(
 
       } else if (cr.type === "OTHER") {
         const updates = pc.proposedFileUpdates as Record<string, unknown> | undefined;
+        const otherDetail = ["Modificación de documento", adminNotes?.trim()].filter(Boolean).join(" | ");
         if (updates || adminVersionStr?.trim()) {
           const updateData: Record<string, unknown> = {};
           if (updates) {
@@ -198,6 +208,7 @@ export async function POST(
           if (!updateData.fechaActualizacion) updateData.fechaActualizacion = now;
           updateData.lastEditedAt       = now;
           updateData.lastEditedByUserId = userId;
+          updateData.controlCambios     = otherDetail;
           await prisma.file.update({ where: { id: cr.fileId }, data: updateData });
         }
       }

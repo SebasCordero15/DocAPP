@@ -121,11 +121,18 @@ export async function PATCH(
     if (task.type === "REVIEW") {
       const intervalDays = task.file.reviewIntervalDays ?? 365;
       const nextReview = new Date(now.getTime() + intervalDays * 24 * 60 * 60 * 1000);
-      fileUpdates.fechaRevision    = nextReview;
+      fileUpdates.fechaRevision      = nextReview;
       fileUpdates.fechaActualizacion = now;
-      fileUpdates.status = "REVIEWED";
+      fileUpdates.status             = "REVIEWED";
+      fileUpdates.controlCambios     = [
+        "Revisión completada",
+        notes?.trim(),
+      ].filter(Boolean).join(" | ");
     }
-    if (task.type === "UPDATE")  { fileUpdates.fechaActualizacion = now; }
+    if (task.type === "UPDATE") {
+      fileUpdates.fechaActualizacion = now;
+      fileUpdates.controlCambios     = ["Actualización completada", notes?.trim()].filter(Boolean).join(" | ");
+    }
     if (task.type === "APPROVE") { fileUpdates.status = "REVIEWED"; }
 
     if (Object.keys(fileUpdates).length > 0) {

@@ -137,10 +137,22 @@ export async function POST(
     fechaActualizacion: now,
   };
 
-  // Auto-update controlCambios from the "cambio a realizar" description
-  if (outgoing.instructions) {
-    fileUpdateData.controlCambios = outgoing.instructions;
-  }
+  // Build controlCambios detail from this event
+  const typeLabel =
+    outgoing.type === "ACTUALIZACION" ? "Actualización"
+    : outgoing.type === "REVISION"    ? "Revisión"
+    : "Corrección";
+  const outcomeLabel =
+    outcomeType === "no_changes" ? "Sin cambios"
+    : outcomeType === "new_version" ? "Nueva versión"
+    : outcomeType === "corrected"   ? "Corregido"
+    : "";
+  const parts = [typeLabel, outcomeLabel].filter(Boolean).join(" — ");
+  const detail = [parts, outgoing.instructions, parsed.data.notes]
+    .map((s) => s?.trim())
+    .filter(Boolean)
+    .join(" | ");
+  fileUpdateData.controlCambios = detail || typeLabel;
 
   // Advance next review date: base = now (date of this review/update) + interval
   if (file.reviewIntervalDays) {
