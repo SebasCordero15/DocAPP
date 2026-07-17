@@ -179,6 +179,7 @@ export async function GET(req: NextRequest) {
           versionStr: true,
           mimeType: true,
           status: true,
+          fechaRevision: true,
           folder: { select: { id: true, name: true } },
         },
       },
@@ -217,6 +218,7 @@ export async function GET(req: NextRequest) {
       completedAt: t.completedAt?.toISOString() ?? null,
       createdAt: t.createdAt.toISOString(),
       isOverdue: t.dueDate ? t.dueDate < now && t.status !== "COMPLETED" : false,
+      fileRevisionOverdue: t.file.fechaRevision ? t.file.fechaRevision < now && t.status !== "COMPLETED" : false,
       chainCurrentStep: t.reviewChain?.currentStep ?? null,
       chainTotalSteps:  t.reviewChain?.totalSteps  ?? null,
       reviewChain: undefined, // don't leak full chain object; use the flattened fields above

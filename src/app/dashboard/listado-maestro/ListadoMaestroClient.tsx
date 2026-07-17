@@ -475,7 +475,20 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
                         </td>
                         <td style={td}>{f.versionStr ?? <span style={{ color: "#d1d5db" }}>—</span>}</td>
                         <td style={td}>{fmtDate(f.fechaEmision)}</td>
-                        <td style={td}>{fmtDate(f.fechaRevision)}</td>
+                        <td style={td}>
+                          {f.fechaRevision ? (() => {
+                            const today = new Date(); today.setHours(0, 0, 0, 0);
+                            const overdue = new Date(f.fechaRevision) < today;
+                            return overdue ? (
+                              <div>
+                                <span style={{ color: "#dc2626", fontWeight: 700 }}>{fmtDate(f.fechaRevision)}</span>
+                                <span style={{ marginLeft: 5, background: "#fee2e2", color: "#dc2626", fontSize: 10, fontWeight: 700, borderRadius: 4, padding: "1px 5px" }}>Vencido</span>
+                              </div>
+                            ) : (
+                              <span>{fmtDate(f.fechaRevision)}</span>
+                            );
+                          })() : <span style={{ color: "#d1d5db" }}>—</span>}
+                        </td>
                         <td style={td}>{fmtDate(f.fechaActualizacion)}</td>
                         <td style={{ ...td, maxWidth: 180 }}>
                           {f.controlCambios ? (

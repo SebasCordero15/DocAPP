@@ -35,7 +35,7 @@ interface OutgoingTaskInfo {
 interface Task {
   id: string; type: TaskType; status: TaskStatus;
   dueDate: string | null; notes: string | null; rejectionNote: string | null;
-  createdAt: string; completedAt: string | null; isOverdue: boolean;
+  createdAt: string; completedAt: string | null; isOverdue: boolean; fileRevisionOverdue: boolean;
   file: TaskFile; assignedTo: TaskUser; assignedBy: TaskUser;
   reviewChainId: string | null;
   stepOrder: number | null;
@@ -738,6 +738,28 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
 
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 24px" }}>
 
+        {/* ── Vencidos banner ─────────────────────────────────────────────────── */}
+        {mainTab === "acciones" && docCounts.atrasadas > 0 && (
+          <div
+            onClick={() => { setDocTab("atrasadas"); fetchDocFiles("atrasadas"); }}
+            style={{
+              background: "#fef2f2", border: "1.5px solid #fca5a5", borderRadius: 10,
+              padding: "12px 20px", marginBottom: 24, cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 14,
+            }}
+          >
+            <span style={{ fontSize: 20 }}>⚠</span>
+            <div style={{ flex: 1 }}>
+              <span style={{ fontWeight: 700, color: "#dc2626", fontSize: 14 }}>
+                {docCounts.atrasadas} {docCounts.atrasadas === 1 ? "documento vencido" : "documentos vencidos"}
+              </span>
+              <span style={{ color: "#ef4444", fontSize: 12, marginLeft: 10 }}>
+                — fecha de revisión superada. Haz clic para ver.
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* ── Section A: Mis Tareas / Tareas del Equipo ───────────────────────── */}
         {(mainTab === "acciones" || mainTab === "equipo") && (
           <section style={{ marginBottom: 48 }}>
@@ -796,8 +818,9 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                   const typeColor = OUT_TYPE_COLORS_LOC[or.type] ?? { bg: "#f3f4f6", color: "#374151" };
                   const overallDone = sorted.every((t) => t.status === "COMPLETED");
                   const anyOverdue  = !overallDone && sorted.some((t) => t.isOverdue);
+                  const revVencida  = !overallDone && sorted.some((t) => t.fileRevisionOverdue);
                   return (
-                    <div key={or.id} className="card" style={{ borderLeft: `4px solid ${anyOverdue ? "#dc2626" : typeColor.color}` }}>
+                    <div key={or.id} className="card" style={{ borderLeft: `4px solid ${anyOverdue || revVencida ? "#dc2626" : typeColor.color}` }}>
                       <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
                         <FileIcon mimeType={rep.file.mimeType} size={30} />
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -817,6 +840,11 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                             }}>
                               {overallDone ? t("completed") : anyOverdue ? t("overdue") : t("stepStatus.inProgress")}
                             </span>
+                            {revVencida && !overallDone && (
+                              <span style={{ background: "#fee2e2", color: "#dc2626", borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>
+                                ⚠ Rev. vencida
+                              </span>
+                            )}
                           </div>
                           {/* Meta */}
                           <div style={{ display: "flex", gap: 14, fontSize: 12, color: "#64748b", flexWrap: "wrap", marginBottom: 10 }}>
@@ -957,6 +985,9 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                             )}
                             {task.isOverdue && (
                               <span style={{ background: "#fee2e2", color: "#dc2626", borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>{t("overdue")}</span>
+                            )}
+                            {task.fileRevisionOverdue && !task.isOverdue && (
+                              <span style={{ background: "#fee2e2", color: "#dc2626", borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>⚠ Rev. vencida</span>
                             )}
                             {/* Action-required chip */}
                             {task.status !== "COMPLETED" && task.assignedTo.id === userId && (

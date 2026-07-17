@@ -131,6 +131,7 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
 
   // ── Próximas Revisiones state ──
   const [revFiles,    setRevFiles]    = useState<RevFile[]>([]);
+  const [revVencidas, setRevVencidas] = useState<RevFile[]>([]);
   const [revAsignadas, setRevAsignadas] = useState<RevAsignada[]>([]);
   const [revLoading,  setRevLoading]  = useState(false);
   const [revLoaded,   setRevLoaded]   = useState(false);
@@ -177,9 +178,14 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
     const res = await fetch("/api/control-cambios/revisiones");
     if (res.ok) {
       const data = await res.json();
-      const sorted = (data.programadas as RevFile[]).filter((f) => f.fechaRevision);
-      sorted.sort((a, b) => new Date(a.fechaRevision).getTime() - new Date(b.fechaRevision).getTime());
-      setRevFiles(sorted);
+      const all = (data.programadas as RevFile[]).filter((f) => f.fechaRevision);
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const vencidas  = all.filter((f) => new Date(f.fechaRevision) < today);
+      const proximas  = all.filter((f) => new Date(f.fechaRevision) >= today);
+      vencidas.sort((a, b) => new Date(a.fechaRevision).getTime() - new Date(b.fechaRevision).getTime());
+      proximas.sort((a, b) => new Date(a.fechaRevision).getTime() - new Date(b.fechaRevision).getTime());
+      setRevVencidas(vencidas);
+      setRevFiles(proximas);
       setRevAsignadas(data.asignadas ?? []);
     }
     setRevLoading(false);
@@ -282,7 +288,7 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
         <div style={{ display: "flex", borderTop: "1px solid rgba(255,255,255,0.15)", paddingLeft: 16 }}>
           {([
             { key: "cambios"  as const, label: t("tabs.registro"), badge: 0 },
-            ...(isAdmin ? [{ key: "revisiones" as const, label: t("tabs.proximas"), badge: revFiles.length + revAsignadas.length }] : []),
+            ...(isAdmin ? [{ key: "revisiones" as const, label: t("tabs.proximas"), badge: revVencidas.length + revFiles.length + revAsignadas.length }] : []),
             { key: "archivo" as const, label: t("tabs.archivo"), badge: 0 },
           ]).map((tab) => {
             const isActive = activeTab === tab.key;
@@ -534,8 +540,64 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
                 </div>
               )}
 
+              {/* ── Revisiones VENCIDAS ── */}
+              {revVencidas.length > 0 && (
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                    <div style={{ background: "#dc2626", color: "#fff", borderRadius: 6, padding: "4px 14px", fontSize: 13, fontWeight: 700 }}>
+                      ⚠ Revisiones Vencidas
+                    </div>
+                    <span style={{ fontSize: 12, color: "#dc2626", fontWeight: 600 }}>{revVencidas.length} {revVencidas.length !== 1 ? t("docPlural") : t("docSingular")}</span>
+                  </div>
+                  <div style={{ background: "#fff", border: "2px solid #fca5a5", borderRadius: 10, overflow: "hidden" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid #fee2e2", background: "#fff5f5" }}>
+                          {[t("tableUpcoming.fecha"), tc("documento"), tc("codigo"), t("tableUpcoming.responsable"), t("tableUpcoming.carpeta")].map((h) => (
+                            <th key={h} style={{ padding: "9px 16px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#ef4444", textTransform: "uppercase", letterSpacing: 0.5, whiteSpace: "nowrap" }}>
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {revVencidas.map((f) => {
+                          const today = new Date(); today.setHours(0, 0, 0, 0);
+                          const daysOverdue = Math.ceil((today.getTime() - new Date(f.fechaRevision).getTime()) / 86_400_000);
+                          return (
+                            <tr key={f.id} style={{ borderBottom: "1px solid #fee2e2", background: daysOverdue > 30 ? "#fef2f2" : "#fff" }}>
+                              <td style={{ padding: "11px 16px", whiteSpace: "nowrap" }}>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: "#dc2626" }}>{fmtDate(f.fechaRevision)}</div>
+                                <div style={{ fontSize: 11, color: "#dc2626", marginTop: 1, fontWeight: 600 }}>
+                                  Vencido hace {daysOverdue} {daysOverdue === 1 ? "día" : "días"}
+                                </div>
+                              </td>
+                              <td style={{ padding: "11px 16px", fontSize: 13, color: "#1e293b", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {f.nombreDocumento || f.name}
+                              </td>
+                              <td style={{ padding: "11px 16px" }}>
+                                {f.codigo
+                                  ? <code style={{ background: "#fee2e2", padding: "2px 7px", borderRadius: 4, fontSize: 12, color: "#dc2626" }}>{f.codigo}</code>
+                                  : <span style={{ color: "#d1d5db" }}>—</span>
+                                }
+                              </td>
+                              <td style={{ padding: "11px 16px", fontSize: 13, color: "#374151" }}>
+                                {f.encargadoDocumento?.name ?? <span style={{ color: "#d1d5db" }}>—</span>}
+                              </td>
+                              <td style={{ padding: "11px 16px", fontSize: 12, color: "#64748b" }}>
+                                {f.folder?.name ?? <span style={{ color: "#d1d5db" }}>{t("root")}</span>}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
               {/* ── Revisiones programadas ── */}
-              {revFiles.length === 0 && revAsignadas.length === 0 ? (
+              {revFiles.length === 0 && revVencidas.length === 0 && revAsignadas.length === 0 ? (
                 <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "48px 24px", textAlign: "center", color: "#94a3b8" }}>
                   <p style={{ fontSize: 15, margin: 0 }}>{t("emptyUpcoming")}</p>
                 </div>

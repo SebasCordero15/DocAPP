@@ -21,7 +21,7 @@ export async function GET() {
       where: {
         companyId,
         deletedAt: null,
-        fechaRevision: { gte: today },
+        fechaRevision: { not: null },
         ...(!isAdmin ? {
           OR: [
             { status: "REVIEWED" },
