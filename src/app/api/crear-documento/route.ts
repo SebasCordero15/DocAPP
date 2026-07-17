@@ -131,6 +131,7 @@ export async function POST(req: NextRequest) {
             codigo:           codigo?.trim() || null,
             status:           "REVIEWED",
             uploadedByUserId: userId,
+            fechaEmision:     new Date(),
             previewRows:      previewRows ?? undefined,
           },
         });
@@ -153,6 +154,7 @@ export async function POST(req: NextRequest) {
           codigo:          codigo?.trim() || null,
           status:          "IN_REVIEW",
           uploadedByUserId: userId,
+          fechaEmision:    new Date(),
           previewRows:     previewRows ?? undefined,
         },
       });

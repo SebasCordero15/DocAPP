@@ -114,7 +114,7 @@ export async function POST(
           }
         }
 
-        // Compute first review date = file.createdAt + interval
+        // First review date = createdAt + interval (user-defined cadence from upload date)
         const baseDate = cr.file?.createdAt ?? now;
         const reviewDate = new Date(baseDate.getTime() + reviewIntervalDays * 24 * 60 * 60 * 1000);
 
@@ -126,6 +126,8 @@ export async function POST(
             reviewIntervalDays,
             fechaRevision:         reviewDate,
             reviewDueDate:         reviewDate,
+            // Ensure fechaEmision is stamped (covers docs created before this fix)
+            fechaEmision:          cr.file?.createdAt ?? now,
             ...(assignedCodigo ? { codigo: assignedCodigo } : {}),
             ...(adminVersionStr?.trim() ? { versionStr: adminVersionStr.trim() } : {}),
           },

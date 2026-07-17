@@ -130,12 +130,12 @@ export async function POST(
 
   // APPROVED — apply changes to the file
   const outcomeType = outgoing.outcomeType;
-  const hasContentChanges = outcomeType === "new_version" || outcomeType === "corrected";
 
-  const fileUpdateData: Record<string, unknown> = { updatedAt: now };
-
-  // Only update fechaActualizacion when content actually changed
-  if (hasContentChanges) fileUpdateData.fechaActualizacion = now;
+  const fileUpdateData: Record<string, unknown> = {
+    updatedAt: now,
+    // fechaActualizacion = date of this review/update/correction (all types)
+    fechaActualizacion: now,
+  };
 
   // Auto-update controlCambios from the "cambio a realizar" description
   if (outgoing.instructions) {
