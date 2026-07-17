@@ -132,10 +132,12 @@ export async function POST(
         });
 
       } else if (cr.type === "EDIT_METADATA" || cr.type === "REVISION_DATE_CHANGE") {
-        const after = pc.after as Record<string, unknown> | undefined;
-        if (after) {
+        // proposedFileUpdates: from task-completion; after: from manual edit CRs
+        const source = (pc.proposedFileUpdates ?? pc.after) as Record<string, unknown> | undefined;
+        if (source) {
           const updateData: Record<string, unknown> = {};
-          for (const [k, v] of Object.entries(after)) {
+          for (const [k, v] of Object.entries(source)) {
+            if (k === "status") continue; // never apply raw status from proposed changes
             updateData[k] = DATE_FIELDS.has(k) && typeof v === "string" ? new Date(v) : v;
           }
           if (adminVersionStr?.trim()) updateData.versionStr = adminVersionStr.trim();

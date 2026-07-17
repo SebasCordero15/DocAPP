@@ -130,17 +130,19 @@ export async function POST(
 
   // APPROVED — apply changes to the file
   const outcomeType = outgoing.outcomeType;
-  const fileUpdateData: Record<string, unknown> = {
-    updatedAt: now,
-    fechaActualizacion: now,
-  };
+  const hasContentChanges = outcomeType === "new_version" || outcomeType === "corrected";
+
+  const fileUpdateData: Record<string, unknown> = { updatedAt: now };
+
+  // Only update fechaActualizacion when content actually changed
+  if (hasContentChanges) fileUpdateData.fechaActualizacion = now;
 
   // Auto-update controlCambios from the "cambio a realizar" description
   if (outgoing.instructions) {
     fileUpdateData.controlCambios = outgoing.instructions;
   }
 
-  // Recompute next review date from interval (base = now = last update date)
+  // Advance next review date: base = now (date of this review/update) + interval
   if (file.reviewIntervalDays) {
     const reviewDate = new Date(now.getTime() + file.reviewIntervalDays * 24 * 60 * 60 * 1000);
     fileUpdateData.fechaRevision = reviewDate;

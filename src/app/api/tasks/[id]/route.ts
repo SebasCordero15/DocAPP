@@ -31,7 +31,7 @@ export async function PATCH(
   const task = await prisma.documentTask.findFirst({
     where: { id: params.id, companyId },
     include: {
-      file: { select: { id: true, name: true, nombreDocumento: true, status: true } },
+      file: { select: { id: true, name: true, nombreDocumento: true, status: true, reviewIntervalDays: true } },
       assignedTo: { select: { id: true, name: true } },
       assignedBy: { select: { id: true, name: true } },
       reviewChain: {
@@ -118,7 +118,13 @@ export async function PATCH(
     const bypass    = canBypassApproval(fileLevel, session.role);
 
     const fileUpdates: Record<string, unknown> = {};
-    if (task.type === "REVIEW")  { fileUpdates.fechaRevision    = now; fileUpdates.status = "REVIEWED"; }
+    if (task.type === "REVIEW") {
+      const intervalDays = task.file.reviewIntervalDays ?? 365;
+      const nextReview = new Date(now.getTime() + intervalDays * 24 * 60 * 60 * 1000);
+      fileUpdates.fechaRevision    = nextReview;
+      fileUpdates.fechaActualizacion = now;
+      fileUpdates.status = "REVIEWED";
+    }
     if (task.type === "UPDATE")  { fileUpdates.fechaActualizacion = now; }
     if (task.type === "APPROVE") { fileUpdates.status = "REVIEWED"; }
 
