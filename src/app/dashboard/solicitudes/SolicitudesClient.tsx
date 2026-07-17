@@ -263,6 +263,7 @@ export default function SolicitudesClient({ company, userRole }: Props) {
     if (res.ok) {
       setCrs((prev) => prev.filter((cr) => cr.id !== id));
       setRejectingId(null); setApprovingId(null);
+      window.dispatchEvent(new Event("pendientes-changed"));
     } else if (res.status === 409) {
       const d = await res.json().catch(() => ({}));
       if (d.error === "activeRequests") {
@@ -336,6 +337,7 @@ export default function SolicitudesClient({ company, userRole }: Props) {
     if (res.ok) {
       await fetchOutgoing();
       setReviewingId(null);
+      window.dispatchEvent(new Event("pendientes-changed"));
     } else {
       const d = await res.json().catch(() => ({}));
       alert(d.error ?? t("errors.processingReview"));

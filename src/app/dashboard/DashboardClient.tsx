@@ -216,6 +216,19 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
   useEffect(() => { fetchPendingCounts(); }, [fetchPendingCounts]);
   useEffect(() => { fetchCRCount(); }, [fetchCRCount]);
 
+  // Poll notifications every 30 s and refresh counts on pendientes-changed event
+  useEffect(() => {
+    const notifInterval = setInterval(fetchNotifications, 30_000);
+    const countsInterval = setInterval(fetchPendingCounts, 30_000);
+    const handler = () => { fetchPendingCounts(); fetchCRCount(); fetchNotifications(); };
+    window.addEventListener("pendientes-changed", handler);
+    return () => {
+      clearInterval(notifInterval);
+      clearInterval(countsInterval);
+      window.removeEventListener("pendientes-changed", handler);
+    };
+  }, [fetchNotifications, fetchPendingCounts, fetchCRCount]);
+
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
