@@ -985,7 +985,13 @@
       "unexpected": "Unexpected error.",
       "createFolder": "Error creating folder."
     },
-    "deleteConfirm": "Delete \"{name}\"?"
+    "deleteConfirm": "Delete \"{name}\"?",
+    "deleteFolderConfirm": "Delete folder \"{name}\"? All its contents will also be deleted.",
+    "newSubfolder": "New subfolder",
+    "newSubfolderIn": "Inside \"{parent}\"",
+    "subfoldersLabel": "Subfolders",
+    "renameFolder": "Rename",
+    "uploadModal.uploadingTo": "Destination: {path}"
   },
   "listadoMaestro": {
     "header": "Master List",

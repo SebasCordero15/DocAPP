@@ -17,7 +17,7 @@ export async function GET() {
 
   const [allFolders, allFiles] = await Promise.all([
     prisma.folder.findMany({
-      where: { companyId, parentId: null, deletedAt: null },
+      where: { companyId, parentId: null, deletedAt: null, isExternal: false },
       orderBy: { createdAt: "asc" },
     }),
     prisma.file.findMany({
@@ -90,11 +90,14 @@ export async function POST(req: NextRequest) {
 
   const { name, parentId } = parsed.data;
 
+  let parentIsExternal = false;
   if (parentId) {
     const parent = await prisma.folder.findFirst({
       where: { id: parentId, companyId, deletedAt: null },
+      select: { id: true, isExternal: true },
     });
     if (!parent) return NextResponse.json({ error: "Parent folder not found" }, { status: 404 });
+    parentIsExternal = parent.isExternal;
 
     const level = await resolveFolderAccess(session.userId, companyId, session.role, parentId);
     if (level === "NONE") return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -104,7 +107,7 @@ export async function POST(req: NextRequest) {
   }
 
   const folder = await prisma.folder.create({
-    data: { companyId, name, parentId: parentId ?? null },
+    data: { companyId, name, parentId: parentId ?? null, isExternal: parentIsExternal },
   });
 
   await logAction({

@@ -985,7 +985,13 @@
       "unexpected": "Error inesperado.",
       "createFolder": "Error al crear la carpeta."
     },
-    "deleteConfirm": "¿Eliminar \"{name}\"?"
+    "deleteConfirm": "¿Eliminar \"{name}\"?",
+    "deleteFolderConfirm": "¿Eliminar la carpeta \"{name}\"? Se eliminará también todo su contenido.",
+    "newSubfolder": "Nueva subcarpeta",
+    "newSubfolderIn": "Dentro de \"{parent}\"",
+    "subfoldersLabel": "Subcarpetas",
+    "renameFolder": "Renombrar",
+    "uploadModal.uploadingTo": "Destino: {path}"
   },
   "listadoMaestro": {
     "header": "Listado Maestro",
