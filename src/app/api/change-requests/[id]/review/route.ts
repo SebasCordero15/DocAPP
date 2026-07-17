@@ -45,6 +45,7 @@ const schema = z.object({
   adminVersionStr:       z.string().max(50).optional().nullable(),
   reviewIntervalDays:    z.number().int().min(1).max(3650).optional().nullable(),
   encargadoDocumentoId:  z.string().optional().nullable(),
+  force:                 z.boolean().optional().default(false),
 });
 
 // POST /api/change-requests/[id]/review — admin approve or reject a ChangeRequest
@@ -72,7 +73,7 @@ export async function POST(
   const parsed = schema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
-  const { action, adminNotes, assignedCodigo, adminVersionStr, reviewIntervalDays, encargadoDocumentoId } = parsed.data;
+  const { action, adminNotes, assignedCodigo, adminVersionStr, reviewIntervalDays, encargadoDocumentoId, force } = parsed.data;
 
   if (action === "REJECT" && !adminNotes?.trim()) {
     return NextResponse.json({ error: "adminNotes is required for rejection" }, { status: 400 });
@@ -150,6 +151,30 @@ export async function POST(
         }
 
       } else if (cr.type === "DELETE") {
+        // Check for active outgoing requests before deleting
+        if (!force) {
+          const activeOutgoing = await prisma.outgoingRequest.findMany({
+            where: {
+              fileId: cr.fileId,
+              companyId,
+              status: { in: ["PENDING", "IN_PROGRESS", "PENDING_APPROVAL"] },
+            },
+            select: { id: true, type: true },
+          });
+          if (activeOutgoing.length > 0) {
+            const types = [...new Set(activeOutgoing.map((o) =>
+              o.type === "ACTUALIZACION" ? "actualización"
+              : o.type === "REVISION" ? "revisión"
+              : "corrección"
+            ))];
+            return NextResponse.json({
+              error: "activeRequests",
+              count: activeOutgoing.length,
+              types,
+              message: `Este documento tiene ${activeOutgoing.length} solicitud(es) activa(s): ${types.join(", ")}. ¿Desea continuar con la eliminación?`,
+            }, { status: 409 });
+          }
+        }
         await prisma.file.update({ where: { id: cr.fileId }, data: { deletedAt: now } });
 
       } else if (cr.type === "REVISION_REQUEST") {

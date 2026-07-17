@@ -129,7 +129,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const where: Record<string, unknown> = { companyId };
+  const where: Record<string, unknown> = {
+    companyId,
+    // Exclude tasks whose parent outgoing request was cancelled
+    NOT: { outgoingRequest: { status: "CANCELLED" } },
+  };
 
   if (view === "mine") {
     where.assignedToUserId = session.userId;

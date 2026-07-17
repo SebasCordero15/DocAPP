@@ -176,6 +176,7 @@ export default function SolicitudesClient({ company, userRole }: Props) {
   const [approveUsers,           setApproveUsers]           = useState<CompanyUser[]>([]);
   const [approveUsersLoading,    setApproveUsersLoading]    = useState(false);
   const [viewerFile, setViewerFile] = useState<ViewableFile | null>(null);
+  const [deleteWarn, setDeleteWarn] = useState<{ crId: string; message: string } | null>(null);
 
   function openPreview(id: string, name: string, mimeType: string) {
     if (isViewable(mimeType)) setViewerFile({ id, name, mimeType });
@@ -225,7 +226,7 @@ export default function SolicitudesClient({ company, userRole }: Props) {
   }
 
   // ── Entrantes actions ────────────────────────────────────────────────────────
-  async function submitCrReview(id: string, action: "APPROVE" | "REJECT", assignedCodigo?: string, adminVersionStr?: string) {
+  async function submitCrReview(id: string, action: "APPROVE" | "REJECT", assignedCodigo?: string, adminVersionStr?: string, force?: boolean) {
     const note = rejectNote[id]?.trim();
     if (action === "REJECT" && !note) return;
 
@@ -255,12 +256,20 @@ export default function SolicitudesClient({ company, userRole }: Props) {
         adminVersionStr: adminVersionStr ?? null,
         encargadoDocumentoId,
         reviewIntervalDays,
+        force: force ?? false,
       }),
     });
     setProcessing(null);
     if (res.ok) {
       setCrs((prev) => prev.filter((cr) => cr.id !== id));
       setRejectingId(null); setApprovingId(null);
+    } else if (res.status === 409) {
+      const d = await res.json().catch(() => ({}));
+      if (d.error === "activeRequests") {
+        setDeleteWarn({ crId: id, message: d.message });
+      } else {
+        alert(d.error ?? t("errors.processingRequest"));
+      }
     } else {
       const d = await res.json().catch(() => ({}));
       alert(d.error ?? t("errors.processingRequest"));
@@ -581,6 +590,13 @@ export default function SolicitudesClient({ company, userRole }: Props) {
                         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 3 }}>
                           <span style={{ fontWeight: 700, fontSize: 15, color: "#1e293b" }}>{doc}</span>
                           <span style={{ background: typeColor.bg, color: typeColor.color, borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>{CR_TYPE_LABELS[cr.type] ?? cr.type}</span>
+                          {cr.file?.mimeType && isViewable(cr.file.mimeType) && (
+                            <button
+                              onClick={() => openPreview(cr.file!.id, cr.file!.name, cr.file!.mimeType!)}
+                              style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 6, padding: "2px 10px", fontSize: 11, cursor: "pointer", color: "#1d4ed8", fontWeight: 600 }}>
+                              {tc("ver")}
+                            </button>
+                          )}
                         </div>
                         <div style={{ display: "flex", gap: 14, fontSize: 12, color: "#64748b", flexWrap: "wrap" }}>
                           {cr.file?.codigo && <span>Código: <b>{cr.file.codigo}</b></span>}
@@ -1056,6 +1072,37 @@ export default function SolicitudesClient({ company, userRole }: Props) {
         </div>
       )}
     </div>
+
+    {/* Delete-with-active-requests warning modal */}
+    {deleteWarn && (
+      <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ background: "#fff", borderRadius: 14, padding: "28px 32px", maxWidth: 440, width: "90%", boxShadow: "0 20px 60px rgba(0,0,0,0.25)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+            <div style={{ background: "#fef3c7", borderRadius: 10, padding: 10, flexShrink: 0 }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 15, color: "#1e293b", marginBottom: 2 }}>Solicitudes activas detectadas</div>
+              <div style={{ fontSize: 13, color: "#64748b" }}>{deleteWarn.message}</div>
+            </div>
+          </div>
+          <p style={{ fontSize: 13, color: "#475569", marginBottom: 20, lineHeight: 1.5 }}>
+            Si elimina este documento, las solicitudes activas quedarán sin efecto. Esta acción no se puede deshacer.
+          </p>
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <button onClick={() => setDeleteWarn(null)}
+              style={{ background: "#f1f5f9", color: "#64748b", border: "1px solid #e2e8f0", padding: "8px 18px", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
+              {tc("cancel")}
+            </button>
+            <button onClick={() => { const id = deleteWarn.crId; setDeleteWarn(null); submitCrReview(id, "APPROVE", undefined, undefined, true); }}
+              style={{ background: "#dc2626", color: "#fff", border: "none", padding: "8px 18px", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13 }}>
+              Eliminar de todas formas
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
     <FileViewerModal file={viewerFile} onClose={() => setViewerFile(null)} brand={p} />
     </>
   );

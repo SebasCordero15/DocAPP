@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireActiveSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 // GET /api/tasks/counts — lightweight counts for bell badge + login panel
 export async function GET() {
@@ -10,21 +11,17 @@ export async function GET() {
   const companyId = session.companyId;
   const now = new Date();
 
+  const baseTaskWhere: Prisma.DocumentTaskWhereInput = {
+    companyId,
+    assignedToUserId: session.userId,
+    status: { not: "COMPLETED" },
+    NOT: { outgoingRequest: { status: "CANCELLED" } },
+  };
+
   const [pendientes, atrasadas, myPendingCR, returnedOutgoing, top5] = await Promise.all([
+    prisma.documentTask.count({ where: baseTaskWhere }),
     prisma.documentTask.count({
-      where: {
-        companyId,
-        assignedToUserId: session.userId,
-        status: { not: "COMPLETED" },
-      },
-    }),
-    prisma.documentTask.count({
-      where: {
-        companyId,
-        assignedToUserId: session.userId,
-        status: { not: "COMPLETED" },
-        dueDate: { lt: now },
-      },
+      where: { ...baseTaskWhere, dueDate: { lt: now } },
     }),
     prisma.changeRequest.count({
       where: {
@@ -42,11 +39,7 @@ export async function GET() {
       },
     }),
     prisma.documentTask.findMany({
-      where: {
-        companyId,
-        assignedToUserId: session.userId,
-        status: { not: "COMPLETED" },
-      },
+      where: baseTaskWhere,
       orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
       take: 5,
       select: {
