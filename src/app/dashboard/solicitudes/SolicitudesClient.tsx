@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { CheckCircle, Check, X as XIcon, Plus, ChevronDown, ChevronUp } from "lucide-react";
 import FileIcon from "@/components/FileIcon";
+import FileViewerModal, { isViewable, type ViewableFile } from "@/components/FileViewerModal";
 
 // ─── Shared types ───────────────────────────────────────────────────────────────
 
@@ -174,6 +175,12 @@ export default function SolicitudesClient({ company, userRole }: Props) {
   const [approveIntervalCustom,  setApproveIntervalCustom]  = useState<Record<string, string>>({});
   const [approveUsers,           setApproveUsers]           = useState<CompanyUser[]>([]);
   const [approveUsersLoading,    setApproveUsersLoading]    = useState(false);
+  const [viewerFile, setViewerFile] = useState<ViewableFile | null>(null);
+
+  function openPreview(id: string, name: string, mimeType: string) {
+    if (isViewable(mimeType)) setViewerFile({ id, name, mimeType });
+    else downloadFile(id);
+  }
 
   // ── Fetch data ───────────────────────────────────────────────────────────────
   const fetchCrs = useCallback(async () => {
@@ -374,9 +381,16 @@ export default function SolicitudesClient({ company, userRole }: Props) {
         <div style={{ fontSize: 13, color: "#475569" }}>
           {t("newFile")} <b>{name}</b>{size ? ` (${fmtSize(size)})` : ""}
           {cr.file && (
-            <button onClick={() => downloadFile(cr.file!.id)} style={{ marginLeft: 12, background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 6, padding: "3px 10px", fontSize: 12, cursor: "pointer", color: "#475569", fontWeight: 600 }}>
-              {t("downloadReview")}
-            </button>
+            <span style={{ display: "inline-flex", gap: 6, marginLeft: 8 }}>
+              {cr.file.mimeType && isViewable(cr.file.mimeType) && (
+                <button onClick={() => openPreview(cr.file!.id, cr.file!.name, cr.file!.mimeType!)} style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 6, padding: "3px 10px", fontSize: 12, cursor: "pointer", color: "#1d4ed8", fontWeight: 600 }}>
+                  {tc("ver")}
+                </button>
+              )}
+              <button onClick={() => downloadFile(cr.file!.id)} style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 6, padding: "3px 10px", fontSize: 12, cursor: "pointer", color: "#475569", fontWeight: 600 }}>
+                {t("downloadReview")}
+              </button>
+            </span>
           )}
         </div>
       );
@@ -454,7 +468,21 @@ export default function SolicitudesClient({ company, userRole }: Props) {
         </div>
       );
     }
-    if (cr.type === "REPLACE_FILE") return <div style={{ fontSize: 13, color: "#475569" }}>{t("replaceFile")}{cr.file && <button onClick={() => downloadFile(cr.file!.id)} style={{ marginLeft: 12, background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 6, padding: "3px 10px", fontSize: 12, cursor: "pointer" }}>{t("downloadCurrent")}</button>}</div>;
+    if (cr.type === "REPLACE_FILE") return (
+      <div style={{ fontSize: 13, color: "#475569" }}>
+        {t("replaceFile")}
+        {cr.file && (
+          <span style={{ display: "inline-flex", gap: 6, marginLeft: 8 }}>
+            {cr.file.mimeType && isViewable(cr.file.mimeType) && (
+              <button onClick={() => openPreview(cr.file!.id, cr.file!.name, cr.file!.mimeType!)} style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 6, padding: "3px 10px", fontSize: 12, cursor: "pointer", color: "#1d4ed8", fontWeight: 600 }}>
+                {tc("ver")}
+              </button>
+            )}
+            <button onClick={() => downloadFile(cr.file!.id)} style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 6, padding: "3px 10px", fontSize: 12, cursor: "pointer" }}>{t("downloadCurrent")}</button>
+          </span>
+        )}
+      </div>
+    );
     if (cr.type === "OTHER") {
       const updates = pc.proposedFileUpdates as Record<string, unknown> | undefined;
       if (!updates) return <span style={{ fontSize: 13, color: "#94a3b8" }}>{t("taskChange")}</span>;
@@ -473,6 +501,7 @@ export default function SolicitudesClient({ company, userRole }: Props) {
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
+    <>
     <div style={{ flex: 1, overflowY: "auto", background: "#f8fafc", fontFamily: `'${company.fontFamily}', Inter, system-ui, sans-serif` }}>
       <style>{`
         .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px 24px; margin-bottom: 14px; }
@@ -734,9 +763,17 @@ export default function SolicitudesClient({ company, userRole }: Props) {
                           <span>{new Date(o.createdAt).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" })}</span>
                         </div>
                       </div>
-                      <button onClick={() => setExpanded((s) => { const n = new Set(s); n.has(o.id) ? n.delete(o.id) : n.add(o.id); return n; })} style={{ background: "none", border: "none", cursor: "pointer", color: "#64748b", padding: 4 }}>
-                        {isExp ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                      </button>
+                      <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
+                        {isViewable(o.file.mimeType) && (
+                          <button onClick={() => openPreview(o.file.id, o.file.name, o.file.mimeType)}
+                            style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer", color: "#1d4ed8", fontWeight: 600 }}>
+                            {tc("ver")}
+                          </button>
+                        )}
+                        <button onClick={() => setExpanded((s) => { const n = new Set(s); n.has(o.id) ? n.delete(o.id) : n.add(o.id); return n; })} style={{ background: "none", border: "none", cursor: "pointer", color: "#64748b", padding: 4 }}>
+                          {isExp ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        </button>
+                      </div>
                     </div>
 
                     {/* Progress steps */}
@@ -1019,5 +1056,7 @@ export default function SolicitudesClient({ company, userRole }: Props) {
         </div>
       )}
     </div>
+    <FileViewerModal file={viewerFile} onClose={() => setViewerFile(null)} brand={p} />
+    </>
   );
 }

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import * as XLSX from "xlsx";
 import FileIcon from "@/components/FileIcon";
+import FileViewerModal, { isViewable, type ViewableFile } from "@/components/FileViewerModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -144,6 +145,7 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
   type SortKey = "codigo" | "nombre" | "version" | "fechaEmision" | "fechaRevision" | "fechaActualizacion" | "encargado";
   const [sortKey, setSortKey] = useState<SortKey>("fechaEmision");
   const [sortAsc, setSortAsc] = useState(false);
+  const [viewerFile, setViewerFile] = useState<ViewableFile | null>(null);
 
   // ── fetch ─────────────────────────────────────────────────────────────────
 
@@ -489,7 +491,10 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
                         </td>
                         <td style={td}>
                           <div style={{ display: "flex", gap: 6, flexWrap: "nowrap" }}>
-                            <button onClick={() => downloadFile(f.id)} style={{ ...ghostBtn, fontSize: 11, padding: "3px 8px" }}>{t("actions.view")}</button>
+                            <button
+                              onClick={() => isViewable(f.mimeType) ? setViewerFile({ id: f.id, name: f.nombreDocumento ?? f.name, mimeType: f.mimeType }) : downloadFile(f.id)}
+                              style={{ ...ghostBtn, fontSize: 11, padding: "3px 8px", ...(isViewable(f.mimeType) ? { color: "#1d4ed8", background: "#eff6ff", border: "1px solid #bfdbfe" } : {}) }}
+                            >{t("actions.view")}</button>
                             <button onClick={() => openFlowModal(f)} style={{ ...ghostBtn, fontSize: 11, padding: "3px 8px", color: "#5b21b6" }}>{t("actions.flow")}</button>
                             {canEdit && (
                               <button
@@ -663,6 +668,7 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
         </div>
       </div>
     )}
+    <FileViewerModal file={viewerFile} onClose={() => setViewerFile(null)} />
     </>
   );
 }

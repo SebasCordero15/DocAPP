@@ -72,6 +72,7 @@
     }
   },
   "dashboard": {
+    "back": "Volver",
     "searchPlaceholder": "Buscar archivos…",
     "pendingBanner": {
       "heading": "Tienes pendientes que requieren tu atención",

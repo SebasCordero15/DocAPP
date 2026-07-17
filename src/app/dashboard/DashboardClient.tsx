@@ -532,6 +532,16 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
           borderBottom: "1px solid #e2e8f0",
           display: "flex", alignItems: "center", gap: 16, flexShrink: 0,
         }}>
+          {/* Back button — only when inside a folder */}
+          {folderId && (
+            <button
+              onClick={() => navigateTo(breadcrumb.length > 1 ? breadcrumb[breadcrumb.length - 2].id : null)}
+              style={{ display: "flex", alignItems: "center", gap: 4, background: "#f1f5f9", border: "1px solid #e2e8f0", color: "#374151", padding: "5px 12px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600, flexShrink: 0 }}
+            >
+              <ChevronLeft size={15} /> {t("back")}
+            </button>
+          )}
+
           {/* Breadcrumb */}
           <nav style={{ flex: 1, display: "flex", alignItems: "center", gap: 4, fontSize: 14, overflow: "hidden", minWidth: 0 }}>
             <span onClick={() => navigateTo(null)} style={{ cursor: "pointer", color: brand, fontWeight: 600, whiteSpace: "nowrap" }}>

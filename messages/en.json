@@ -72,6 +72,7 @@
     }
   },
   "dashboard": {
+    "back": "Back",
     "searchPlaceholder": "Search files…",
     "pendingBanner": {
       "heading": "You have pending items requiring your attention",

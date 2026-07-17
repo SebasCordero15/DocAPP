@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { Globe, Upload, FolderPlus, Folder, FileText, X, Loader2, Trash2, Eye, Download, ChevronRight, Pencil } from "lucide-react";
 import FileIcon from "@/components/FileIcon";
+import FileViewerModal, { isViewable, type ViewableFile } from "@/components/FileViewerModal";
 
 interface ExternalFolder {
   id: string;
@@ -94,6 +95,7 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
   const [newFolderParentId, setNewFolderParentId] = useState<string | null>(null);
   const [newFolderName, setNewFolderName]   = useState("");
   const [creatingFolder, setCreatingFolder] = useState(false);
+  const [viewerFile, setViewerFile] = useState<ViewableFile | null>(null);
 
   // ── Data loading ────────────────────────────────────────────────────────
 
@@ -317,11 +319,12 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
     setCurrentFiles(prev => prev.filter(f => f.id !== fileId));
   }
 
-  async function viewFile(fileId: string) {
-    const res = await fetch(`/api/files/${fileId}/view-url`);
-    if (!res.ok) return;
-    const { url } = await res.json();
-    window.open(url, "_blank");
+  function viewFile(file: ExternalFile) {
+    if (isViewable(file.mimeType)) {
+      setViewerFile({ id: file.id, name: file.nombreDocumento || file.name, mimeType: file.mimeType });
+    } else {
+      fetch(`/api/files/${file.id}/view-url`).then((r) => r.json()).then((d) => window.open(d.url, "_blank"));
+    }
   }
 
   async function downloadFile(fileId: string) {
@@ -337,6 +340,7 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
+    <>
     <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "#f5f7fa", fontFamily: `'${company.fontFamily}', Inter, system-ui, sans-serif` }}>
 
       {/* Header */}
@@ -480,43 +484,48 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
                 </div>
               ) : (
                 <>
-                  {/* Subfolders grid */}
+                  {/* Subfolders — list rows matching main document explorer style */}
                   {currentSubfolders.length > 0 && (
                     <div style={{ marginBottom: 24 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
                         {t("subfoldersLabel")}
                       </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 10 }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                         {currentSubfolders.map((sub) => {
                           const isRenaming = renamingId === sub.id;
                           return (
                             <div key={sub.id}
-                              onClick={() => !isRenaming && navigateInto(sub)}
-                              style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px", cursor: isRenaming ? "default" : "pointer", transition: "box-shadow 0.15s", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: isAdmin ? 8 : 0 }}>
-                                <Folder size={22} color={brand} style={{ flexShrink: 0 }} />
-                                {isRenaming ? (
+                              style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "11px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                              {isRenaming ? (
+                                <div style={{ display: "flex", gap: 8, flex: 1 }}>
                                   <input autoFocus value={renameValue}
                                     onChange={(e) => setRenameValue(e.target.value)}
                                     onKeyDown={(e) => { if (e.key === "Enter") saveRename(sub.id); if (e.key === "Escape") setRenamingId(null); }}
                                     onBlur={() => saveRename(sub.id)}
-                                    onClick={(e) => e.stopPropagation()}
-                                    style={{ flex: 1, border: "1px solid #e2e8f0", borderRadius: 4, padding: "3px 7px", fontSize: 13, outline: "none", minWidth: 0 }} />
-                                ) : (
-                                  <span style={{ fontSize: 13, fontWeight: 600, color: "#334155", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub.name}</span>
-                                )}
-                              </div>
-                              {isAdmin && !isRenaming && (
-                                <div style={{ display: "flex", gap: 6 }}>
-                                  <button onClick={(e) => { e.stopPropagation(); startRename(sub); }}
-                                    style={{ display: "flex", alignItems: "center", gap: 4, border: "1px solid #e2e8f0", background: "#f8fafc", color: "#64748b", borderRadius: 5, padding: "3px 8px", cursor: "pointer", fontSize: 11 }}>
-                                    <Pencil size={11} /> {t("renameFolder")}
-                                  </button>
-                                  <button onClick={(e) => { e.stopPropagation(); deleteFolder(sub.id, sub.name); }}
-                                    style={{ display: "flex", alignItems: "center", gap: 4, border: "1px solid #fecaca", background: "#fff5f5", color: "#ef4444", borderRadius: 5, padding: "3px 8px", cursor: "pointer", fontSize: 11 }}>
-                                    <Trash2 size={11} />
-                                  </button>
+                                    style={{ flex: 1, border: "1px solid #e2e8f0", borderRadius: 6, padding: "6px 10px", fontSize: 13, outline: "none" }} />
+                                  <button onClick={() => setRenamingId(null)}
+                                    style={{ border: "1px solid #e2e8f0", background: "#f8fafc", color: "#64748b", padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>{tc("cancel")}</button>
                                 </div>
+                              ) : (
+                                <>
+                                  <span onClick={() => navigateInto(sub)}
+                                    style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontWeight: 600, color: "#1e293b", fontSize: 14, flex: 1, minWidth: 0 }}>
+                                    <Folder size={18} color={brand} style={{ flexShrink: 0 }} />
+                                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub.name}</span>
+                                  </span>
+                                  {isAdmin && (
+                                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                                      <button onClick={() => startRename(sub)} title={t("renameFolder")}
+                                        style={{ border: "1px solid #e2e8f0", background: "#f8fafc", color: "#64748b", borderRadius: 6, padding: "4px 8px", cursor: "pointer", display: "flex", alignItems: "center" }}>
+                                        <Pencil size={13} />
+                                      </button>
+                                      <button onClick={() => deleteFolder(sub.id, sub.name)} title={tc("eliminar")}
+                                        style={{ border: "1px solid #fecaca", background: "#fff5f5", color: "#ef4444", borderRadius: 6, padding: "4px 8px", cursor: "pointer", display: "flex", alignItems: "center" }}>
+                                        <Trash2 size={13} />
+                                      </button>
+                                    </div>
+                                  )}
+                                </>
                               )}
                             </div>
                           );
@@ -571,7 +580,7 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
                             <td style={{ padding: "10px 14px", fontSize: 12, color: "#94a3b8" }}>{fmtDate(f.createdAt)}</td>
                             <td style={{ padding: "10px 14px" }}>
                               <div style={{ display: "flex", gap: 6 }}>
-                                <button onClick={() => viewFile(f.id)} title={tc("ver")} style={actionBtnStyle}><Eye size={13} /></button>
+                                <button onClick={() => viewFile(f)} title={tc("ver")} style={actionBtnStyle}><Eye size={13} /></button>
                                 <button onClick={() => downloadFile(f.id)} title={tc("descargar")} style={actionBtnStyle}><Download size={13} /></button>
                                 {(isAdmin || f.uploadedBy?.id === currentUserId) && (
                                   <button onClick={() => deleteFile(f.id, f.nombreDocumento)} title={tc("eliminar")} style={{ ...actionBtnStyle, color: "#ef4444", borderColor: "#fecaca" }}><Trash2 size={13} /></button>
@@ -710,6 +719,8 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
+    <FileViewerModal file={viewerFile} onClose={() => setViewerFile(null)} />
+    </>
   );
 }
 
