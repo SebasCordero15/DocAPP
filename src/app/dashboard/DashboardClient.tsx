@@ -134,6 +134,7 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const notifRef = useRef<HTMLDivElement>(null);
+  const prevUnreadRef = useRef(0);
 
   // ── Pendientes state ────────────────────────────────────────────────────────
   const [pendingCounts, setPendingCounts] = useState({ enRevision: 0, borrador: 0, revisados: 0, atrasadas: 0 });
@@ -186,7 +187,13 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
     if (res.ok) {
       const data = await res.json();
       setNotifications(data.notifications);
-      setUnreadCount(data.unreadCount);
+      const newUnread = data.unreadCount ?? 0;
+      setUnreadCount(newUnread);
+      // When new notifications arrive, also refresh sidebar task count
+      if (newUnread > prevUnreadRef.current) {
+        window.dispatchEvent(new Event("pendientes-changed"));
+      }
+      prevUnreadRef.current = newUnread;
     }
   }, []);
 

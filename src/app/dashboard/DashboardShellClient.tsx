@@ -328,6 +328,28 @@ export default function DashboardShellClient({
 
       {/* ── Content area ── */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
+        {/* Persistent pending tasks banner — shows on every page */}
+        {pendingTotal > 0 && (
+          <div
+            onClick={() => router.push("/dashboard/pendientes")}
+            style={{
+              background: "#dc2626", color: "#fff",
+              padding: "9px 20px",
+              display: "flex", alignItems: "center", gap: 10,
+              flexShrink: 0, cursor: "pointer",
+              fontSize: 13, fontWeight: 700,
+              boxShadow: "0 2px 6px rgba(220,38,38,0.4)",
+            }}
+          >
+            <span style={{ fontSize: 16 }}>⚠</span>
+            <span>
+              Tienes {pendingTotal} tarea{pendingTotal !== 1 ? "s" : ""} pendiente{pendingTotal !== 1 ? "s" : ""} sin completar.
+            </span>
+            <span style={{ marginLeft: "auto", textDecoration: "underline", fontWeight: 600 }}>
+              Ver pendientes →
+            </span>
+          </div>
+        )}
         {children}
       </div>
 

@@ -178,6 +178,11 @@ export default function SolicitudesClient({ company, userRole }: Props) {
   const [viewerFile, setViewerFile] = useState<ViewableFile | null>(null);
   const [deleteWarn, setDeleteWarn] = useState<{ crId: string; message: string } | null>(null);
 
+  // ── Review date update modal (after approval) ────────────────────────────────
+  const [reviewDateModal, setReviewDateModal] = useState<{ fileId: string; docName: string } | null>(null);
+  const [reviewDateValue, setReviewDateValue] = useState("");
+  const [savingReviewDate, setSavingReviewDate] = useState(false);
+
   function openPreview(id: string, name: string, mimeType: string) {
     if (isViewable(mimeType)) setViewerFile({ id, name, mimeType });
     else downloadFile(id);
@@ -245,6 +250,7 @@ export default function SolicitudesClient({ company, userRole }: Props) {
       }
     }
 
+    const cr = crs.find((c) => c.id === id);
     setProcessing(id);
     const res = await fetch(`/api/change-requests/${id}/review`, {
       method: "POST",
@@ -261,9 +267,15 @@ export default function SolicitudesClient({ company, userRole }: Props) {
     });
     setProcessing(null);
     if (res.ok) {
-      setCrs((prev) => prev.filter((cr) => cr.id !== id));
+      setCrs((prev) => prev.filter((c) => c.id !== id));
       setRejectingId(null); setApprovingId(null);
       window.dispatchEvent(new Event("pendientes-changed"));
+      // After approval (non-delete), ask if admin wants to update review date
+      if (action === "APPROVE" && cr?.type !== "DELETE" && cr?.file) {
+        const docName = cr.file.nombreDocumento || cr.file.name;
+        setReviewDateValue("");
+        setReviewDateModal({ fileId: cr.file.id, docName });
+      }
     } else if (res.status === 409) {
       const d = await res.json().catch(() => ({}));
       if (d.error === "activeRequests") {
@@ -335,13 +347,33 @@ export default function SolicitudesClient({ company, userRole }: Props) {
     });
     setOutProcessing(null);
     if (res.ok) {
+      const outReq = outgoing.find((o) => o.id === id);
       await fetchOutgoing();
       setReviewingId(null);
       window.dispatchEvent(new Event("pendientes-changed"));
+      // After approval, ask if admin wants to update review date
+      if (decision === "APPROVED" && outReq?.file) {
+        const docName = outReq.file.nombreDocumento || outReq.file.name;
+        setReviewDateValue("");
+        setReviewDateModal({ fileId: outReq.file.id, docName });
+      }
     } else {
       const d = await res.json().catch(() => ({}));
       alert(d.error ?? t("errors.processingReview"));
     }
+  }
+
+  async function saveReviewDate() {
+    if (!reviewDateModal || !reviewDateValue) { setReviewDateModal(null); return; }
+    setSavingReviewDate(true);
+    const iso = new Date(reviewDateValue).toISOString();
+    await fetch(`/api/files/${reviewDateModal.fileId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fechaRevision: iso, reviewDueDate: iso }),
+    });
+    setSavingReviewDate(false);
+    setReviewDateModal(null);
   }
 
   // ── Create outgoing request ──────────────────────────────────────────────────
@@ -1106,6 +1138,51 @@ export default function SolicitudesClient({ company, userRole }: Props) {
     )}
 
     <FileViewerModal file={viewerFile} onClose={() => setViewerFile(null)} brand={p} />
+
+    {/* ── Review date update modal ─────────────────────────────────────────── */}
+    {reviewDateModal && (
+      <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ background: "#fff", borderRadius: 16, padding: "28px 24px", width: 420, maxWidth: "92vw", boxShadow: "0 24px 64px rgba(0,0,0,0.22)" }}>
+          <h3 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 700, color: "#1e293b" }}>
+            ¿Actualizar fecha de próxima revisión?
+          </h3>
+          <p style={{ margin: "0 0 18px", fontSize: 13, color: "#64748b" }}>
+            Documento: <strong style={{ color: "#1e293b" }}>{reviewDateModal.docName}</strong>
+          </p>
+          <p style={{ margin: "0 0 10px", fontSize: 13, color: "#374151" }}>
+            Puedes establecer cuándo se debe volver a revisar este documento. El sistema enviará una notificación al llegar la fecha.
+          </p>
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+              Nueva fecha de revisión
+            </label>
+            <input
+              type="date"
+              value={reviewDateValue}
+              onChange={(e) => setReviewDateValue(e.target.value)}
+              min={new Date().toISOString().slice(0, 10)}
+              style={{ width: "100%", padding: "9px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 14, boxSizing: "border-box" }}
+            />
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              onClick={saveReviewDate}
+              disabled={savingReviewDate || !reviewDateValue}
+              style={{ flex: 1, background: p, color: "#fff", border: "none", padding: "11px", borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: reviewDateValue ? "pointer" : "not-allowed", opacity: (!reviewDateValue || savingReviewDate) ? 0.6 : 1 }}
+            >
+              {savingReviewDate ? "Guardando…" : "Actualizar fecha"}
+            </button>
+            <button
+              onClick={() => setReviewDateModal(null)}
+              disabled={savingReviewDate}
+              style={{ padding: "11px 18px", background: "#f1f5f9", color: "#64748b", border: "none", borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: "pointer" }}
+            >
+              Dejar igual
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     </>
   );
 }
