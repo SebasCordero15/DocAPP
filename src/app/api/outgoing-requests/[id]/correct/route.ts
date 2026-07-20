@@ -67,10 +67,14 @@ export async function POST(
     if (outgoing.type === "CORRECCION")    updateData.outcomeType = "corrected";
   }
 
-  await prisma.outgoingRequest.update({
-    where: { id: params.id },
-    data: updateData,
-  });
+  await prisma.$transaction([
+    prisma.outgoingRequest.update({ where: { id: params.id }, data: updateData }),
+    // Mark all tasks as completed — user resubmitted, ball is now in admin's court
+    prisma.documentTask.updateMany({
+      where: { outgoingRequestId: params.id },
+      data: { status: "COMPLETED", completedAt: new Date() },
+    }),
+  ]);
 
   const truncated = instructions.length > 150 ? instructions.slice(0, 147) + "…" : instructions;
   await logAction({

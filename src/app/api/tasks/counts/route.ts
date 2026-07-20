@@ -15,7 +15,7 @@ export async function GET() {
     companyId,
     assignedToUserId: session.userId,
     status: { not: "COMPLETED" },
-    NOT: { outgoingRequest: { status: { in: ["CANCELLED", "RETURNED"] } } },
+    NOT: { outgoingRequest: { status: { in: ["CANCELLED", "RETURNED", "PENDING_APPROVAL", "APPROVED"] } } },
   };
 
   const [pendientes, atrasadas, myPendingCR, returnedOutgoing, top5] = await Promise.all([
