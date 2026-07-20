@@ -59,7 +59,6 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
   const [nombre,       setNombre]       = useState("");
   const [departamento, setDepartamento] = useState("");
   const [tipo,         setTipo]         = useState("PROCEDIMIENTO");
-  const [version,      setVersion]      = useState("v1.0");
   const [folderId,     setFolderId]     = useState("");
   const [departments,  setDepartments]  = useState<{ id: string; name: string }[]>([]);
 
@@ -79,7 +78,7 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
   const [done,       setDone]       = useState(false);
   const [error,      setError]      = useState("");
 
-  const folderTree = buildFolderTree(folders);
+  const folderTree = buildFolderTree(folders.filter((f) => !f.isExternal));
 
   // Load departments on mount
   useEffect(() => {
@@ -154,7 +153,6 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
           nombreDocumento: nombre,
           departamento,
           tipoDocumento:   tipo,
-          versionStr:      version,
           ...(folderId ? { folderId } : {}),
           reviewerIds:     reviewers.map((r) => r.id),
         }),
@@ -166,7 +164,7 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
     }
   }
 
-  const canStep0 = nombre.trim() && departamento.trim() && tipo && version.trim();
+  const canStep0 = nombre.trim() && departamento.trim() && tipo;
   const canStep1 = !!file;
   const canStep2 = isExternalFolder || reviewers.length > 0;
 
@@ -253,13 +251,6 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
                   <select style={is} value={tipo} onChange={(e) => setTipo(e.target.value)}>
                     {TIPO_OPTIONS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                   </select>
-                </div>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, marginTop: 20 }}>
-                <div>
-                  <label style={ls}>{t("fields.version")}</label>
-                  <input style={is} value={version} onChange={(e) => setVersion(e.target.value)} placeholder="v1.0" />
                 </div>
               </div>
 
@@ -426,7 +417,6 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
                 <Row label={t("confirmLabels.nombre")} value={nombre} />
                 <Row label={t("confirmLabels.departamento")} value={departamento} />
                 <Row label={t("confirmLabels.tipo")} value={TIPO_OPTIONS.find((opt) => opt.value === tipo)?.label ?? tipo} />
-                <Row label={t("confirmLabels.version")} value={version} />
                 <Row label={t("confirmLabels.carpeta")} value={selectedFolderLabel} />
                 <Row label={t("confirmLabels.archivo")} value={file?.name ?? "—"} />
                 {!isExternalFolder && (
