@@ -1460,9 +1460,9 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
           return (
             <section style={{ marginTop: 48 }}>
               <div style={{ marginBottom: 16 }}>
-                <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#1e293b" }}>My Requests</h2>
+                <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#1e293b" }}>Mis Solicitudes</h2>
                 <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94a3b8" }}>
-                  Deletion requests and review proposals submitted to the admin
+                  Solicitudes de eliminación y propuestas de revisión enviadas al admin
                 </p>
               </div>
               {mySolicitudes.map((cr) => {

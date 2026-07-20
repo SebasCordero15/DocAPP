@@ -62,7 +62,7 @@ export async function resolveFileAccess(
 
   const file = await prisma.file.findFirst({
     where: { id: fileId, companyId },
-    select: { folderId: true },
+    select: { folderId: true, uploadedByUserId: true, encargadoDocumentoId: true },
   });
   if (!file) return "NONE";
 
@@ -70,6 +70,9 @@ export async function resolveFileAccess(
     where: { companyId, userId, fileId },
   });
   if (explicit) return explicit.accessLevel;
+
+  // Uploader and responsible person always have at least EDIT access
+  if (file.uploadedByUserId === userId || file.encargadoDocumentoId === userId) return "EDIT";
 
   return resolveFolderAccess(userId, companyId, role, file.folderId);
 }

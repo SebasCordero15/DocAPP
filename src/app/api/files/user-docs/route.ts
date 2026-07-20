@@ -45,6 +45,7 @@ export async function GET() {
       companyId,
       deletedAt: null,
       status: { notIn: ["OBSOLETE"] },
+
       OR: [
         { uploadedByUserId: userId },
         { encargadoDocumentoId: userId },
