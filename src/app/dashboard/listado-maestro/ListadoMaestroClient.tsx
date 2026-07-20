@@ -146,6 +146,7 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>("fechaEmision");
   const [sortAsc, setSortAsc] = useState(false);
   const [viewerFile, setViewerFile] = useState<ViewableFile | null>(null);
+  const [ccDetail, setCcDetail] = useState<string | null>(null);
 
   // ── fetch ─────────────────────────────────────────────────────────────────
 
@@ -492,7 +493,11 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
                         <td style={td}>{fmtDate(f.fechaActualizacion)}</td>
                         <td style={{ ...td, maxWidth: 180 }}>
                           {f.controlCambios ? (
-                            <span style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                            <span
+                              onClick={() => setCcDetail(f.controlCambios)}
+                              title="Clic para ver detalle completo"
+                              style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", cursor: "pointer", textDecoration: "underline dotted", textDecorationColor: "#94a3b8" }}
+                            >
                               {f.controlCambios}
                             </span>
                           ) : <span style={{ color: "#d1d5db" }}>—</span>}
@@ -682,6 +687,31 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
       </div>
     )}
     <FileViewerModal file={viewerFile} onClose={() => setViewerFile(null)} />
+
+    {/* ── Control de Cambios detail modal ──────────────────────────────────── */}
+    {ccDetail && (
+      <div
+        style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}
+        onClick={() => setCcDetail(null)}
+      >
+        <div
+          style={{ background: "#fff", borderRadius: 14, padding: "24px 28px", width: 460, maxWidth: "92vw", boxShadow: "0 20px 60px rgba(0,0,0,0.2)", maxHeight: "80vh", overflowY: "auto" }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <span style={{ fontWeight: 700, fontSize: 15, color: "#1e293b" }}>Control de Cambios</span>
+            <button onClick={() => setCcDetail(null)} style={{ background: "#f1f5f9", border: "none", borderRadius: 6, width: 28, height: 28, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b", fontSize: 16 }}>×</button>
+          </div>
+          <div style={{ fontSize: 14, color: "#374151", lineHeight: 1.7, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+            {ccDetail.split(" | ").map((part, i) => (
+              <div key={i} style={{ padding: "6px 0", borderBottom: i < ccDetail.split(" | ").length - 1 ? "1px solid #f1f5f9" : "none" }}>
+                {part.trim()}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )}
     </>
   );
 }
