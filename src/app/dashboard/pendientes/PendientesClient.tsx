@@ -172,10 +172,10 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
     REVIEW: t("types.REVISION"), UPDATE: t("types.ACTUALIZACION"), APPROVE: t("actions.approve"), OTHER: t("types.CORRECCION"),
   };
   const CR_TYPE_LABELS: Record<string, string> = {
-    NEW_UPLOAD: "New upload", EDIT_METADATA: "Metadata edit",
-    REPLACE_FILE: "File replacement", DELETE: "Deletion request",
-    REVISION_DATE_CHANGE: "Review date change", OTHER: "Other",
-    REVISION_REQUEST: "Review proposal",
+    NEW_UPLOAD: "Nueva carga", EDIT_METADATA: "Edición de metadatos",
+    REPLACE_FILE: "Reemplazo de archivo", DELETE: "Solicitud de eliminación",
+    REVISION_DATE_CHANGE: "Cambio de fecha de revisión", OTHER: "Otro",
+    REVISION_REQUEST: "Propuesta de revisión",
   };
   const CR_STATUS_LABELS: Record<string, string> = {
     PENDING: tc("pendiente"), APPROVED: tc("aprobado"), REJECTED: tc("rechazado"),
@@ -1484,7 +1484,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                         </div>
                         {cr.status === "APPROVED" && (
                           <div style={{ marginTop: 8, padding: "7px 12px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 6, fontSize: 12, color: "#166534" }}>
-                            {cr.type === "DELETE" ? "The document was deleted." : "Approved — the admin will initiate the change process."}
+                            {cr.type === "DELETE" ? "El documento fue eliminado." : "Aprobado — el admin iniciará el proceso de cambio."}
                             {cr.adminNotes && <span> <b>Nota:</b> {cr.adminNotes}</span>}
                           </div>
                         )}
@@ -1512,7 +1512,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
           <div className="modal-box" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#1e293b" }}>
-                Respond to request — {outModal.outgoingRequest.type === "ACTUALIZACION" ? t("types.ACTUALIZACION") : outModal.outgoingRequest.type === "REVISION" ? t("types.REVISION") : t("types.CORRECCION")}
+                Responder solicitud — {outModal.outgoingRequest.type === "ACTUALIZACION" ? t("types.ACTUALIZACION") : outModal.outgoingRequest.type === "REVISION" ? t("types.REVISION") : t("types.CORRECCION")}
               </h3>
               {!outSubmitting && (
                 <button onClick={() => setOutModal(null)} style={{ background: "#f1f5f9", border: "none", borderRadius: 6, padding: "4px 8px", cursor: "pointer", color: "#64748b" }}><X size={14} /></button>
@@ -1521,37 +1521,37 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
 
             <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13 }}>
               <b>{outModal.docName}</b>
-              {outModal.currentVersion && <span style={{ color: "#94a3b8", marginLeft: 8 }}>Current version: {outModal.currentVersion}</span>}
+              {outModal.currentVersion && <span style={{ color: "#94a3b8", marginLeft: 8 }}>Versión actual: {outModal.currentVersion}</span>}
             </div>
 
             {outModal.outgoingRequest.instructions && (
               <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#1e40af" }}>
-                <b>Instructions:</b> {outModal.outgoingRequest.instructions}
+                <b>Instrucciones:</b> {outModal.outgoingRequest.instructions}
               </div>
             )}
 
             {/* Step 2: show step 1 result */}
             {outModal.outgoingRequest.totalSteps === 2 && outModal.outgoingRequest.step1OutcomeType && (
               <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#166534" }}>
-                <b>Previous step result:</b>{" "}
-                {outModal.outgoingRequest.step1OutcomeType === "no_changes" ? "No changes needed"
-                  : outModal.outgoingRequest.step1OutcomeType === "new_version" ? `New version (${outModal.outgoingRequest.step1VersionStr ?? "—"})`
-                  : "Correction applied"}
+                <b>Resultado del paso anterior:</b>{" "}
+                {outModal.outgoingRequest.step1OutcomeType === "no_changes" ? "Sin cambios necesarios"
+                  : outModal.outgoingRequest.step1OutcomeType === "new_version" ? `Nueva versión (${outModal.outgoingRequest.step1VersionStr ?? "—"})`
+                  : "Corrección aplicada"}
               </div>
             )}
 
             {/* Outcome selection */}
             {outModal.outgoingRequest.type === "REVISION" && (
               <div style={{ marginBottom: 16 }}>
-                <label style={ls}>Review result</label>
+                <label style={ls}>Resultado de la revisión</label>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, cursor: "pointer" }}>
                     <input type="radio" name="outcome" checked={outOutcome === "no_changes"} onChange={() => setOutOutcome("no_changes")} />
-                    Document is correct, no changes needed
+                    El documento es correcto, no se necesitan cambios
                   </label>
                   <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, cursor: "pointer" }}>
                     <input type="radio" name="outcome" checked={outOutcome === "new_version"} onChange={() => setOutOutcome("new_version")} />
-                    Changes needed — upload new version
+                    Se requieren cambios — subir nueva versión
                   </label>
                 </div>
               </div>
@@ -1575,7 +1575,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
             {/* Version label */}
             {(outOutcome === "new_version" || outModal.outgoingRequest.type === "ACTUALIZACION") && (
               <div style={{ marginBottom: 16 }}>
-                <label style={ls}>Version label (e.g. v1.2)</label>
+                <label style={ls}>Etiqueta de versión (ej. v1.2)</label>
                 <input
                   style={inputS}
                   value={outVersionStr}
@@ -1590,14 +1590,14 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
               <>
                 {outModal.outgoingRequest.correctionFields?.nombre && (
                   <div style={{ marginBottom: 12 }}>
-                    <label style={ls}>Corrected document name</label>
-                    <input style={inputS} value={outNombreDoc} onChange={(e) => setOutNombreDoc(e.target.value)} placeholder="New document name" />
+                    <label style={ls}>Nombre del documento corregido</label>
+                    <input style={inputS} value={outNombreDoc} onChange={(e) => setOutNombreDoc(e.target.value)} placeholder="Nuevo nombre del documento" />
                   </div>
                 )}
                 {outModal.outgoingRequest.correctionFields?.area && (
                   <div style={{ marginBottom: 12 }}>
-                    <label style={ls}>Area / department</label>
-                    <input style={inputS} value={outDepartamento} onChange={(e) => setOutDepartamento(e.target.value)} placeholder="Area or department" />
+                    <label style={ls}>Área / departamento</label>
+                    <input style={inputS} value={outDepartamento} onChange={(e) => setOutDepartamento(e.target.value)} placeholder="Área o departamento" />
                   </div>
                 )}
               </>
@@ -1611,7 +1611,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                 disabled={outSubmitting}
                 style={{ flex: 1, background: "#d97706", color: "#fff", border: "none", padding: "11px", borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: "pointer", opacity: outSubmitting ? 0.7 : 1 }}
               >
-                {outSubmitting ? "Sending…" : "Send response"}
+                {outSubmitting ? "Enviando…" : "Enviar respuesta"}
               </button>
               <button onClick={() => !outSubmitting && setOutModal(null)} disabled={outSubmitting} style={{ background: "#f1f5f9", color: "#64748b", border: "none", padding: "11px 16px", borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
                 {tc("cancel")}
@@ -1840,7 +1840,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                 style={{ ...inputS, height: 80, resize: "vertical" }}
                 value={assignForm.notes}
                 onChange={(e) => setAssignForm((f) => ({ ...f, notes: e.target.value }))}
-                placeholder="Instructions for the assigned user…"
+                placeholder="Instrucciones para el usuario asignado…"
               />
             </div>
 
@@ -1868,7 +1868,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                 disabled={submittingAssign}
                 style={{ flex: 1, background: p, color: "#fff", border: "none", padding: "11px", borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: "pointer", opacity: submittingAssign ? 0.7 : 1 }}
               >
-                {submittingAssign ? "Assigning…" : "Assign task"}
+                {submittingAssign ? "Asignando…" : "Asignar tarea"}
               </button>
               <button onClick={() => setShowAssign(false)} style={{ background: "#f1f5f9", color: "#64748b", border: "none", padding: "11px 16px", borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
                 {tc("cancel")}
@@ -1979,7 +1979,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                 disabled={correctSubmitting || !correctInstructions.trim()}
                 style={{ background: "#f97316", color: "#fff", border: "none", padding: "9px 22px", borderRadius: 8, cursor: correctSubmitting ? "default" : "pointer", fontSize: 13, fontWeight: 700, opacity: (correctSubmitting || !correctInstructions.trim()) ? 0.65 : 1 }}
               >
-                {correctSubmitting ? (correctFile ? "Uploading…" : "Sending…") : "Resubmit for approval"}
+                {correctSubmitting ? (correctFile ? "Subiendo…" : "Enviando…") : "Reenviar para aprobación"}
               </button>
             </div>
           </div>
