@@ -2,7 +2,10 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
-import { Globe, Upload, FolderPlus, Folder, FileText, X, Loader2, Trash2, Eye, Download, ChevronRight, Pencil } from "lucide-react";
+import {
+  Globe, Upload, FolderPlus, Folder, FileText, X, Loader2,
+  Trash2, Eye, Download, ChevronRight, ChevronLeft, Pencil, Plus,
+} from "lucide-react";
 import FileIcon from "@/components/FileIcon";
 import FileViewerModal, { isViewable, type ViewableFile } from "@/components/FileViewerModal";
 
@@ -59,59 +62,46 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
     { value: "OTRO",          label: t("tipos.OTRO") },
   ];
 
-  // Root external folders for the sidebar
   const [rootFolders, setRootFolders]   = useState<ExternalFolder[]>([]);
   const [loading, setLoading]           = useState(true);
 
-  // Navigation breadcrumb stack — each entry is { id, name } of the open folder
   const [navStack, setNavStack]         = useState<{ id: string; name: string }[]>([]);
   const [currentSubfolders, setCurrentSubfolders] = useState<ExternalFolder[]>([]);
   const [currentFiles, setCurrentFiles] = useState<ExternalFile[]>([]);
   const [navLoading, setNavLoading]     = useState(false);
 
-  const currentFolderId = navStack.length > 0 ? navStack[navStack.length - 1].id : null;
-  const selectedRootId  = navStack.length > 0 ? navStack[0].id : null;
+  const currentFolderId   = navStack.length > 0 ? navStack[navStack.length - 1].id : null;
   const currentFolderName = navStack.length > 0 ? navStack[navStack.length - 1].name : "";
 
-  // Inline rename state
   const [renamingId, setRenamingId]     = useState<string | null>(null);
   const [renameValue, setRenameValue]   = useState("");
 
-  // Upload modal
   const [showUpload, setShowUpload]         = useState(false);
   const [uploading, setUploading]           = useState(false);
   const [uploadError, setUploadError]       = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [form, setForm] = useState({
-    nombreDocumento: "",
-    departamento:    "",
-    tipoDocumento:   "PROCEDIMIENTO",
-  });
+  const [form, setForm] = useState({ nombreDocumento: "", departamento: "", tipoDocumento: "PROCEDIMIENTO" });
   const [pickedFile, setPickedFile] = useState<File | null>(null);
 
-  // New folder / subfolder modal
   const [showNewFolder, setShowNewFolder]   = useState(false);
   const [newFolderParentId, setNewFolderParentId] = useState<string | null>(null);
   const [newFolderName, setNewFolderName]   = useState("");
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [viewerFile, setViewerFile] = useState<ViewableFile | null>(null);
 
-  // ── Data loading ────────────────────────────────────────────────────────
+  // ── Inline new-root-folder form ─────────────────────────────────────────────
+  const [showRootForm, setShowRootForm]   = useState(false);
+  const [rootFormName, setRootFormName]   = useState("");
+  const [creatingRoot, setCreatingRoot]   = useState(false);
+
+  // ── Data loading ─────────────────────────────────────────────────────────────
 
   function loadRootFolders() {
     setLoading(true);
     fetch("/api/externos")
       .then((r) => r.json())
-      .then((d) => {
-        const folders: ExternalFolder[] = d.folders ?? [];
-        setRootFolders(folders);
-        if (folders.length > 0) {
-          const first = folders[0];
-          setNavStack([{ id: first.id, name: first.name }]);
-          fetchFolder(first.id);
-        }
-      })
+      .then((d) => { setRootFolders(d.folders ?? []); })
       .finally(() => setLoading(false));
   }
 
@@ -129,7 +119,13 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
 
   useEffect(() => { loadRootFolders(); }, []);
 
-  // ── Navigation ───────────────────────────────────────────────────────────
+  // ── Navigation ────────────────────────────────────────────────────────────────
+
+  function navigateToRoot() {
+    setNavStack([]);
+    setCurrentSubfolders([]);
+    setCurrentFiles([]);
+  }
 
   function selectRoot(folder: ExternalFolder) {
     if (renamingId) return;
@@ -142,13 +138,22 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
     fetchFolder(folder.id);
   }
 
-  function navigateTo(idx: number) {
+  function navigateToCrumb(idx: number) {
     const newStack = navStack.slice(0, idx + 1);
     setNavStack(newStack);
     fetchFolder(newStack[newStack.length - 1].id);
   }
 
-  // ── Folder actions ───────────────────────────────────────────────────────
+  function navigateBack() {
+    if (navStack.length <= 1) { navigateToRoot(); }
+    else {
+      const newStack = navStack.slice(0, -1);
+      setNavStack(newStack);
+      fetchFolder(newStack[newStack.length - 1].id);
+    }
+  }
+
+  // ── Folder actions ────────────────────────────────────────────────────────────
 
   function openNewFolder(parentId: string | null) {
     setNewFolderParentId(parentId);
@@ -162,8 +167,7 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
     try {
       if (newFolderParentId === null) {
         const res = await fetch("/api/externos", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+          method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name: newFolderName.trim() }),
         });
         if (!res.ok) throw new Error(t("errors.createFolder"));
@@ -173,8 +177,7 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
         fetchFolder(folder.id);
       } else {
         const res = await fetch("/api/folders", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+          method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name: newFolderName.trim(), parentId: newFolderParentId }),
         });
         if (!res.ok) throw new Error(t("errors.createFolder"));
@@ -190,6 +193,26 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
     }
   }
 
+  async function createRootFolder() {
+    if (!rootFormName.trim()) return;
+    setCreatingRoot(true);
+    try {
+      const res = await fetch("/api/externos", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: rootFormName.trim() }),
+      });
+      if (!res.ok) throw new Error(t("errors.createFolder"));
+      const { folder } = await res.json();
+      setRootFolders(prev => [...prev, folder]);
+      setRootFormName("");
+      setShowRootForm(false);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : t("errors.unexpected"));
+    } finally {
+      setCreatingRoot(false);
+    }
+  }
+
   function startRename(folder: ExternalFolder) {
     setRenamingId(folder.id);
     setRenameValue(folder.name);
@@ -201,8 +224,7 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
     if (!trimmed) return;
     try {
       const res = await fetch(`/api/folders/${folderId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: trimmed }),
       });
       if (!res.ok) return;
@@ -220,11 +242,7 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
     if (isRoot) {
       const nextFolders = rootFolders.filter(f => f.id !== folderId);
       setRootFolders(nextFolders);
-      if (selectedRootId === folderId) {
-        setNavStack([]);
-        setCurrentSubfolders([]);
-        setCurrentFiles([]);
-      }
+      if (navStack[0]?.id === folderId) navigateToRoot();
     } else {
       setCurrentSubfolders(prev => prev.filter(f => f.id !== folderId));
       const stackIdx = navStack.findIndex(n => n.id === folderId);
@@ -232,12 +250,12 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
         const newStack = navStack.slice(0, stackIdx);
         setNavStack(newStack);
         if (newStack.length > 0) fetchFolder(newStack[newStack.length - 1].id);
-        else { setCurrentSubfolders([]); setCurrentFiles([]); }
+        else navigateToRoot();
       }
     }
   }
 
-  // ── File actions ─────────────────────────────────────────────────────────
+  // ── File actions ──────────────────────────────────────────────────────────────
 
   function openUpload() {
     setForm({ nombreDocumento: "", departamento: "", tipoDocumento: "PROCEDIMIENTO" });
@@ -258,13 +276,10 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
 
     try {
       const urlRes = await fetch("/api/files/upload-url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          folderId: currentFolderId,
-          name: pickedFile.name,
-          mimeType: pickedFile.type || "application/octet-stream",
-          size: pickedFile.size,
+          folderId: currentFolderId, name: pickedFile.name,
+          mimeType: pickedFile.type || "application/octet-stream", size: pickedFile.size,
         }),
       });
       if (!urlRes.ok) {
@@ -275,19 +290,16 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
 
       setUploadProgress(30);
       const putRes = await fetch(uploadUrl, {
-        method: "PUT",
-        body: pickedFile,
+        method: "PUT", body: pickedFile,
         headers: { "Content-Type": pickedFile.type || "application/octet-stream" },
       });
       if (!putRes.ok) throw new Error(t("errors.uploadFile"));
       setUploadProgress(70);
 
       const createRes = await fetch("/api/crear-documento", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          storageKey,
-          name: pickedFile.name,
+          storageKey, name: pickedFile.name,
           mimeType: pickedFile.type || "application/octet-stream",
           size: pickedFile.size,
           nombreDocumento: form.nombreDocumento.trim(),
@@ -332,226 +344,242 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
     if (!res.ok) return;
     const { url } = await res.json();
     const a = document.createElement("a");
-    a.href = url;
-    a.download = "";
-    a.click();
+    a.href = url; a.download = ""; a.click();
   }
 
-  // ── Render ───────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
     <>
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "#f5f7fa", fontFamily: `'${company.fontFamily}', Inter, system-ui, sans-serif` }}>
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "#f8fafc", fontFamily: `'${company.fontFamily}', Inter, system-ui, sans-serif` }}>
 
-      {/* Header */}
-      <div style={{ background: brand, color: "#fff", padding: "12px 28px", flexShrink: 0, display: "flex", alignItems: "center", gap: 10 }}>
+      {/* ── Brand header ── */}
+      <div style={{ background: brand, color: "#fff", padding: "12px 24px", flexShrink: 0, display: "flex", alignItems: "center", gap: 10 }}>
         <Globe size={18} />
         <strong style={{ fontSize: 16 }}>{t("header")}</strong>
-        <span style={{ marginLeft: "auto", fontSize: 12, opacity: 0.75 }}>{t("headerSub")}</span>
       </div>
 
-      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+      {/* ── Topbar: breadcrumb + actions ── */}
+      <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 24px", height: 52, display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
 
-        {/* ── Sidebar: root folders ── */}
-        <aside style={{ width: 220, background: "#fff", borderRight: "1px solid #e2e8f0", display: "flex", flexDirection: "column", flexShrink: 0 }}>
-          <div style={{ padding: "12px 12px 8px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 1 }}>{t("foldersLabel")}</span>
-            {isAdmin && (
-              <button onClick={() => openNewFolder(null)} title={t("createFolder")}
-                style={{ border: "none", background: "transparent", cursor: "pointer", color: brand, padding: 2, display: "flex" }}>
-                <FolderPlus size={16} />
-              </button>
+        {/* Back button */}
+        {currentFolderId && (
+          <button onClick={navigateBack}
+            style={{ display: "flex", alignItems: "center", gap: 4, background: "#f1f5f9", border: "1px solid #e2e8f0", color: "#374151", padding: "5px 12px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600, flexShrink: 0 }}>
+            <ChevronLeft size={15} /> Atrás
+          </button>
+        )}
+
+        {/* Breadcrumb */}
+        <nav style={{ flex: 1, display: "flex", alignItems: "center", gap: 4, fontSize: 14, overflow: "hidden", minWidth: 0 }}>
+          <span onClick={navigateToRoot}
+            style={{ cursor: "pointer", color: brand, fontWeight: 600, whiteSpace: "nowrap" }}>
+            Externos
+          </span>
+          {navStack.map((item, idx) => (
+            <span key={item.id} style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+              <span style={{ color: "#cbd5e1", margin: "0 2px" }}>/</span>
+              <span
+                onClick={() => idx < navStack.length - 1 ? navigateToCrumb(idx) : undefined}
+                style={{
+                  cursor: idx < navStack.length - 1 ? "pointer" : "default",
+                  color: idx < navStack.length - 1 ? brand : "#1e293b",
+                  fontWeight: idx === navStack.length - 1 ? 600 : 400,
+                  whiteSpace: "nowrap",
+                }}>
+                {item.name}
+              </span>
+            </span>
+          ))}
+        </nav>
+
+        {/* Action buttons */}
+        <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+          {/* Root level: create root folder */}
+          {!currentFolderId && isAdmin && (
+            <button onClick={() => { setShowRootForm(true); setRootFormName(""); }}
+              style={{ display: "flex", alignItems: "center", gap: 6, background: brand, color: "#fff", border: "none", padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
+              <Plus size={14} /> {t("createFolder")}
+            </button>
+          )}
+          {/* Inside folder: create subfolder + upload */}
+          {currentFolderId && isAdmin && (
+            <button onClick={() => openNewFolder(currentFolderId)}
+              style={{ display: "flex", alignItems: "center", gap: 6, background: "#f1f5f9", color: "#475569", border: "1px solid #e2e8f0", padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
+              <FolderPlus size={14} /> {t("newSubfolder")}
+            </button>
+          )}
+          {currentFolderId && canEdit && (
+            <button onClick={openUpload}
+              style={{ display: "flex", alignItems: "center", gap: 6, background: brand, color: "#fff", border: "none", padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
+              <Upload size={14} /> {t("uploadBtn")}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Main scrollable content ── */}
+      <main style={{ flex: 1, overflowY: "auto", padding: "24px 28px" }}>
+
+        {/* ═══════════════════════════════ ROOT LEVEL ═══════════════════════════════ */}
+        {!currentFolderId && (
+          <>
+            {/* Inline create root folder form */}
+            {showRootForm && (
+              <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                <input autoFocus value={rootFormName}
+                  onChange={(e) => setRootFormName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") createRootFolder(); if (e.key === "Escape") { setShowRootForm(false); } }}
+                  placeholder={t("folderModal.namePlaceholder")}
+                  style={{ flex: 1, border: "1px solid #e2e8f0", borderRadius: 8, padding: "8px 12px", fontSize: 13, outline: "none" }} />
+                <button onClick={createRootFolder} disabled={creatingRoot || !rootFormName.trim()}
+                  style={{ background: brand, color: "#fff", border: "none", padding: "8px 18px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600, opacity: (!rootFormName.trim() || creatingRoot) ? 0.6 : 1 }}>
+                  {creatingRoot ? t("folderModal.creating") : t("folderModal.create")}
+                </button>
+                <button onClick={() => setShowRootForm(false)}
+                  style={{ border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", padding: "8px 14px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>
+                  {tc("cancel")}
+                </button>
+              </div>
             )}
-          </div>
 
-          <div style={{ flex: 1, overflowY: "auto", padding: "8px 8px" }}>
             {loading ? (
-              <p style={{ fontSize: 13, color: "#aaa", padding: "8px 4px" }}>{t("loadingFolders")}</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {[1, 2, 3].map((i) => (
+                  <div key={i} style={{ height: 58, background: "#e2e8f0", borderRadius: 10, opacity: 1 - i * 0.2 }} />
+                ))}
+              </div>
             ) : rootFolders.length === 0 ? (
-              <div style={{ padding: "16px 8px", textAlign: "center" }}>
-                <p style={{ fontSize: 13, color: "#aaa", margin: 0 }}>{t("noFolders")}</p>
+              <div style={{ textAlign: "center", padding: "64px 32px", color: "#94a3b8" }}>
+                <Globe size={48} strokeWidth={1} color="#cbd5e1" style={{ marginBottom: 12 }} />
+                <p style={{ margin: "0 0 6px", fontSize: 16, fontWeight: 600, color: "#64748b" }}>
+                  {isAdmin ? t("noFolderAdmin") : t("noFolderUser")}
+                </p>
                 {isAdmin && (
-                  <button onClick={() => openNewFolder(null)}
-                    style={{ marginTop: 10, background: brand, color: "#fff", border: "none", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>
+                  <button onClick={() => { setShowRootForm(true); setRootFormName(""); }}
+                    style={{ marginTop: 14, background: brand, color: "#fff", border: "none", padding: "8px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
                     {t("createFolder")}
                   </button>
                 )}
               </div>
             ) : (
-              rootFolders.map((f) => {
-                const isSelected = selectedRootId === f.id;
-                const isRenaming = renamingId === f.id;
-                return (
-                  <div key={f.id} style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 2, borderRadius: 6, background: isSelected ? brand : "transparent", padding: "5px 7px" }}>
-                    <Folder size={14} style={{ flexShrink: 0, color: isSelected ? "#fff" : brand }} />
-                    {isRenaming ? (
-                      <input autoFocus value={renameValue}
-                        onChange={(e) => setRenameValue(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter") saveRename(f.id); if (e.key === "Escape") setRenamingId(null); }}
-                        onBlur={() => saveRename(f.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        style={{ flex: 1, border: "1px solid #e2e8f0", borderRadius: 4, padding: "2px 6px", fontSize: 12, outline: "none", minWidth: 0 }} />
-                    ) : (
-                      <button onClick={() => selectRoot(f)}
-                        style={{ flex: 1, textAlign: "left", background: "transparent", border: "none", cursor: "pointer", color: isSelected ? "#fff" : "#334155", fontSize: 13, fontWeight: isSelected ? 600 : 400, padding: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {f.name}
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {rootFolders.map((f) => {
+                  const isRenaming = renamingId === f.id;
+                  return (
+                    <div key={f.id}
+                      style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "13px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                      {isRenaming ? (
+                        <div style={{ display: "flex", gap: 8, flex: 1 }}>
+                          <input autoFocus value={renameValue}
+                            onChange={(e) => setRenameValue(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") saveRename(f.id); if (e.key === "Escape") setRenamingId(null); }}
+                            onBlur={() => saveRename(f.id)}
+                            style={{ flex: 1, border: "1px solid #e2e8f0", borderRadius: 6, padding: "6px 10px", fontSize: 13, outline: "none" }} />
+                          <button onClick={() => setRenamingId(null)}
+                            style={{ border: "1px solid #e2e8f0", background: "#f8fafc", color: "#64748b", padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>{tc("cancel")}</button>
+                        </div>
+                      ) : (
+                        <>
+                          <span onClick={() => selectRoot(f)}
+                            style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontWeight: 600, color: "#1e293b", fontSize: 14, flex: 1, minWidth: 0 }}>
+                            <Folder size={20} color={brand} style={{ flexShrink: 0 }} />
+                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
+                          </span>
+                          {isAdmin && (
+                            <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                              <button onClick={(e) => { e.stopPropagation(); startRename(f); }} title={t("renameFolder")}
+                                style={actionBtnStyle}><Pencil size={13} /></button>
+                              <button onClick={(e) => { e.stopPropagation(); deleteFolder(f.id, f.name); }} title={tc("eliminar")}
+                                style={{ ...actionBtnStyle, color: "#ef4444", borderColor: "#fecaca", background: "#fff5f5" }}><Trash2 size={13} /></button>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ═══════════════════════════════ INSIDE FOLDER ════════════════════════════ */}
+        {currentFolderId && (
+          <>
+            {navLoading ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#94a3b8", marginBottom: 20, fontSize: 13 }}>
+                <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} />
+                {tc("loading")}
+              </div>
+            ) : (
+              <>
+                {/* Subfolders */}
+                {currentSubfolders.length > 0 && (
+                  <div style={{ marginBottom: 24 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+                      {t("subfoldersLabel")}
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      {currentSubfolders.map((sub) => {
+                        const isRenaming = renamingId === sub.id;
+                        return (
+                          <div key={sub.id}
+                            style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "11px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                            {isRenaming ? (
+                              <div style={{ display: "flex", gap: 8, flex: 1 }}>
+                                <input autoFocus value={renameValue}
+                                  onChange={(e) => setRenameValue(e.target.value)}
+                                  onKeyDown={(e) => { if (e.key === "Enter") saveRename(sub.id); if (e.key === "Escape") setRenamingId(null); }}
+                                  onBlur={() => saveRename(sub.id)}
+                                  style={{ flex: 1, border: "1px solid #e2e8f0", borderRadius: 6, padding: "6px 10px", fontSize: 13, outline: "none" }} />
+                                <button onClick={() => setRenamingId(null)}
+                                  style={{ border: "1px solid #e2e8f0", background: "#f8fafc", color: "#64748b", padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>{tc("cancel")}</button>
+                              </div>
+                            ) : (
+                              <>
+                                <span onClick={() => navigateInto(sub)}
+                                  style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontWeight: 600, color: "#1e293b", fontSize: 14, flex: 1, minWidth: 0 }}>
+                                  <Folder size={18} color={brand} style={{ flexShrink: 0 }} />
+                                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub.name}</span>
+                                </span>
+                                {isAdmin && (
+                                  <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                                    <button onClick={() => startRename(sub)} title={t("renameFolder")} style={actionBtnStyle}><Pencil size={13} /></button>
+                                    <button onClick={() => deleteFolder(sub.id, sub.name)} title={tc("eliminar")}
+                                      style={{ ...actionBtnStyle, color: "#ef4444", borderColor: "#fecaca", background: "#fff5f5" }}><Trash2 size={13} /></button>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Subfolder create form (modal triggers this below) */}
+
+                {/* Files section */}
+                {currentFiles.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "48px 20px", color: "#aaa" }}>
+                    <FileText size={36} strokeWidth={1} style={{ marginBottom: 12 }} />
+                    <p style={{ margin: 0, fontSize: 14 }}>{t("emptyFolder")}</p>
+                    {canEdit && (
+                      <button onClick={openUpload}
+                        style={{ marginTop: 14, background: brand, color: "#fff", border: "none", padding: "8px 18px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
+                        {t("uploadFirst")}
                       </button>
                     )}
-                    {isAdmin && !isRenaming && (
-                      <div style={{ display: "flex", gap: 1, flexShrink: 0 }}>
-                        <button onClick={(e) => { e.stopPropagation(); startRename(f); }} title={t("renameFolder")}
-                          style={{ border: "none", background: "transparent", cursor: "pointer", color: isSelected ? "rgba(255,255,255,0.75)" : "#94a3b8", padding: "2px 3px", display: "flex", borderRadius: 3 }}>
-                          <Pencil size={11} />
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); deleteFolder(f.id, f.name); }} title={tc("eliminar")}
-                          style={{ border: "none", background: "transparent", cursor: "pointer", color: isSelected ? "rgba(255,255,255,0.75)" : "#ef4444", padding: "2px 3px", display: "flex", borderRadius: 3 }}>
-                          <Trash2 size={11} />
-                        </button>
+                  </div>
+                ) : (
+                  <>
+                    {currentSubfolders.length > 0 && (
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+                        {t("tableHeaders.documento")}s
                       </div>
                     )}
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </aside>
-
-        {/* ── Main area ── */}
-        <section style={{ flex: 1, overflowY: "auto", padding: 24 }}>
-          {!currentFolderId ? (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "#aaa", gap: 12 }}>
-              <Globe size={40} strokeWidth={1} />
-              <p style={{ margin: 0, fontSize: 14 }}>
-                {rootFolders.length === 0
-                  ? (isAdmin ? t("noFolderAdmin") : t("noFolderUser"))
-                  : t("noFolderSelected")}
-              </p>
-            </div>
-          ) : (
-            <>
-              {/* Breadcrumb */}
-              {navStack.length > 1 && (
-                <nav style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 16, fontSize: 13, flexWrap: "wrap" }}>
-                  {navStack.map((item, idx) => (
-                    <span key={item.id} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                      {idx < navStack.length - 1 ? (
-                        <>
-                          <button onClick={() => navigateTo(idx)}
-                            style={{ background: "none", border: "none", color: brand, cursor: "pointer", fontSize: 13, fontWeight: 600, padding: 0 }}>
-                            {item.name}
-                          </button>
-                          <ChevronRight size={13} color="#94a3b8" />
-                        </>
-                      ) : (
-                        <span style={{ fontWeight: 700, color: "#1e293b" }}>{item.name}</span>
-                      )}
-                    </span>
-                  ))}
-                </nav>
-              )}
-
-              {/* Folder header */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Folder size={20} color={brand} />
-                  <h2 style={{ margin: 0, fontSize: 18, color: "#1e293b" }}>{currentFolderName}</h2>
-                  <span style={{ background: "#e0f2fe", color: "#0369a1", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>
-                    {t("docCount", { count: currentFiles.length })}
-                  </span>
-                </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  {isAdmin && (
-                    <button onClick={() => openNewFolder(currentFolderId)}
-                      style={{ display: "flex", alignItems: "center", gap: 6, background: "#f1f5f9", color: "#475569", border: "1px solid #e2e8f0", padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
-                      <FolderPlus size={14} />
-                      {t("newSubfolder")}
-                    </button>
-                  )}
-                  {canEdit && (
-                    <button onClick={openUpload}
-                      style={{ display: "flex", alignItems: "center", gap: 6, background: brand, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
-                      <Upload size={15} />
-                      {t("uploadBtn")}
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {navLoading ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#94a3b8", marginBottom: 20, fontSize: 13 }}>
-                  <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} />
-                  {tc("loading")}
-                </div>
-              ) : (
-                <>
-                  {/* Subfolders — list rows matching main document explorer style */}
-                  {currentSubfolders.length > 0 && (
-                    <div style={{ marginBottom: 24 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
-                        {t("subfoldersLabel")}
-                      </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                        {currentSubfolders.map((sub) => {
-                          const isRenaming = renamingId === sub.id;
-                          return (
-                            <div key={sub.id}
-                              style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "11px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-                              {isRenaming ? (
-                                <div style={{ display: "flex", gap: 8, flex: 1 }}>
-                                  <input autoFocus value={renameValue}
-                                    onChange={(e) => setRenameValue(e.target.value)}
-                                    onKeyDown={(e) => { if (e.key === "Enter") saveRename(sub.id); if (e.key === "Escape") setRenamingId(null); }}
-                                    onBlur={() => saveRename(sub.id)}
-                                    style={{ flex: 1, border: "1px solid #e2e8f0", borderRadius: 6, padding: "6px 10px", fontSize: 13, outline: "none" }} />
-                                  <button onClick={() => setRenamingId(null)}
-                                    style={{ border: "1px solid #e2e8f0", background: "#f8fafc", color: "#64748b", padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>{tc("cancel")}</button>
-                                </div>
-                              ) : (
-                                <>
-                                  <span onClick={() => navigateInto(sub)}
-                                    style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontWeight: 600, color: "#1e293b", fontSize: 14, flex: 1, minWidth: 0 }}>
-                                    <Folder size={18} color={brand} style={{ flexShrink: 0 }} />
-                                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub.name}</span>
-                                  </span>
-                                  {isAdmin && (
-                                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                                      <button onClick={() => startRename(sub)} title={t("renameFolder")}
-                                        style={{ border: "1px solid #e2e8f0", background: "#f8fafc", color: "#64748b", borderRadius: 6, padding: "4px 8px", cursor: "pointer", display: "flex", alignItems: "center" }}>
-                                        <Pencil size={13} />
-                                      </button>
-                                      <button onClick={() => deleteFolder(sub.id, sub.name)} title={tc("eliminar")}
-                                        style={{ border: "1px solid #fecaca", background: "#fff5f5", color: "#ef4444", borderRadius: 6, padding: "4px 8px", cursor: "pointer", display: "flex", alignItems: "center" }}>
-                                        <Trash2 size={13} />
-                                      </button>
-                                    </div>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* External notice */}
-                  <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, padding: "10px 14px", marginBottom: 18, fontSize: 12, color: "#0369a1" }}>
-                    {t("externalNotice")}
-                  </div>
-
-                  {/* Files table */}
-                  {currentFiles.length === 0 ? (
-                    <div style={{ textAlign: "center", padding: "48px 20px", color: "#aaa" }}>
-                      <FileText size={36} strokeWidth={1} style={{ marginBottom: 12 }} />
-                      <p style={{ margin: 0, fontSize: 14 }}>{t("emptyFolder")}</p>
-                      {canEdit && (
-                        <button onClick={openUpload}
-                          style={{ marginTop: 14, background: brand, color: "#fff", border: "none", padding: "8px 18px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
-                          {t("uploadFirst")}
-                        </button>
-                      )}
-                    </div>
-                  ) : (
                     <table style={{ width: "100%", borderCollapse: "collapse", background: "#fff", borderRadius: 10, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
                       <thead>
                         <tr style={{ borderBottom: "2px solid #f1f5f9" }}>
@@ -583,7 +611,8 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
                                 <button onClick={() => viewFile(f)} title={tc("ver")} style={actionBtnStyle}><Eye size={13} /></button>
                                 <button onClick={() => downloadFile(f.id)} title={tc("descargar")} style={actionBtnStyle}><Download size={13} /></button>
                                 {(isAdmin || f.uploadedBy?.id === currentUserId) && (
-                                  <button onClick={() => deleteFile(f.id, f.nombreDocumento)} title={tc("eliminar")} style={{ ...actionBtnStyle, color: "#ef4444", borderColor: "#fecaca" }}><Trash2 size={13} /></button>
+                                  <button onClick={() => deleteFile(f.id, f.nombreDocumento)} title={tc("eliminar")}
+                                    style={{ ...actionBtnStyle, color: "#ef4444", borderColor: "#fecaca", background: "#fff5f5" }}><Trash2 size={13} /></button>
                                 )}
                               </div>
                             </td>
@@ -591,13 +620,13 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
                         ))}
                       </tbody>
                     </table>
-                  )}
-                </>
-              )}
-            </>
-          )}
-        </section>
-      </div>
+                  </>
+                )}
+              </>
+            )}
+          </>
+        )}
+      </main>
 
       {/* ── Upload modal ── */}
       {showUpload && (
@@ -608,7 +637,6 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
               {!uploading && <button onClick={() => setShowUpload(false)} style={{ border: "none", background: "transparent", cursor: "pointer", color: "#94a3b8" }}><X size={18} /></button>}
             </div>
 
-            {/* Destination (read-only) */}
             <div style={fieldStyle}>
               <label style={labelStyle}>{t("uploadModal.folderLabel")}</label>
               <div style={{ ...inputStyle, background: "#f8fafc", color: "#475569", display: "flex", alignItems: "center", gap: 6 }}>
@@ -617,7 +645,6 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
               </div>
             </div>
 
-            {/* File */}
             <div style={fieldStyle}>
               <label style={labelStyle}>{t("uploadModal.fileLabel")}</label>
               <div onClick={() => !uploading && fileInputRef.current?.click()}
@@ -637,14 +664,12 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
               <input ref={fileInputRef} type="file" style={{ display: "none" }} onChange={(e) => setPickedFile(e.target.files?.[0] ?? null)} />
             </div>
 
-            {/* Nombre */}
             <div style={fieldStyle}>
               <label style={labelStyle}>{t("uploadModal.nombreLabel")}</label>
               <input value={form.nombreDocumento} onChange={(e) => setForm(p => ({ ...p, nombreDocumento: e.target.value }))}
                 placeholder={t("uploadModal.nombrePlaceholder")} style={inputStyle} disabled={uploading} />
             </div>
 
-            {/* Tipo + Dept */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
               <div>
                 <label style={labelStyle}>{t("uploadModal.tipoLabel")}</label>
@@ -685,14 +710,12 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
         </div>
       )}
 
-      {/* ── New folder / subfolder modal ── */}
+      {/* ── New subfolder modal ── */}
       {showNewFolder && (
         <div style={overlayStyle} onClick={() => setShowNewFolder(false)}>
           <div style={{ ...modalStyle, maxWidth: 380 }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <h3 style={{ margin: 0, fontSize: 16 }}>
-                {newFolderParentId ? t("newSubfolder") : t("folderModal.title")}
-              </h3>
+              <h3 style={{ margin: 0, fontSize: 16 }}>{t("newSubfolder")}</h3>
               <button onClick={() => setShowNewFolder(false)} style={{ border: "none", background: "transparent", cursor: "pointer", color: "#94a3b8" }}><X size={18} /></button>
             </div>
             {newFolderParentId && (
