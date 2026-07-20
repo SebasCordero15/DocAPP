@@ -76,6 +76,18 @@ export default function DashboardShellClient({
     return () => { clearInterval(interval); window.removeEventListener("pendientes-changed", handler); };
   }, [refreshTaskCounts, refreshCRCounts]);
 
+  // Refresh badge immediately when the tab becomes visible
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        refreshTaskCounts();
+        refreshCRCounts();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [refreshTaskCounts, refreshCRCounts]);
+
   useEffect(() => {
     refreshCRCounts();
     const interval = setInterval(refreshCRCounts, 30_000);

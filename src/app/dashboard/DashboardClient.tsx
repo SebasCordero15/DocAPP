@@ -229,6 +229,19 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
     };
   }, [fetchNotifications, fetchPendingCounts, fetchCRCount]);
 
+  // Refresh immediately when the tab becomes visible again
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        fetchPendingCounts();
+        fetchNotifications();
+        fetchCRCount();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [fetchPendingCounts, fetchNotifications, fetchCRCount]);
+
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
@@ -613,30 +626,77 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
             ))}
           </div>
 
-          {/* Bell — pending count, navigates to /dashboard/pendientes */}
-          <button
-            onClick={() => router.push("/dashboard/pendientes")}
-            className="icon-btn"
-            title="Pendientes"
-            style={{
-              position: "relative", border: "1px solid #e2e8f0", background: "#fff",
-              borderRadius: 8, padding: "7px 9px", cursor: "pointer", display: "flex", alignItems: "center",
-              color: "#64748b", flexShrink: 0,
-            }}
-          >
-            <Bell size={17} />
-            {pendingTotal > 0 && (
-              <span style={{
-                position: "absolute", top: -5, right: -5,
-                background: "#ef4444", color: "#fff", borderRadius: "50%",
-                width: 17, height: 17, fontSize: 10, fontWeight: 700,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                border: "2px solid #fff",
+          {/* Bell — notification dropdown */}
+          <div style={{ position: "relative", flexShrink: 0 }} ref={notifRef}>
+            <button
+              onClick={openNotifications}
+              className="icon-btn"
+              title="Notificaciones"
+              style={{
+                position: "relative", border: "1px solid #e2e8f0", background: "#fff",
+                borderRadius: 8, padding: "7px 9px", cursor: "pointer", display: "flex", alignItems: "center",
+                color: "#64748b",
+              }}
+            >
+              <Bell size={17} />
+              {unreadCount > 0 && (
+                <span style={{
+                  position: "absolute", top: -5, right: -5,
+                  background: "#ef4444", color: "#fff", borderRadius: "50%",
+                  width: 17, height: 17, fontSize: 10, fontWeight: 700,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  border: "2px solid #fff",
+                }}>
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </button>
+            {notifOpen && (
+              <div style={{
+                position: "absolute", right: 0, top: "calc(100% + 8px)",
+                width: 320, background: "#fff", borderRadius: 12,
+                boxShadow: "0 8px 30px rgba(0,0,0,0.15)", zIndex: 1000,
+                border: "1px solid #e2e8f0", overflow: "hidden",
               }}>
-                {pendingTotal > 9 ? "9+" : pendingTotal}
-              </span>
+                <div style={{ padding: "12px 16px", borderBottom: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontWeight: 700, fontSize: 14, color: "#1e293b" }}>Notificaciones</span>
+                  {notifications.some((n) => !n.read) && (
+                    <span style={{ fontSize: 11, color: "#64748b" }}>Marcando como leídas…</span>
+                  )}
+                </div>
+                {notifications.length === 0 ? (
+                  <div style={{ padding: "28px 16px", textAlign: "center", color: "#94a3b8", fontSize: 13 }}>
+                    Sin notificaciones nuevas
+                  </div>
+                ) : (
+                  <div style={{ maxHeight: 360, overflowY: "auto" }}>
+                    {notifications.map((n) => (
+                      <div
+                        key={n.id}
+                        onClick={() => { setNotifOpen(false); if (n.fileId) router.push("/dashboard/pendientes"); }}
+                        style={{
+                          padding: "11px 16px", borderBottom: "1px solid #f3f4f6",
+                          background: n.read ? "#fff" : "#eff6ff",
+                          cursor: "pointer", transition: "background 0.1s",
+                        }}
+                      >
+                        <div style={{ fontSize: 13, color: "#1e293b", lineHeight: 1.4 }}>{n.message}</div>
+                        <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>{timeAgo(n.createdAt)}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div style={{ padding: "8px 16px", borderTop: "1px solid #e2e8f0", textAlign: "center" }}>
+                  <button
+                    onClick={() => { setNotifOpen(false); router.push("/dashboard/pendientes"); }}
+                    style={{ background: "none", border: "none", color: brand, fontWeight: 600, fontSize: 13, cursor: "pointer" }}
+                  >
+                    Ver todos los pendientes →
+                  </button>
+                </div>
+              </div>
             )}
-          </button>
+          </div>
         </header>
 
         {/* ── Persistent Pendientes Banner ─────────────────────────────────────── */}
