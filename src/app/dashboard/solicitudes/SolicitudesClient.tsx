@@ -103,18 +103,18 @@ export default function SolicitudesClient({ company, userRole }: Props) {
   const tc = useTranslations("common");
 
   const CR_TYPE_LABELS: Record<string, string> = {
-    NEW_UPLOAD: "New upload", EDIT_METADATA: "Metadata edit",
-    REPLACE_FILE: "File replacement", DELETE: "Deletion",
-    REVISION_DATE_CHANGE: "Review date change", OTHER: "Document change",
-    REVISION_REQUEST: "Review proposal",
+    NEW_UPLOAD: "Nueva carga", EDIT_METADATA: "Edición de metadatos",
+    REPLACE_FILE: "Reemplazo de archivo", DELETE: "Eliminación",
+    REVISION_DATE_CHANGE: "Cambio de fecha de revisión", OTHER: "Cambio de documento",
+    REVISION_REQUEST: "Propuesta de revisión",
   };
   const OUT_TYPE_LABELS: Record<string, string> = {
-    ACTUALIZACION: "Update", REVISION: "Review", CORRECCION: "Correction",
+    ACTUALIZACION: "Actualización", REVISION: "Revisión", CORRECCION: "Corrección",
   };
   const OUT_STATUS_LABELS: Record<string, string> = {
-    PENDING: "Pending", IN_PROGRESS: "In progress",
-    PENDING_APPROVAL: "Pending approval", APPROVED: "Approved",
-    REJECTED: "Rejected", RETURNED: "Returned", CANCELLED: "Cancelled",
+    PENDING: "Pendiente", IN_PROGRESS: "En progreso",
+    PENDING_APPROVAL: "Pendiente de aprobación", APPROVED: "Aprobado",
+    REJECTED: "Rechazado", RETURNED: "Devuelto", CANCELLED: "Cancelado",
   };
   const OUTCOME_LABELS: Record<string, string> = {
     no_changes: t("result.noChanges"),
