@@ -382,6 +382,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
 
   // ── correction modal (for RETURNED outgoing requests)
   const [correctModal,        setCorrectModal]        = useState<{ id: string; type: string; docName: string } | null>(null);
+  const [correctMode,         setCorrectMode]         = useState<"upload" | "no_changes">("upload");
   const [correctInstructions, setCorrectInstructions] = useState("");
   const [correctFile,         setCorrectFile]         = useState<File | null>(null);
   const [correctVersionStr,   setCorrectVersionStr]   = useState("");
@@ -395,7 +396,10 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
 
   async function submitCorrection() {
     if (!correctModal) return;
-    if (!correctInstructions.trim()) { setCorrectError(t("errors.unexpectedError")); return; }
+    if (correctMode === "upload" && !correctInstructions.trim()) {
+      setCorrectError("Describe el cambio que realizaste.");
+      return;
+    }
     setCorrectSubmitting(true); setCorrectError(""); setCorrectProgress(0);
 
     let storageKey: string | null = null;
@@ -434,11 +438,12 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
       size       = correctFile.size;
     }
 
+    const finalInstructions = correctInstructions.trim() || (correctMode === "no_changes" ? "Revisado — sin cambios necesarios" : "");
     const res = await fetch(`/api/outgoing-requests/${correctModal.id}/correct`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        instructions: correctInstructions.trim(),
+        instructions: finalInstructions,
         storageKey, fileName, mimeType, size,
         versionStr: correctVersionStr.trim() || null,
       }),
@@ -446,7 +451,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
     setCorrectSubmitting(false);
     if (res.ok) {
       setCorrectModal(null);
-      setCorrectFile(null); setCorrectVersionStr(""); setCorrectProgress(0);
+      setCorrectFile(null); setCorrectVersionStr(""); setCorrectProgress(0); setCorrectMode("upload");
       setReturnedOutgoing((prev) => prev.filter((o) => o.id !== correctModal.id));
       window.dispatchEvent(new Event("pendientes-changed"));
     } else {
@@ -1383,6 +1388,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                             onClick={() => {
                               setCorrectModal({ id: o.id, type: o.type, docName });
                               setCorrectInstructions(o.instructions ?? "");
+                              setCorrectMode("upload");
                               setCorrectError("");
                             }}
                           >
@@ -1882,9 +1888,11 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
           onClick={(e) => { if (e.target === e.currentTarget && !correctSubmitting) setCorrectModal(null); }}>
           <div style={{ background: "#fff", borderRadius: 12, padding: 28, width: "100%", maxWidth: 520, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+
+            {/* Header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#1e293b" }}>Correct and resubmit</h3>
+                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#1e293b" }}>Corregir y reenviar</h3>
                 <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b" }}>{correctModal.docName}</p>
               </div>
               {!correctSubmitting && (
@@ -1892,25 +1900,54 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
               )}
             </div>
 
+            {/* Mode toggle */}
+            <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+              <button
+                disabled={correctSubmitting}
+                onClick={() => { setCorrectMode("upload"); setCorrectFile(null); }}
+                style={{
+                  flex: 1, padding: "10px 12px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: correctMode === "upload" ? 700 : 400,
+                  border: `2px solid ${correctMode === "upload" ? "#f97316" : "#e2e8f0"}`,
+                  background: correctMode === "upload" ? "#fff7ed" : "#f8fafc",
+                  color: correctMode === "upload" ? "#c2410c" : "#64748b",
+                }}
+              >
+                📎 Subir documento corregido
+              </button>
+              <button
+                disabled={correctSubmitting}
+                onClick={() => { setCorrectMode("no_changes"); setCorrectFile(null); }}
+                style={{
+                  flex: 1, padding: "10px 12px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: correctMode === "no_changes" ? 700 : 400,
+                  border: `2px solid ${correctMode === "no_changes" ? "#22c55e" : "#e2e8f0"}`,
+                  background: correctMode === "no_changes" ? "#f0fdf4" : "#f8fafc",
+                  color: correctMode === "no_changes" ? "#15803d" : "#64748b",
+                }}
+              >
+                ✓ Sin cambios — ya estaba correcto
+              </button>
+            </div>
+
+            {/* Description */}
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#475569", marginBottom: 6 }}>
-                Change to make <span style={{ color: "#dc2626" }}>*</span>
+                {correctMode === "upload" ? <>Descripción del cambio realizado <span style={{ color: "#dc2626" }}>*</span></> : <>Nota para el admin <span style={{ fontSize: 11, fontWeight: 400, color: "#94a3b8" }}>(opcional)</span></>}
               </label>
               <textarea
-                rows={4}
+                rows={3}
                 value={correctInstructions}
                 onChange={(e) => setCorrectInstructions(e.target.value)}
                 disabled={correctSubmitting}
-                placeholder="Describe el cambio que se realizará…"
+                placeholder={correctMode === "upload" ? "Describe el cambio que realizaste…" : "Ej: Revisé el documento y el formato ya estaba correcto…"}
                 style={{ width: "100%", padding: "9px 11px", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 13, resize: "vertical", boxSizing: "border-box", outline: "none" }}
               />
             </div>
 
-            {/* File re-upload — only for ACTUALIZACION and CORRECCION */}
-            {(correctModal.type === "ACTUALIZACION" || correctModal.type === "CORRECCION") && (
+            {/* File upload — only in upload mode */}
+            {correctMode === "upload" && (
               <div style={{ marginBottom: 16 }}>
                 <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#475569", marginBottom: 6 }}>
-                  Corrected file <span style={{ fontSize: 11, fontWeight: 400, color: "#94a3b8" }}>(optional — replaces the previous one)</span>
+                  Archivo corregido <span style={{ fontSize: 11, fontWeight: 400, color: "#94a3b8" }}>(reemplaza la versión anterior)</span>
                 </label>
                 <div
                   onClick={() => !correctSubmitting && correctFileRef.current?.click()}
@@ -1934,7 +1971,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                       )}
                     </div>
                   ) : (
-                    <span style={{ fontSize: 12, color: "#94a3b8" }}>Click to select a file</span>
+                    <span style={{ fontSize: 12, color: "#94a3b8" }}>Clic para seleccionar archivo</span>
                   )}
                 </div>
                 <input
@@ -1961,7 +1998,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                 <div style={{ height: 4, background: "#e2e8f0", borderRadius: 2, overflow: "hidden" }}>
                   <div style={{ height: "100%", width: `${correctProgress}%`, background: "#f97316", transition: "width 0.3s ease" }} />
                 </div>
-                <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 4, textAlign: "center" }}>Uploading file…</p>
+                <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 4, textAlign: "center" }}>Subiendo archivo…</p>
               </div>
             )}
 
@@ -1971,14 +2008,21 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
 
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               {!correctSubmitting && (
-                <button onClick={() => { setCorrectModal(null); setCorrectFile(null); setCorrectVersionStr(""); }} style={{ border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", padding: "9px 18px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>{tc("cancel")}</button>
+                <button onClick={() => { setCorrectModal(null); setCorrectFile(null); setCorrectVersionStr(""); setCorrectMode("upload"); }} style={{ border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", padding: "9px 18px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>{tc("cancel")}</button>
               )}
               <button
                 onClick={submitCorrection}
-                disabled={correctSubmitting || !correctInstructions.trim()}
-                style={{ background: "#f97316", color: "#fff", border: "none", padding: "9px 22px", borderRadius: 8, cursor: correctSubmitting ? "default" : "pointer", fontSize: 13, fontWeight: 700, opacity: (correctSubmitting || !correctInstructions.trim()) ? 0.65 : 1 }}
+                disabled={correctSubmitting || (correctMode === "upload" && !correctInstructions.trim())}
+                style={{
+                  background: correctMode === "no_changes" ? "#22c55e" : "#f97316",
+                  color: "#fff", border: "none", padding: "9px 22px", borderRadius: 8,
+                  cursor: correctSubmitting ? "default" : "pointer", fontSize: 13, fontWeight: 700,
+                  opacity: (correctSubmitting || (correctMode === "upload" && !correctInstructions.trim())) ? 0.65 : 1,
+                }}
               >
-                {correctSubmitting ? (correctFile ? "Subiendo…" : "Enviando…") : "Reenviar para aprobación"}
+                {correctSubmitting
+                  ? (correctFile ? "Subiendo…" : "Enviando…")
+                  : correctMode === "no_changes" ? "Confirmar sin cambios" : "Reenviar para aprobación"}
               </button>
             </div>
           </div>
