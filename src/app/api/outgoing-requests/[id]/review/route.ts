@@ -95,29 +95,44 @@ export async function POST(
   }
 
   if (decision === "RETURNED") {
-    await prisma.$transaction(async (tx) => {
-      await tx.outgoingRequest.update({
-        where: { id: params.id },
-        data: {
-          status:                "RETURNED",
-          finalNotes:            notes ?? null,
-          finalReviewedByUserId: userId,
-          finalReviewedAt:       now,
-        },
-      });
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.outgoingRequest.update({
+          where: { id: params.id },
+          data: {
+            status:                "RETURNED",
+            finalNotes:            notes ?? null,
+            finalReviewedByUserId: userId,
+            finalReviewedAt:       now,
+            // Reset pending submission so assignees can re-submit
+            outcomeType:       null,
+            pendingStorageKey: null,
+            pendingFileName:   null,
+            pendingMimeType:   null,
+            pendingSize:       null,
+            pendingVersionStr: null,
+          },
+        });
 
-      const uniqueUserIds = [...new Set(outgoing.tasks.map((t) => t.assignedToUserId))];
-      await tx.notification.createMany({
-        data: uniqueUserIds.map((uid) => ({
-          companyId,
-          userId:  uid,
-          type:    "OUTGOING_REQUEST_RETURNED",
-          message: (`Tu entrega para "${docName}" fue devuelta para corrección.${notes ? ` ${notes}` : ""}`).trim(),
-          fileId:  outgoing.fileId,
-        })),
-        skipDuplicates: true,
+        // Reset all tasks back to PENDING so assignees can redo their work
+        await tx.documentTask.updateMany({
+          where: { outgoingRequestId: params.id },
+          data:  { status: "PENDING", completedAt: null, rejectionNote: null },
+        });
+
+        // Notify each unique assignee individually (avoids createMany + NULL dedupKey issues)
+        const uniqueUserIds = [...new Set(outgoing.tasks.map((t) => t.assignedToUserId))];
+        const notifMsg = `Tu entrega para "${docName}" fue devuelta para corrección.${notes ? ` Motivo: ${notes}` : ""}`;
+        for (const uid of uniqueUserIds) {
+          await tx.notification.create({
+            data: { companyId, userId: uid, type: "OUTGOING_REQUEST_RETURNED", message: notifMsg, fileId: outgoing.fileId },
+          });
+        }
       });
-    });
+    } catch (err) {
+      console.error("[outgoing-review RETURNED]", err);
+      return NextResponse.json({ error: "Error al devolver la solicitud" }, { status: 500 });
+    }
 
     await logAction({
       companyId, userId, action: "OUTGOING_REQUEST_RETURNED",
