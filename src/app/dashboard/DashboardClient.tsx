@@ -199,12 +199,12 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
 
   const fetchCRCount = useCallback(async () => {
     if (!isAdmin) return;
-    const res = await fetch("/api/change-requests/counts");
+    const res = await fetch("/api/change-requests/counts", { cache: "no-store" });
     if (res.ok) { const d = await res.json(); setPendingCRCount(d.pending ?? 0); }
   }, [isAdmin]);
 
   const fetchPendingCounts = useCallback(async () => {
-    const res = await fetch("/api/tasks/counts");
+    const res = await fetch("/api/tasks/counts", { cache: "no-store" });
     if (res.ok) {
       const data = await res.json();
       setPendingCounts({
@@ -734,13 +734,19 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                   </span>
                 )}
                 {myPendingCR > 0 && (
-                  <span style={{ fontSize: 12, background: "rgba(255,255,255,0.22)", borderRadius: 6, padding: "2px 10px", fontWeight: 600 }}>
+                  <span
+                    onClick={() => router.push("/dashboard/pendientes")}
+                    style={{ fontSize: 12, background: "rgba(255,255,255,0.22)", borderRadius: 6, padding: "2px 10px", fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}
+                  >
                     {myPendingCR} {myPendingCR !== 1 ? t("pendingBanner.requests") : t("pendingBanner.request")} {t("pendingBanner.awaitingApproval")}
                   </span>
                 )}
                 {isAdmin && pendingCRCount > 0 && (
-                  <span style={{ fontSize: 12, background: "#f59e0b", color: "#1e293b", borderRadius: 6, padding: "2px 10px", fontWeight: 700 }}>
-                    {pendingCRCount} {pendingCRCount !== 1 ? t("pendingBanner.requests") : t("pendingBanner.request")} {t("pendingBanner.awaitingApproval")}
+                  <span
+                    onClick={() => router.push("/dashboard/solicitudes")}
+                    style={{ fontSize: 12, background: "#f59e0b", color: "#1e293b", borderRadius: 6, padding: "2px 10px", fontWeight: 700, cursor: "pointer", textDecoration: "underline" }}
+                  >
+                    {pendingCRCount} {pendingCRCount !== 1 ? t("pendingBanner.requests") : t("pendingBanner.request")} por aprobar
                   </span>
                 )}
               </div>
@@ -757,7 +763,11 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
               )}
             </div>
             <button
-              onClick={() => router.push("/dashboard/pendientes")}
+              onClick={() => {
+                const hasUserTasks = pendingCounts.enRevision > 0 || pendingCounts.atrasadas > 0 || myPendingCR > 0;
+                const onlyAdminCRs = isAdmin && pendingCRCount > 0 && !hasUserTasks;
+                router.push(onlyAdminCRs ? "/dashboard/solicitudes" : "/dashboard/pendientes");
+              }}
               style={{ background: "#fff", color: brand, border: "none", padding: "8px 20px", borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap" }}
             >
               {t("pendingBanner.viewLink")}

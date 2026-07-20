@@ -54,7 +54,7 @@ export default function DashboardShellClient({
   const [countdown,    setCountdown]    = useState(120);
 
   const refreshTaskCounts = useCallback(() => {
-    fetch("/api/tasks/counts")
+    fetch("/api/tasks/counts", { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => setPendingTotal((d.pendientes ?? 0) + (d.atrasadas ?? 0) + (d.returnedOutgoing ?? 0)))
       .catch(() => {});
@@ -62,7 +62,7 @@ export default function DashboardShellClient({
 
   const refreshCRCounts = useCallback(() => {
     if (!isAdmin) return;
-    fetch("/api/change-requests/counts")
+    fetch("/api/change-requests/counts", { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => setPendingCRCount(d.pending ?? 0))
       .catch(() => {});
