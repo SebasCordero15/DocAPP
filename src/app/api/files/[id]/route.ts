@@ -189,6 +189,23 @@ export async function PATCH(
     },
   });
 
+  // Grant EDIT permission to the new encargado when set/changed by admin
+  if (encargadoDocumentoId && bypass) {
+    const existing = await prisma.permission.findFirst({
+      where: { companyId, userId: encargadoDocumentoId, fileId: file.id },
+    });
+    if (existing) {
+      const levels: Record<string, number> = { READ: 1, EDIT: 2, MANAGE: 3 };
+      if ((levels[existing.accessLevel] ?? 0) < levels["EDIT"]) {
+        await prisma.permission.update({ where: { id: existing.id }, data: { accessLevel: "EDIT" } });
+      }
+    } else {
+      await prisma.permission.create({
+        data: { companyId, userId: encargadoDocumentoId, fileId: file.id, resourceType: "FILE", accessLevel: "EDIT" },
+      });
+    }
+  }
+
   const action = completeReview ? "FILE_REVIEW_COMPLETE" : status === "OBSOLETE" ? "FILE_OBSOLETE" : "FILE_REVIEW_UPDATE";
   const detail = status === "OBSOLETE" ? `Archivado como obsoleto: ${file.nombreDocumento || file.name}` : file.name;
   await logAction({ companyId, userId: session.userId, action, resourceType: "FILE", resourceId: file.id, detail });

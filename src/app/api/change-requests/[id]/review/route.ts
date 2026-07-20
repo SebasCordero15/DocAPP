@@ -135,6 +135,24 @@ export async function POST(
           },
         });
 
+        // Grant explicit EDIT permission to the uploader and the assigned encargado
+        const usersToGrant = [...new Set([cr.requestedByUserId, encargadoDocumentoId])];
+        for (const grantUserId of usersToGrant) {
+          const existing = await prisma.permission.findFirst({
+            where: { companyId, userId: grantUserId, fileId: cr.fileId },
+          });
+          if (existing) {
+            const levels: Record<string, number> = { READ: 1, EDIT: 2, MANAGE: 3 };
+            if ((levels[existing.accessLevel] ?? 0) < levels["EDIT"]) {
+              await prisma.permission.update({ where: { id: existing.id }, data: { accessLevel: "EDIT" } });
+            }
+          } else {
+            await prisma.permission.create({
+              data: { companyId, userId: grantUserId, fileId: cr.fileId, resourceType: "FILE", accessLevel: "EDIT" },
+            });
+          }
+        }
+
       } else if (cr.type === "EDIT_METADATA" || cr.type === "REVISION_DATE_CHANGE") {
         // proposedFileUpdates: from task-completion; after: from manual edit CRs
         const source = (pc.proposedFileUpdates ?? pc.after) as Record<string, unknown> | undefined;
