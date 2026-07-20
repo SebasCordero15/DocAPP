@@ -666,8 +666,8 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
   const visibleRejectedChains   = rejectedChains.filter((c) => !dismissedIds.has(c.id));
   const visibleRejectedCRs      = rejectedCRs.filter((c) => !dismissedIds.has(c.id));
   const visibleRejectedOutgoing = rejectedOutgoing.filter((o) => !dismissedIds.has(o.id));
-  const visibleReturnedOutgoing = returnedOutgoing.filter((o) => !dismissedIds.has(o.id));
-  const rejectedCount = visibleRejectedChains.length + visibleRejectedCRs.length + visibleRejectedOutgoing.length + visibleReturnedOutgoing.length;
+  const visibleReturnedOutgoing = returnedOutgoing; // RETURNED items are never dismissed — user must correct them
+  const rejectedCount = visibleRejectedChains.length + visibleRejectedCRs.length + visibleRejectedOutgoing.length;
 
   const pendingCRs = myChangeRequests.filter((cr) => cr.status === "PENDING");
 
@@ -1268,17 +1268,17 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
                             <span style={{ fontWeight: 700, fontSize: 14, color: "#1e293b" }}>{docName}</span>
                             <span style={{ background: "#fee2e2", color: "#dc2626", borderRadius: 5, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>
-                              Chain rejected
+                              Cadena rechazada
                             </span>
                           </div>
                           <div style={{ display: "flex", gap: 12, fontSize: 12, color: "#64748b", flexWrap: "wrap" }}>
                             {f?.codigo && <span>{t("meta.codigo")} <b>{f.codigo}</b></span>}
-                            <span>Rejected by: <b>{rejectedBy}</b></span>
-                            <span>Date: <b>{new Date(chain.updatedAt).toLocaleDateString("es-MX")}</b></span>
+                            <span>Rechazado por: <b>{rejectedBy}</b></span>
+                            <span>Fecha: <b>{new Date(chain.updatedAt).toLocaleDateString("es-MX")}</b></span>
                           </div>
                           {reason && (
                             <div style={{ marginTop: 8, padding: "7px 12px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6, fontSize: 12, color: "#dc2626" }}>
-                              <b>Reason:</b> {reason}
+                              <b>Motivo:</b> {reason}
                             </div>
                           )}
                         </div>
@@ -1320,8 +1320,8 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                           </div>
                           <div style={{ display: "flex", gap: 12, fontSize: 12, color: "#64748b", flexWrap: "wrap" }}>
                             {f?.codigo && <span>Código: <b>{f.codigo}</b></span>}
-                            <span>Rejected by: <b>{rejectedBy}</b></span>
-                            {cr.reviewedAt && <span>Date: <b>{new Date(cr.reviewedAt).toLocaleDateString("es-MX")}</b></span>}
+                            <span>Rechazado por: <b>{rejectedBy}</b></span>
+                            {cr.reviewedAt && <span>Fecha: <b>{new Date(cr.reviewedAt).toLocaleDateString("es-MX")}</b></span>}
                           </div>
                           {cr.adminNotes && (
                             <div style={{ marginTop: 8, padding: "7px 12px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6, fontSize: 12, color: "#dc2626" }}>
@@ -1353,14 +1353,13 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                   const typeLabel = { ACTUALIZACION: "Actualización", REVISION: "Revisión", CORRECCION: "Corrección" }[o.type] ?? o.type;
                   return (
                     <div key={o.id} style={{ background: "#fff", border: "1px solid #fed7aa", borderLeft: "4px solid #f97316", borderRadius: 10, padding: "14px 18px", marginBottom: 10, position: "relative" }}>
-                      <button onClick={() => dismissItem(o.id)} title="Dismiss" style={{ position: "absolute", top: 8, right: 10, background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 18, lineHeight: 1, padding: 2 }}>×</button>
                       <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
                         {f && <FileIcon mimeType={f.mimeType} size={28} />}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
                             <span style={{ fontWeight: 700, fontSize: 14, color: "#1e293b" }}>{docName}</span>
                             <span style={{ background: "#fff7ed", color: "#c2410c", borderRadius: 5, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>
-                              Returned — pending correction
+                              Devuelto — pendiente de corrección
                             </span>
                             <span style={{ background: "#f1f5f9", color: "#475569", borderRadius: 5, padding: "1px 7px", fontSize: 11 }}>
                               {typeLabel}
@@ -1368,12 +1367,12 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                           </div>
                           <div style={{ display: "flex", gap: 12, fontSize: 12, color: "#64748b", flexWrap: "wrap" }}>
                             {f?.codigo && <span>Código: <b>{f.codigo}</b></span>}
-                            <span>Returned by: <b>{returnedBy}</b></span>
-                            {o.finalReviewedAt && <span>Date: <b>{new Date(o.finalReviewedAt).toLocaleDateString("es-MX")}</b></span>}
+                            <span>Devuelto por: <b>{returnedBy}</b></span>
+                            {o.finalReviewedAt && <span>Fecha: <b>{new Date(o.finalReviewedAt).toLocaleDateString("es-MX")}</b></span>}
                           </div>
                           {o.finalNotes && (
                             <div style={{ marginTop: 8, padding: "7px 12px", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 6, fontSize: 12, color: "#c2410c" }}>
-                              <b>Admin note:</b> {o.finalNotes}
+                              <b>Nota del admin:</b> {o.finalNotes}
                             </div>
                           )}
                         </div>
@@ -1409,7 +1408,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
                             <span style={{ fontWeight: 700, fontSize: 14, color: "#1e293b" }}>{docName}</span>
                             <span style={{ background: "#ede9fe", color: "#6d28d9", borderRadius: 5, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>
-                              Outgoing request rejected
+                              Solicitud saliente rechazada
                             </span>
                             <span style={{ background: "#f1f5f9", color: "#475569", borderRadius: 5, padding: "1px 7px", fontSize: 11 }}>
                               {typeLabel}
@@ -1417,8 +1416,8 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                           </div>
                           <div style={{ display: "flex", gap: 12, fontSize: 12, color: "#64748b", flexWrap: "wrap" }}>
                             {f?.codigo && <span>Código: <b>{f.codigo}</b></span>}
-                            <span>Rejected by: <b>{rejectedBy}</b></span>
-                            {o.finalReviewedAt && <span>Date: <b>{new Date(o.finalReviewedAt).toLocaleDateString("es-MX")}</b></span>}
+                            <span>Rechazado por: <b>{rejectedBy}</b></span>
+                            {o.finalReviewedAt && <span>Fecha: <b>{new Date(o.finalReviewedAt).toLocaleDateString("es-MX")}</b></span>}
                           </div>
                           {o.finalNotes && (
                             <div style={{ marginTop: 8, padding: "7px 12px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6, fontSize: 12, color: "#dc2626" }}>
