@@ -17,6 +17,7 @@ export async function GET(req: NextRequest) {
   const q            = searchParams.get("q")?.toLowerCase() ?? "";
   const codigoFilter = searchParams.get("codigo")?.toLowerCase() ?? "";
   const nombreFilter = searchParams.get("nombre")?.toLowerCase() ?? "";
+  const tipoFilter   = searchParams.get("tipo") ?? "";
   const dateFrom     = searchParams.get("dateFrom");
   const dateTo       = searchParams.get("dateTo");
   const page         = Math.max(1, parseInt(searchParams.get("page") ?? "1") || 1);
@@ -355,6 +356,7 @@ export async function GET(req: NextRequest) {
 
   // Apply search + dedicated filters
   const filtered = entries.filter((e) => {
+    if (tipoFilter && e.tipo !== tipoFilter) return false;
     if (codigoFilter && !(e.codigo?.toLowerCase().includes(codigoFilter) ?? false)) return false;
     if (nombreFilter && !(e.documento?.toLowerCase().includes(nombreFilter) ?? false)) return false;
     if (q && !(

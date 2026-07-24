@@ -127,6 +127,7 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
   const [dateTo,   setDateTo]   = useState("");
   const [fCodigo,  setFCodigo]  = useState("");
   const [fNombre,  setFNombre]  = useState("");
+  const [fTipo,    setFTipo]    = useState("");
   const [page,     setPage]     = useState(1);
 
   // ── Próximas Revisiones state ──
@@ -156,6 +157,7 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
     if (dateTo)   p.set("dateTo", dateTo);
     if (fCodigo)  p.set("codigo", fCodigo);
     if (fNombre)  p.set("nombre", fNombre);
+    if (fTipo)    p.set("tipo", fTipo);
     p.set("page", String(page));
     const res = await fetch(`/api/control-cambios?${p}`);
     if (res.ok) {
@@ -165,13 +167,13 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
       setPageCount(data.pageCount);
     }
     setLoading(false);
-  }, [q, dateFrom, dateTo, fCodigo, fNombre, page]);
+  }, [q, dateFrom, dateTo, fCodigo, fNombre, fTipo, page]);
 
   useEffect(() => { fetchEntries(); }, [fetchEntries]);
   useEffect(() => { fetchRevisiones(); }, []);
 
   function applySearch() { setPage(1); fetchEntries(); }
-  function clearFilters() { setQ(""); setDateFrom(""); setDateTo(""); setFCodigo(""); setFNombre(""); setPage(1); }
+  function clearFilters() { setQ(""); setDateFrom(""); setDateTo(""); setFCodigo(""); setFNombre(""); setFTipo(""); setPage(1); }
 
   async function fetchRevisiones() {
     setRevLoading(true);
@@ -349,6 +351,34 @@ export default function ControlCambiosClient({ company, userRole }: Props) {
               </div>
             </div>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
+              <div style={{ flex: "2 1 200px" }}>
+                <label style={labelStyle}>{t("table.tipoCambio")}</label>
+                <select value={fTipo} onChange={(e) => setFTipo(e.target.value)} style={inputStyle}>
+                  <option value="">Todos</option>
+                  <optgroup label="Actividad de archivos">
+                    <option value="FILE_UPLOAD">Archivo subido</option>
+                    <option value="FILE_DELETE">Archivo eliminado</option>
+                    <option value="FILE_REVIEW_COMPLETE">Revisión completada</option>
+                    <option value="FILE_REVIEW_UPDATE">Revisión programada</option>
+                    <option value="FILE_METADATA_UPDATE">Metadatos actualizados</option>
+                    <option value="FILE_STATUS_UPDATE">Estado actualizado</option>
+                    <option value="FILE_OBSOLETE">Archivado como obsoleto</option>
+                    <option value="OUTGOING_REQUEST_RETURNED">Entrega devuelta</option>
+                    <option value="OUTGOING_REQUEST_CORRECTED">Entrega corregida</option>
+                  </optgroup>
+                  <optgroup label="Solicitudes de cambio">
+                    <option value="CR_NEW_UPLOAD">Archivo nuevo</option>
+                    <option value="CR_EDIT_METADATA">Edición de metadatos</option>
+                    <option value="CR_DELETE">Solicitud de eliminación</option>
+                    <option value="CR_REVISION_DATE_CHANGE">Cambio de fecha de revisión</option>
+                  </optgroup>
+                  <optgroup label="Entregas aprobadas">
+                    <option value="OR_ACTUALIZACION">Actualización aprobada</option>
+                    <option value="OR_REVISION">Revisión aprobada</option>
+                    <option value="OR_CORRECCION">Corrección aprobada</option>
+                  </optgroup>
+                </select>
+              </div>
               <div style={{ flex: "1 1 130px" }}>
                 <label style={labelStyle}>{tc("from")}</label>
                 <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={inputStyle} />

@@ -972,15 +972,15 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                           {/* Title row */}
                           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
                             <span style={{ fontWeight: 700, fontSize: 15, color: "#1e293b" }}>{docName}</span>
-                            {/* Only show generic type chip when not an outgoing task (outgoing chip below already names the type) */}
-                            {!isOutTask && (
+                            {/* Generic type chip: hidden for outgoing tasks and chain tasks (those get their own descriptive chip) */}
+                            {!isOutTask && !isChainTask && (
                               <span style={{ background: typeColor.bg, color: typeColor.color, borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
                                 {TASK_TYPE_LABELS[task.type]}
                               </span>
                             )}
                             {isChainTask && (
                               <span style={{ background: "#ede9fe", color: "#6d28d9", borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>
-                                Cadena · Paso {task.stepOrder}/{task.chainTotalSteps}
+                                Creación de doc. · Paso {task.stepOrder}/{task.chainTotalSteps}
                               </span>
                             )}
                             {isOutTask && task.outgoingRequest && (
