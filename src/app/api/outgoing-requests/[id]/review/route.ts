@@ -179,7 +179,8 @@ export async function POST(
   let oldStorageKeyToDelete: string | null = null;
 
   if (outcomeType === "no_changes") {
-    // Nothing to change on the file itself — just mark approved
+    // No file swap needed — but admin may still update the version label
+    if (adminVersionStr) fileUpdateData.versionStr = adminVersionStr;
   } else if (outcomeType === "new_version" || (outcomeType === "corrected" && outgoing.pendingStorageKey)) {
     // Version swap: current → previous, pending → current
     const newVersionStr = adminVersionStr ?? outgoing.pendingVersionStr ?? file.versionStr;

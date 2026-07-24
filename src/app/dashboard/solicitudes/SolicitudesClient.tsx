@@ -271,7 +271,7 @@ export default function SolicitudesClient({ company, userRole }: Props) {
       setRejectingId(null); setApprovingId(null);
       window.dispatchEvent(new Event("pendientes-changed"));
       // After approval (non-delete), ask if admin wants to update review date
-      if (action === "APPROVE" && cr?.type !== "DELETE" && cr?.file) {
+      if (action === "APPROVE" && cr?.type !== "DELETE" && cr?.type !== "NEW_UPLOAD" && cr?.file) {
         const docName = cr.file.nombreDocumento || cr.file.name;
         setReviewDateValue("");
         setReviewDateModal({ fileId: cr.file.id, docName });

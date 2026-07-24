@@ -269,7 +269,6 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
     if (!pickedFile) { setUploadError(t("errors.noFile")); return; }
     if (!currentFolderId) { setUploadError(t("errors.noFolder")); return; }
     if (!form.nombreDocumento.trim()) { setUploadError(t("errors.noNombre")); return; }
-    if (!form.departamento.trim()) { setUploadError(t("errors.noDept")); return; }
 
     setUploading(true);
     setUploadError(null);
@@ -303,8 +302,8 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
           mimeType: pickedFile.type || "application/octet-stream",
           size: pickedFile.size,
           nombreDocumento: form.nombreDocumento.trim(),
-          departamento: form.departamento.trim(),
-          tipoDocumento: form.tipoDocumento,
+          departamento: "Externo",
+          tipoDocumento: "OTRO",
           versionStr: "v1.0",
           folderId: currentFolderId,
           reviewerIds: [],
@@ -668,20 +667,6 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
               <label style={labelStyle}>{t("uploadModal.nombreLabel")}</label>
               <input value={form.nombreDocumento} onChange={(e) => setForm(p => ({ ...p, nombreDocumento: e.target.value }))}
                 placeholder={t("uploadModal.nombrePlaceholder")} style={inputStyle} disabled={uploading} />
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-              <div>
-                <label style={labelStyle}>{t("uploadModal.tipoLabel")}</label>
-                <select value={form.tipoDocumento} onChange={(e) => setForm(p => ({ ...p, tipoDocumento: e.target.value }))} style={inputStyle} disabled={uploading}>
-                  {TIPOS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={labelStyle}>{t("uploadModal.deptLabel")}</label>
-                <input value={form.departamento} onChange={(e) => setForm(p => ({ ...p, departamento: e.target.value }))}
-                  placeholder={t("uploadModal.deptPlaceholder")} style={inputStyle} disabled={uploading} />
-              </div>
             </div>
 
             {uploadError && (

@@ -514,7 +514,7 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
                               style={{ ...ghostBtn, fontSize: 11, padding: "3px 8px", ...(isViewable(f.mimeType) ? { color: "#1d4ed8", background: "#eff6ff", border: "1px solid #bfdbfe" } : {}) }}
                             >{t("actions.view")}</button>
                             <button onClick={() => openFlowModal(f)} style={{ ...ghostBtn, fontSize: 11, padding: "3px 8px", color: "#5b21b6" }}>{t("actions.flow")}</button>
-                            {canEdit && (
+                            {userRole === "COMPANY_ADMIN" && (
                               <button
                                 onClick={() => editingId === f.id ? setEditingId(null) : startEdit(f)}
                                 style={{ ...ghostBtn, fontSize: 11, padding: "3px 8px", color: editingId === f.id ? "#dc2626" : "#374151" }}

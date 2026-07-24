@@ -748,18 +748,40 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
           <div
             onClick={() => { setDocTab("atrasadas"); fetchDocFiles("atrasadas"); }}
             style={{
-              background: "#fef2f2", border: "1.5px solid #fca5a5", borderRadius: 10,
-              padding: "12px 20px", marginBottom: 24, cursor: "pointer",
+              background: "#dc2626", borderRadius: 10,
+              padding: "14px 20px", marginBottom: 24, cursor: "pointer",
               display: "flex", alignItems: "center", gap: 14,
+              boxShadow: "0 2px 8px rgba(220,38,38,0.25)",
             }}
           >
-            <span style={{ fontSize: 20 }}>⚠</span>
+            <span style={{ fontSize: 24 }}>🚨</span>
             <div style={{ flex: 1 }}>
-              <span style={{ fontWeight: 700, color: "#dc2626", fontSize: 14 }}>
+              <span style={{ fontWeight: 800, color: "#fff", fontSize: 15 }}>
                 {docCounts.atrasadas} {docCounts.atrasadas === 1 ? "documento vencido" : "documentos vencidos"}
               </span>
-              <span style={{ color: "#ef4444", fontSize: 12, marginLeft: 10 }}>
+              <span style={{ color: "#fecaca", fontSize: 13, marginLeft: 10 }}>
                 — fecha de revisión superada. Haz clic para ver.
+              </span>
+            </div>
+            <span style={{ color: "#fecaca", fontSize: 12, fontWeight: 600 }}>Ver documentos →</span>
+          </div>
+        )}
+
+        {/* ── Equipo overdue banner ────────────────────────────────────────────── */}
+        {mainTab === "equipo" && teamTasks.some((t) => t.isOverdue || t.fileRevisionOverdue) && (
+          <div style={{
+            background: "#dc2626", borderRadius: 10,
+            padding: "14px 20px", marginBottom: 24,
+            display: "flex", alignItems: "center", gap: 14,
+            boxShadow: "0 2px 8px rgba(220,38,38,0.25)",
+          }}>
+            <span style={{ fontSize: 24 }}>🚨</span>
+            <div style={{ flex: 1 }}>
+              <span style={{ fontWeight: 800, color: "#fff", fontSize: 15 }}>
+                {teamTasks.filter((t) => t.isOverdue || t.fileRevisionOverdue).length} tarea(s) del equipo vencidas
+              </span>
+              <span style={{ color: "#fecaca", fontSize: 13, marginLeft: 10 }}>
+                — ver abajo las tareas marcadas en rojo o naranja
               </span>
             </div>
           </div>
@@ -825,7 +847,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                   const anyOverdue  = !overallDone && sorted.some((t) => t.isOverdue);
                   const revVencida  = !overallDone && sorted.some((t) => t.fileRevisionOverdue);
                   return (
-                    <div key={or.id} className="card" style={{ borderLeft: `4px solid ${anyOverdue || revVencida ? "#dc2626" : typeColor.color}` }}>
+                    <div key={or.id} className="card" style={{ borderLeft: `4px solid ${anyOverdue ? "#dc2626" : revVencida ? "#f97316" : typeColor.color}`, background: anyOverdue ? "#fff5f5" : revVencida ? "#fff7ed" : undefined }}>
                       <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
                         <FileIcon mimeType={rep.file.mimeType} size={30} />
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -839,14 +861,15 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                               {t("outgoingBadge")}
                             </span>
                             <span style={{
-                              background: overallDone ? "#dcfce7" : anyOverdue ? "#fee2e2" : "#f1f5f9",
-                              color:      overallDone ? "#166534" : anyOverdue ? "#dc2626" : "#64748b",
-                              borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: anyOverdue ? 700 : 400,
+                              background: overallDone ? "#dcfce7" : anyOverdue ? "#dc2626" : "#f1f5f9",
+                              color:      overallDone ? "#166534" : anyOverdue ? "#fff"     : "#64748b",
+                              borderRadius: 6, padding: anyOverdue ? "2px 10px" : "1px 8px", fontSize: anyOverdue ? 12 : 11, fontWeight: anyOverdue ? 800 : 400,
+                              letterSpacing: anyOverdue ? "0.02em" : undefined,
                             }}>
-                              {overallDone ? t("completed") : anyOverdue ? t("overdue") : t("stepStatus.inProgress")}
+                              {overallDone ? t("completed") : anyOverdue ? `⚠ ${t("overdue")}` : t("stepStatus.inProgress")}
                             </span>
-                            {revVencida && !overallDone && (
-                              <span style={{ background: "#fee2e2", color: "#dc2626", borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>
+                            {revVencida && !overallDone && !anyOverdue && (
+                              <span style={{ background: "#f97316", color: "#fff", borderRadius: 6, padding: "2px 10px", fontSize: 12, fontWeight: 800, letterSpacing: "0.02em" }}>
                                 ⚠ Rev. vencida
                               </span>
                             )}
@@ -964,7 +987,7 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                   const OUT_TYPE_LABELS: Record<string, string> = { ACTUALIZACION: t("types.ACTUALIZACION"), REVISION: t("types.REVISION"), CORRECCION: t("types.CORRECCION") };
                   const docName = task.file.nombreDocumento || task.file.name;
                   return (
-                    <div key={task.id} className="card" style={{ borderLeft: task.isOverdue ? "4px solid #dc2626" : isChainTask ? `4px solid #7c3aed` : `4px solid ${p}` }}>
+                    <div key={task.id} className="card" style={{ borderLeft: task.isOverdue ? "4px solid #dc2626" : (task.fileRevisionOverdue ? "4px solid #f97316" : isChainTask ? `4px solid #7c3aed` : `4px solid ${p}`), background: task.isOverdue ? "#fff5f5" : task.fileRevisionOverdue ? "#fff7ed" : undefined }}>
                       <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
                         <FileIcon mimeType={task.file.mimeType} size={30} />
 
@@ -989,10 +1012,10 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
                               </span>
                             )}
                             {task.isOverdue && (
-                              <span style={{ background: "#fee2e2", color: "#dc2626", borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>{t("overdue")}</span>
+                              <span style={{ background: "#dc2626", color: "#fff", borderRadius: 6, padding: "2px 10px", fontSize: 12, fontWeight: 800, letterSpacing: "0.02em" }}>⚠ {t("overdue")}</span>
                             )}
                             {task.fileRevisionOverdue && !task.isOverdue && (
-                              <span style={{ background: "#fee2e2", color: "#dc2626", borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 700 }}>⚠ Rev. vencida</span>
+                              <span style={{ background: "#f97316", color: "#fff", borderRadius: 6, padding: "2px 10px", fontSize: 12, fontWeight: 800, letterSpacing: "0.02em" }}>⚠ Rev. vencida</span>
                             )}
                             {/* Action-required chip */}
                             {task.status !== "COMPLETED" && task.assignedTo.id === userId && (
@@ -1577,8 +1600,8 @@ export default function PendientesClient({ company, userRole, userId }: Props) {
               </div>
             )}
 
-            {/* Version label */}
-            {(outOutcome === "new_version" || outModal.outgoingRequest.type === "ACTUALIZACION") && (
+            {/* Version label — admin only */}
+            {isAdmin && (outOutcome === "new_version" || outModal.outgoingRequest.type === "ACTUALIZACION") && (
               <div style={{ marginBottom: 16 }}>
                 <label style={ls}>Etiqueta de versión (ej. v1.2)</label>
                 <input
