@@ -11,7 +11,7 @@ interface WelcomeEmailParams {
   adminName: string;
   companyName: string;
   companySlug: string;
-  tempPassword: string;
+  password: string;
   loginUrl: string;
 }
 
@@ -63,7 +63,7 @@ export async function sendCompanyWelcomeEmail(
               <tr style="border-top:1px solid #e2e8f0;">
                 <td style="color:#64748b;padding:7px 0;vertical-align:top;">Contraseña</td>
                 <td style="padding:7px 0;">
-                  <code style="background:#1B3A6B;color:#ffffff;padding:5px 12px;border-radius:6px;font-size:14px;font-weight:700;letter-spacing:1px;">${p.tempPassword}</code>
+                  <code style="background:#1B3A6B;color:#ffffff;padding:5px 12px;border-radius:6px;font-size:14px;font-weight:700;letter-spacing:1px;">${p.password}</code>
                 </td>
               </tr>
             </table>

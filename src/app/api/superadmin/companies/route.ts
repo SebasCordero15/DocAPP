@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { randomBytes } from "crypto";
 import { requireActiveSession, hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/audit";
@@ -14,7 +13,6 @@ const PLAN_LIMITS: Record<string, { maxUsers: number; maxStorageMB: number }> = 
 
 const schema = z.object({
   name: z.string().min(1).max(100),
-  slug: z.string().min(2).max(50).regex(/^[a-z0-9-]+$/, "Slug must be lowercase letters, numbers, and hyphens"),
   industry: z.enum(["FARMACIA", "ALIMENTOS", "MATERIALES", "SERVICIOS", "OTRO", "LEGAL", "FINANCE", "HEALTHCARE", "REAL_ESTATE", "TECH", "OTHER"]),
   plan: z.enum(["BASIC", "PRO", "ENTERPRISE"]).default("BASIC"),
   maxUsers: z.number().int().min(1).max(10000).default(10),
@@ -26,10 +24,36 @@ const schema = z.object({
   logoUrl: z.string().max(700_000).optional(),
   adminName: z.string().min(1).max(100),
   adminEmail: z.string().email(),
+  adminPassword: z.string().min(8).max(100),
 });
 
-function generateTempPassword(): string {
-  return randomBytes(12).toString("base64url").slice(0, 16);
+function isStrongEnough(pw: string): boolean {
+  return pw.length >= 8 && /[A-Z]/.test(pw) && /[a-z]/.test(pw) && /[0-9]/.test(pw);
+}
+
+function slugify(input: string): string {
+  return (
+    input
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9\s-]/g, "")
+      .replace(/\s+/g, "-")
+      .replace(/-{2,}/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 50) || "empresa"
+  );
+}
+
+async function generateUniqueSlug(name: string): Promise<string> {
+  const base = slugify(name);
+  let slug = base;
+  let n = 2;
+  while (await prisma.company.findUnique({ where: { slug } })) {
+    slug = `${base}-${n}`;
+    n++;
+  }
+  return slug;
 }
 
 // POST /api/superadmin/companies — provision a new tenant + initial admin user.
@@ -49,19 +73,20 @@ export async function POST(req: NextRequest) {
   }
 
   const {
-    name, slug, industry, plan,
+    name, industry, plan,
     primaryColor, secondaryColor, accentColor, fontFamily, logoUrl,
-    adminName, adminEmail,
+    adminName, adminEmail, adminPassword,
   } = parsed.data;
 
-  // Slug must be globally unique.
-  const existing = await prisma.company.findUnique({ where: { slug } });
-  if (existing) {
-    return NextResponse.json({ error: "Slug already taken", field: "slug" }, { status: 409 });
+  if (!isStrongEnough(adminPassword)) {
+    return NextResponse.json(
+      { error: "La contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula y un número", field: "adminPassword" },
+      { status: 400 }
+    );
   }
 
-  const tempPassword = generateTempPassword();
-  const passwordHash = await hashPassword(tempPassword);
+  const slug = await generateUniqueSlug(name);
+  const passwordHash = await hashPassword(adminPassword);
   const planLimits = PLAN_LIMITS[plan] ?? PLAN_LIMITS.BASIC;
 
   let company: Awaited<ReturnType<typeof prisma.company.create>>;
@@ -80,7 +105,7 @@ export async function POST(req: NextRequest) {
             email: adminEmail,
             passwordHash,
             role: "COMPANY_ADMIN",
-            forcePasswordChange: true,
+            forcePasswordChange: false,
           },
         },
       },
@@ -106,14 +131,13 @@ export async function POST(req: NextRequest) {
     adminName,
     companyName: name,
     companySlug: slug,
-    tempPassword,
+    password: adminPassword,
     loginUrl,
   });
 
   return NextResponse.json(
     {
       company: { id: company.id, slug: company.slug },
-      tempPassword,
       emailSent: sent,
       emailError: emailError ?? null,
     },

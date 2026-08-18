@@ -764,9 +764,9 @@
     "pendingInvites": "{count, plural, one {· # pending invite} other {· # pending invites}}",
     "atLimitMsg": "User limit reached. Deactivate a user or contact support to expand your plan.",
     "addUser": "Add user",
-    "tabDirect": "Create with temporary password",
+    "tabDirect": "Create with assigned password",
     "tabInvite": "Send invitation link",
-    "directDesc": "Create the user immediately with a temporary password you can share directly (without needing email).",
+    "directDesc": "Create the user immediately and set their access password yourself, which you can share directly (without needing email).",
     "inviteDesc": "Send an invitation link. The user clicks the link and creates their own password.",
     "labels": {
       "fullName": "Full name *",
@@ -774,7 +774,7 @@
       "emailReadonly": "Email (not editable)",
       "role": "Role",
       "baseRole": "Base role",
-      "tempPwLabel": "Temporary password",
+      "tempPwLabel": "Password",
       "tempPwPlaceholder": "Min. 8 chars · uppercase · lowercase · number",
       "specifyManual": "Specify password manually"
     },
@@ -804,7 +804,8 @@
       "activate": "Activate",
       "revoke": "Revoke",
       "saving": "Saving…",
-      "save": "Save"
+      "save": "Save",
+      "generate": "Generate"
     },
     "members": "Members",
     "tableHeaders": {
@@ -843,8 +844,8 @@
       "errorGeneric": "Error saving"
     },
     "tempPw": {
-      "title": "✓ Temporary password generated for {name}",
-      "desc": "This password is shown only once. Share it with {email} securely. The user must change it upon login.",
+      "title": "✓ Password assigned to {name}",
+      "desc": "This password is shown only once. Share it with {email} securely.",
       "copy": "Copy",
       "copied": "Copied!"
     },
@@ -875,7 +876,8 @@
       "update": "Error updating",
       "connection": "Connection error",
       "sendInvite": "Error sending invitation",
-      "createUser": "Error creating user"
+      "createUser": "Error creating user",
+      "weakPassword": "Password must be at least 8 characters with an uppercase letter, a lowercase letter, and a number"
     },
     "loading": "Loading…"
   },

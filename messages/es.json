@@ -764,9 +764,9 @@
     "pendingInvites": "{count, plural, one {· # invitación pendiente} other {· # invitaciones pendientes}}",
     "atLimitMsg": "Límite de usuarios alcanzado. Desactiva un usuario o contacta soporte para ampliar el plan.",
     "addUser": "Agregar usuario",
-    "tabDirect": "Crear con contraseña temporal",
+    "tabDirect": "Crear con contraseña asignada",
     "tabInvite": "Enviar enlace de invitación",
-    "directDesc": "Crea el usuario inmediatamente con una contraseña temporal que puedes compartir directamente (sin necesitar correo electrónico).",
+    "directDesc": "Crea el usuario inmediatamente y define tú mismo su contraseña de acceso, que puedes compartir directamente (sin necesitar correo electrónico).",
     "inviteDesc": "Envía un enlace de invitación. El usuario hará clic en el enlace y creará su propia contraseña.",
     "labels": {
       "fullName": "Nombre completo *",
@@ -774,7 +774,7 @@
       "emailReadonly": "Correo (no editable)",
       "role": "Rol",
       "baseRole": "Rol base",
-      "tempPwLabel": "Contraseña temporal",
+      "tempPwLabel": "Contraseña",
       "tempPwPlaceholder": "Mín. 8 chars · mayúscula · minúscula · número",
       "specifyManual": "Especificar contraseña manualmente"
     },
@@ -804,7 +804,8 @@
       "activate": "Activar",
       "revoke": "Revocar",
       "saving": "Guardando…",
-      "save": "Guardar"
+      "save": "Guardar",
+      "generate": "Generar"
     },
     "members": "Miembros",
     "tableHeaders": {
@@ -843,8 +844,8 @@
       "errorGeneric": "Error al guardar"
     },
     "tempPw": {
-      "title": "✓ Contraseña temporal generada para {name}",
-      "desc": "Esta contraseña se muestra una sola vez. Compártela con {email} de forma segura. El usuario deberá cambiarla al iniciar sesión.",
+      "title": "✓ Contraseña asignada a {name}",
+      "desc": "Esta contraseña se muestra una sola vez. Compártela con {email} de forma segura.",
       "copy": "Copiar",
       "copied": "¡Copiado!"
     },
@@ -875,7 +876,8 @@
       "update": "Error al actualizar",
       "connection": "Error de conexión",
       "sendInvite": "Error al enviar invitación",
-      "createUser": "Error al crear usuario"
+      "createUser": "Error al crear usuario",
+      "weakPassword": "La contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula y un número"
     },
     "loading": "Cargando…"
   },

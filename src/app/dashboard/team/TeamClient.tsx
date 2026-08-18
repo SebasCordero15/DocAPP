@@ -34,6 +34,20 @@ interface Props {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+function isStrongEnough(pw: string): boolean {
+  return pw.length >= 8 && /[A-Z]/.test(pw) && /[a-z]/.test(pw) && /[0-9]/.test(pw);
+}
+
+function generateStrongPassword(length = 14): string {
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lower = "abcdefghijkmnpqrstuvwxyz";
+  const digits = "23456789";
+  const all = upper + lower + digits;
+  const pick = (set: string) => set[Math.floor(Math.random() * set.length)];
+  let pw = pick(upper) + pick(lower) + pick(digits);
+  for (let i = pw.length; i < length; i++) pw += pick(all);
+  return pw.split("").sort(() => Math.random() - 0.5).join("");
+}
 
 const ROLE_COLORS: Record<Role, { bg: string; fg: string }> = {
   COMPANY_ADMIN: { bg: "#fef3c7", fg: "#92400e" },
@@ -283,12 +297,14 @@ export default function TeamClient({ currentUserId, company }: Props) {
   const [inviteError,  setInviteError]  = useState<string | null>(null);
 
   // Direct create form
-  const [dcName,    setDcName]    = useState("");
-  const [dcEmail,   setDcEmail]   = useState("");
-  const [dcRole,    setDcRole]    = useState<Role>("VIEWER");
-  const [dcSaving,  setDcSaving]  = useState(false);
-  const [dcError,   setDcError]   = useState<string | null>(null);
-  const [dcResult,  setDcResult]  = useState<{ tempPassword: string; user: TeamUser } | null>(null);
+  const [dcName,     setDcName]     = useState("");
+  const [dcEmail,    setDcEmail]    = useState("");
+  const [dcRole,     setDcRole]     = useState<Role>("VIEWER");
+  const [dcPassword, setDcPassword] = useState("");
+  const [dcShowPw,   setDcShowPw]   = useState(false);
+  const [dcSaving,   setDcSaving]   = useState(false);
+  const [dcError,    setDcError]    = useState<string | null>(null);
+  const [dcResult,   setDcResult]   = useState<{ password: string; user: TeamUser } | null>(null);
 
   // Per-user actions
   const [mutating,     setMutating]     = useState<Record<string, boolean>>({});
@@ -357,22 +373,27 @@ export default function TeamClient({ currentUserId, company }: Props) {
 
   async function createDirect(e: React.FormEvent) {
     e.preventDefault();
+    if (!isStrongEnough(dcPassword)) {
+      setDcError(t("errors.weakPassword"));
+      return;
+    }
     setDcSaving(true);
     setDcError(null);
     setDcResult(null);
     const res = await fetch("/api/admin/users/create-direct", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: dcName, email: dcEmail, role: dcRole }),
+      body: JSON.stringify({ name: dcName, email: dcEmail, role: dcRole, password: dcPassword }),
     });
     const d = await res.json();
     if (!res.ok) {
       setDcError(d.error ?? t("errors.createUser"));
     } else {
-      setDcResult({ tempPassword: d.tempPassword, user: d.user });
+      setDcResult({ password: d.password, user: d.user });
       setDcName("");
       setDcEmail("");
       setDcRole("VIEWER");
+      setDcPassword("");
       await load();
     }
     setDcSaving(false);
@@ -389,6 +410,7 @@ export default function TeamClient({ currentUserId, company }: Props) {
     setInviteError(null);
     setDcResult(null);
     setDcError(null);
+    setDcPassword("");
   }
 
   const atLimit = activeUserCount >= maxUsers;
@@ -467,18 +489,35 @@ export default function TeamClient({ currentUserId, company }: Props) {
                         <option value="COMPANY_ADMIN">{t("roleOptions.admin")}</option>
                       </select>
                     </div>
-                    <div style={{ display: "flex", alignItems: "flex-end" }}>
-                      <button type="submit" disabled={dcSaving || atLimit} style={{ ...actionBtn, width: "100%", opacity: (dcSaving || atLimit) ? 0.6 : 1 }}>
-                        {dcSaving ? t("actions.creating") : t("actions.create")}
-                      </button>
+                    <div>
+                      <label style={lbl}>{t("labels.tempPwLabel")}</label>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <input
+                          type={dcShowPw ? "text" : "password"}
+                          required
+                          value={dcPassword}
+                          onChange={(e) => setDcPassword(e.target.value)}
+                          placeholder={t("labels.tempPwPlaceholder")}
+                          style={{ ...inp, flex: 1 }}
+                        />
+                        <button type="button" onClick={() => setDcShowPw((v) => !v)} style={{ ...cancelBtn, padding: "8px 10px" }}>
+                          {dcShowPw ? "🙈" : "👁"}
+                        </button>
+                        <button type="button" onClick={() => { setDcPassword(generateStrongPassword()); setDcShowPw(true); }} style={{ ...cancelBtn, padding: "8px 10px", whiteSpace: "nowrap" }}>
+                          {t("actions.generate")}
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  {dcError && <p style={{ color: "#dc2626", fontSize: 13, margin: "4px 0 0" }}>{dcError}</p>}
+                  <button type="submit" disabled={dcSaving || atLimit} style={{ ...actionBtn, opacity: (dcSaving || atLimit) ? 0.6 : 1 }}>
+                    {dcSaving ? t("actions.creating") : t("actions.create")}
+                  </button>
+                  {dcError && <p style={{ color: "#dc2626", fontSize: 13, margin: "8px 0 0" }}>{dcError}</p>}
                 </form>
 
                 {dcResult && (
                   <TempPasswordBox
-                    password={dcResult.tempPassword}
+                    password={dcResult.password}
                     userName={dcResult.user.name}
                     userEmail={dcResult.user.email}
                     onClose={() => setDcResult(null)}

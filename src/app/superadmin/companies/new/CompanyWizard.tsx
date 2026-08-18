@@ -12,7 +12,6 @@ type Step = 1 | 2 | 3 | 4;
 
 interface WizardData {
   name: string;
-  slug: string;
   industry: Industry;
   plan: Plan;
   maxUsers: number;
@@ -23,25 +22,31 @@ interface WizardData {
   logoPreview: string; // base64 data URL (also stored as logoUrl)
   adminName: string;
   adminEmail: string;
+  adminPassword: string;
 }
 
 interface CreationResult {
-  companySlug: string;
   companyName: string;
-  tempPassword: string;
+  adminEmail: string;
+  adminPassword: string;
   emailSent: boolean;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function toSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-{2,}/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 50);
+function isStrongEnough(pw: string): boolean {
+  return pw.length >= 8 && /[A-Z]/.test(pw) && /[a-z]/.test(pw) && /[0-9]/.test(pw);
+}
+
+function generateStrongPassword(length = 14): string {
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lower = "abcdefghijkmnpqrstuvwxyz";
+  const digits = "23456789";
+  const all = upper + lower + digits;
+  const pick = (set: string) => set[Math.floor(Math.random() * set.length)];
+  let pw = pick(upper) + pick(lower) + pick(digits);
+  for (let i = pw.length; i < length; i++) pw += pick(all);
+  return pw.split("").sort(() => Math.random() - 0.5).join("");
 }
 
 const FONTS = ["Inter", "Roboto", "Lato", "Montserrat", "Merriweather", "Playfair Display"];
@@ -61,9 +66,9 @@ const PLANS: { value: Plan; label: string; maxUsers: number }[] = [
 ];
 
 const DEFAULTS: WizardData = {
-  name: "", slug: "", industry: "OTRO", plan: "BASIC", maxUsers: 10,
+  name: "", industry: "OTRO", plan: "BASIC", maxUsers: 10,
   primaryColor: "#2563eb", secondaryColor: "#1e40af", accentColor: "#7c3aed",
-  fontFamily: "Inter", logoPreview: "", adminName: "", adminEmail: "",
+  fontFamily: "Inter", logoPreview: "", adminName: "", adminEmail: "", adminPassword: "",
 };
 
 // ─── Step indicator ───────────────────────────────────────────────────────────
@@ -174,17 +179,10 @@ export default function CompanyWizard() {
   const [result, setResult] = useState<CreationResult | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const [showPw, setShowPw] = useState(false);
+
   function set<K extends keyof WizardData>(key: K, val: WizardData[K]) {
     setData((prev) => ({ ...prev, [key]: val }));
-  }
-
-  function handleNameChange(name: string) {
-    setData((prev) => ({
-      ...prev,
-      name,
-      // Keep slug in sync while the user hasn't manually edited it
-      slug: prev.slug === toSlug(prev.name) ? toSlug(name) : prev.slug,
-    }));
   }
 
   function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -197,9 +195,15 @@ export default function CompanyWizard() {
   }
 
   function canAdvance(): boolean {
-    if (step === 1) return data.name.trim().length > 0 && /^[a-z0-9-]{2,50}$/.test(data.slug);
+    if (step === 1) return data.name.trim().length > 0;
     if (step === 2) return true;
-    if (step === 3) return data.adminName.trim().length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.adminEmail);
+    if (step === 3) {
+      return (
+        data.adminName.trim().length > 0 &&
+        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.adminEmail) &&
+        isStrongEnough(data.adminPassword)
+      );
+    }
     return true;
   }
 
@@ -211,24 +215,24 @@ export default function CompanyWizard() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: data.name, slug: data.slug, industry: data.industry, plan: data.plan,
+          name: data.name, industry: data.industry, plan: data.plan,
           maxUsers: data.maxUsers,
           primaryColor: data.primaryColor, secondaryColor: data.secondaryColor,
           accentColor: data.accentColor, fontFamily: data.fontFamily,
           logoUrl: data.logoPreview || undefined,
-          adminName: data.adminName, adminEmail: data.adminEmail,
+          adminName: data.adminName, adminEmail: data.adminEmail, adminPassword: data.adminPassword,
         }),
       });
       const json = await res.json();
       if (!res.ok) {
         setServerError(json.error ?? "Failed to create company");
-        if (json.field === "slug") setStep(1);
+        if (json.field === "adminPassword") setStep(3);
         return;
       }
       setResult({
-        companySlug: json.company.slug,
         companyName: data.name,
-        tempPassword: json.tempPassword,
+        adminEmail: data.adminEmail,
+        adminPassword: data.adminPassword,
         emailSent: json.emailSent,
       });
     } catch {
@@ -240,7 +244,7 @@ export default function CompanyWizard() {
 
   async function copyPassword() {
     if (!result) return;
-    await navigator.clipboard.writeText(result.tempPassword);
+    await navigator.clipboard.writeText(result.adminPassword);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   }
@@ -252,16 +256,16 @@ export default function CompanyWizard() {
       <div style={{ maxWidth: 560, margin: "0 auto", textAlign: "center" }}>
         <h2 style={{ fontSize: 24, color: "#1e293b", margin: "0 0 8px" }}>¡{result.companyName} está activa!</h2>
         <p style={{ color: "#64748b", marginBottom: 28 }}>
-          Slug: <code style={{ background: "#f1f5f9", padding: "2px 8px", borderRadius: 4 }}>{result.companySlug}</code>
+          Administrador: <strong>{result.adminEmail}</strong>
         </p>
 
         <div style={{ background: "#fef9c3", border: "1px solid #fde68a", borderRadius: 10, padding: "18px 20px", marginBottom: 20, textAlign: "left" }}>
           <p style={{ margin: "0 0 10px", fontWeight: 700, color: "#92400e", fontSize: 14 }}>
-            Contraseña temporal — cópiala ahora, no se mostrará de nuevo
+            Contraseña asignada — guárdala, no volverá a mostrarse
           </p>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <code style={{ flex: 1, background: "#fff", border: "1px solid #fcd34d", padding: "10px 14px", borderRadius: 6, fontSize: 16, letterSpacing: 2, fontFamily: "monospace" }}>
-              {result.tempPassword}
+              {result.adminPassword}
             </code>
             <button onClick={copyPassword} style={{ background: "#d97706", color: "#fff", border: "none", padding: "10px 16px", borderRadius: 6, cursor: "pointer", fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
               {copied ? "Copiado" : "Copiar"}
@@ -271,7 +275,7 @@ export default function CompanyWizard() {
 
         <div style={{ background: result.emailSent ? "#f0fdf4" : "#fff7ed", border: `1px solid ${result.emailSent ? "#bbf7d0" : "#fed7aa"}`, borderRadius: 8, padding: "10px 14px", marginBottom: 28, fontSize: 13, color: result.emailSent ? "#166534" : "#9a3412" }}>
           {result.emailSent
-            ? `Correo de bienvenida enviado a ${data.adminEmail}`
+            ? `Correo de bienvenida enviado a ${result.adminEmail}`
             : `Correo no enviado (configura RESEND_API_KEY) — comparte la contraseña manualmente`}
         </div>
 
@@ -311,18 +315,7 @@ export default function CompanyWizard() {
 
               <label style={s.label}>
                 Nombre de la empresa *
-                <input style={s.input} value={data.name} placeholder="Empresa S.A." onChange={(e) => handleNameChange(e.target.value)} />
-              </label>
-
-              <label style={s.label}>
-                Slug (URL) * <span style={s.hint}>(letras minúsculas, números, guiones)</span>
-                <input
-                  style={s.input}
-                  value={data.slug}
-                  placeholder="empresa-sa"
-                  onChange={(e) => set("slug", e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
-                />
-                {data.slug && <span style={s.hint}>Página de ingreso: /login?company={data.slug}</span>}
+                <input style={s.input} value={data.name} placeholder="Empresa S.A." onChange={(e) => set("name", e.target.value)} />
               </label>
 
               <label style={s.label}>
@@ -441,13 +434,34 @@ export default function CompanyWizard() {
                 <input type="email" style={s.input} value={data.adminEmail} placeholder="admin@empresa.com" onChange={(e) => set("adminEmail", e.target.value)} />
               </label>
 
+              <label style={s.label}>
+                Contraseña de acceso * <span style={s.hint}>(mín. 8 caracteres, mayúscula, minúscula y número)</span>
+                <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                  <input
+                    type={showPw ? "text" : "password"}
+                    style={{ ...s.input, marginTop: 0, flex: 1 }}
+                    value={data.adminPassword}
+                    placeholder="Contraseña para el administrador"
+                    onChange={(e) => set("adminPassword", e.target.value)}
+                  />
+                  <button type="button" onClick={() => setShowPw((v) => !v)} style={s.btn("#64748b", true)}>
+                    {showPw ? "Ocultar" : "Ver"}
+                  </button>
+                  <button type="button" onClick={() => { set("adminPassword", generateStrongPassword()); setShowPw(true); }} style={s.btn("#2563eb", true)}>
+                    Generar
+                  </button>
+                </div>
+                {data.adminPassword.length > 0 && !isStrongEnough(data.adminPassword) && (
+                  <span style={{ ...s.hint, color: "#dc2626" }}>La contraseña no cumple los requisitos mínimos</span>
+                )}
+              </label>
+
               <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "14px 16px", fontSize: 13, color: "#166534", marginTop: 8 }}>
                 <strong>¿Qué ocurre después?</strong>
                 <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
-                  <li>Se genera una contraseña de 16 caracteres en el servidor.</li>
-                  <li>Se muestra <em>una sola vez</em> después de crear la empresa.</li>
-                  <li>Se envía un correo de bienvenida (si RESEND_API_KEY está configurado).</li>
-                  <li>El administrador deberá cambiarla en su primer acceso.</li>
+                  <li>Se crea el usuario con la contraseña que definiste arriba.</li>
+                  <li>Se envía un correo de bienvenida con esas credenciales (si RESEND_API_KEY está configurado).</li>
+                  <li>El administrador puede cambiarla luego desde su propio panel.</li>
                 </ul>
               </div>
             </div>
@@ -461,7 +475,6 @@ export default function CompanyWizard() {
               <div style={s.card}>
                 <p style={s.cardHead}>Empresa</p>
                 <div style={s.row}><span style={s.rowLabel}>Nombre</span><strong>{data.name}</strong></div>
-                <div style={s.row}><span style={s.rowLabel}>Slug</span><code>{data.slug}</code></div>
                 <div style={s.row}><span style={s.rowLabel}>Industria</span><span>{INDUSTRIES.find(i => i.value === data.industry)?.label}</span></div>
                 <div style={s.row}>
                   <span style={s.rowLabel}>Plan</span>
@@ -489,6 +502,7 @@ export default function CompanyWizard() {
                 <p style={s.cardHead}>Administrador</p>
                 <div style={s.row}><span style={s.rowLabel}>Nombre</span><span>{data.adminName}</span></div>
                 <div style={s.row}><span style={s.rowLabel}>Correo</span><span>{data.adminEmail}</span></div>
+                <div style={s.row}><span style={s.rowLabel}>Contraseña</span><code>{"•".repeat(Math.min(data.adminPassword.length, 16))}</code></div>
               </div>
             </div>
           )}
