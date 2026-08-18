@@ -537,14 +537,8 @@
       "departamentoPlaceholder": "— Select department —",
       "noDepts": "The admin can define departments in Team → Departments.",
       "tipo": "Document type",
-      "tipoOptions": {
-        "Procedimiento": "Procedure",
-        "Manual": "Manual",
-        "Instructivo": "Work instruction",
-        "Formato": "Form",
-        "Política": "Policy",
-        "Otro": "Other"
-      },
+      "tipoPlaceholder": "— Select document type —",
+      "noTipos": "The admin can define document types in Team → Document types.",
       "version": "Version",
       "carpeta": "Folder (optional)",
       "carpetaPlaceholder": "— No folder —"
@@ -857,6 +851,23 @@
       "add": "+ Add",
       "loading": "Loading…",
       "empty": "No departments defined.",
+      "save": "Save",
+      "edit": "Edit",
+      "delete": "Delete",
+      "errors": {
+        "create": "Error creating",
+        "save": "Error saving",
+        "delete": "Cannot delete"
+      }
+    },
+    "docTypes": {
+      "title": "Document types",
+      "desc": "Define document types available when creating documents.",
+      "placeholder": "New document type name…",
+      "adding": "Saving…",
+      "add": "+ Add",
+      "loading": "Loading…",
+      "empty": "No document types defined.",
       "save": "Save",
       "edit": "Edit",
       "delete": "Delete",

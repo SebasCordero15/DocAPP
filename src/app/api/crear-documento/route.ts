@@ -36,7 +36,7 @@ const schema = z.object({
   // Document metadata
   nombreDocumento: z.string().min(1).max(500),
   departamento:    z.string().min(1).max(200),
-  tipoDocumento:   z.enum(["PROCEDIMIENTO", "MANUAL", "INSTRUCTIVO", "FORMATO", "POLITICA", "OTRO"]),
+  tipoDocumento:   z.string().min(1).max(100),
   versionStr:      z.string().max(50).default("v1.0"),
   folderId:        z.string().optional(),
   codigo:          z.string().max(50).optional().nullable(),

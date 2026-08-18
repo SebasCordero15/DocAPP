@@ -537,14 +537,8 @@
       "departamentoPlaceholder": "— Selecciona departamento —",
       "noDepts": "El admin puede definir departamentos en Equipo → Departamentos.",
       "tipo": "Tipo de documento",
-      "tipoOptions": {
-        "Procedimiento": "Procedimiento",
-        "Manual": "Manual",
-        "Instructivo": "Instructivo",
-        "Formato": "Formato",
-        "Política": "Política",
-        "Otro": "Otro"
-      },
+      "tipoPlaceholder": "— Selecciona tipo de documento —",
+      "noTipos": "El admin puede definir tipos de documento en Equipo → Tipos de documento.",
       "version": "Versión",
       "carpeta": "Carpeta (opcional)",
       "carpetaPlaceholder": "— Sin carpeta —"
@@ -857,6 +851,23 @@
       "add": "+ Agregar",
       "loading": "Cargando…",
       "empty": "No hay departamentos definidos.",
+      "save": "Guardar",
+      "edit": "Editar",
+      "delete": "Eliminar",
+      "errors": {
+        "create": "Error al crear",
+        "save": "Error al guardar",
+        "delete": "No se puede eliminar"
+      }
+    },
+    "docTypes": {
+      "title": "Tipos de documento",
+      "desc": "Define los tipos de documento disponibles al crear documentos.",
+      "placeholder": "Nombre del nuevo tipo de documento…",
+      "adding": "Guardando…",
+      "add": "+ Agregar",
+      "loading": "Cargando…",
+      "empty": "No hay tipos de documento definidos.",
       "save": "Guardar",
       "edit": "Editar",
       "delete": "Eliminar",

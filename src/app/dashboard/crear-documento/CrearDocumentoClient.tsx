@@ -41,15 +41,6 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
   const brand  = company.primaryColor;
   const t = useTranslations("crearDoc");
 
-  const TIPO_OPTIONS = [
-    { value: "PROCEDIMIENTO", label: t("fields.tipoOptions.Procedimiento") },
-    { value: "MANUAL",        label: t("fields.tipoOptions.Manual") },
-    { value: "INSTRUCTIVO",   label: t("fields.tipoOptions.Instructivo") },
-    { value: "FORMATO",       label: t("fields.tipoOptions.Formato") },
-    { value: "POLITICA",      label: t("fields.tipoOptions.Política") },
-    { value: "OTRO",          label: t("fields.tipoOptions.Otro") },
-  ];
-
   const STEPS_NORMAL   = [t("steps.info"), t("steps.file"), t("steps.reviewers"), t("steps.confirm")];
   const STEPS_EXTERNAL = [t("steps.info"), t("steps.file"), t("steps.confirm")];
 
@@ -58,9 +49,10 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
   // Step 0 — Document info
   const [nombre,       setNombre]       = useState("");
   const [departamento, setDepartamento] = useState("");
-  const [tipo,         setTipo]         = useState("PROCEDIMIENTO");
+  const [tipo,         setTipo]         = useState("");
   const [folderId,     setFolderId]     = useState("");
   const [departments,  setDepartments]  = useState<{ id: string; name: string }[]>([]);
+  const [documentTypes, setDocumentTypes] = useState<{ id: string; name: string }[]>([]);
 
   // Step 1 — File upload
   const fileRef    = useRef<HTMLInputElement>(null);
@@ -80,11 +72,14 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
 
   const folderTree = buildFolderTree(folders.filter((f) => !f.isExternal));
 
-  // Load departments on mount
+  // Load departments and document types on mount
   useEffect(() => {
     fetch("/api/admin/departments")
       .then((r) => r.json())
       .then((d) => setDepartments(d.departments ?? []));
+    fetch("/api/admin/document-types")
+      .then((r) => r.json())
+      .then((d) => setDocumentTypes(d.documentTypes ?? []));
   }, []);
 
   const availableUsers = users.filter(
@@ -164,7 +159,7 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
     }
   }
 
-  const canStep0 = nombre.trim() && departamento.trim() && tipo;
+  const canStep0 = nombre.trim() && departamento.trim() && tipo.trim();
   const canStep1 = !!file;
   const canStep2 = isExternalFolder || reviewers.length > 0;
 
@@ -248,9 +243,19 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
                 </div>
                 <div>
                   <label style={ls}>{t("fields.tipo")} <span style={{ color: "#dc2626" }}>*</span></label>
-                  <select style={is} value={tipo} onChange={(e) => setTipo(e.target.value)}>
-                    {TIPO_OPTIONS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                  </select>
+                  {documentTypes.length > 0 ? (
+                    <select style={is} value={tipo} onChange={(e) => setTipo(e.target.value)}>
+                      <option value="">{t("fields.tipoPlaceholder")}</option>
+                      {documentTypes.map((dt) => <option key={dt.id} value={dt.name}>{dt.name}</option>)}
+                    </select>
+                  ) : (
+                    <input style={is} value={tipo} onChange={(e) => setTipo(e.target.value)} placeholder={t("fields.tipoPlaceholder")} />
+                  )}
+                  {documentTypes.length === 0 && (
+                    <p style={{ fontSize: 11, color: "#94a3b8", margin: "4px 0 0" }}>
+                      {t("fields.noTipos")}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -416,7 +421,7 @@ export default function CrearDocumentoClient({ company, folders, users, currentU
               <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, padding: "20px 24px", marginBottom: 24 }}>
                 <Row label={t("confirmLabels.nombre")} value={nombre} />
                 <Row label={t("confirmLabels.departamento")} value={departamento} />
-                <Row label={t("confirmLabels.tipo")} value={TIPO_OPTIONS.find((opt) => opt.value === tipo)?.label ?? tipo} />
+                <Row label={t("confirmLabels.tipo")} value={tipo} />
                 <Row label={t("confirmLabels.carpeta")} value={selectedFolderLabel} />
                 <Row label={t("confirmLabels.archivo")} value={file?.name ?? "—"} />
                 {!isExternalFolder && (

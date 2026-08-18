@@ -88,15 +88,6 @@ enum Industry {
   OTRO
 }
 
-enum DocumentType {
-  PROCEDIMIENTO
-  MANUAL
-  INSTRUCTIVO
-  FORMATO
-  POLITICA
-  OTRO
-}
-
 enum ReviewChainStatus {
   IN_REVIEW
   COMPLETED
@@ -152,10 +143,24 @@ model Company {
   reviewChains     ReviewChain[]
   outgoingRequests OutgoingRequest[]
   departments      Department[]
+  documentTypes    DocumentTypeOption[]
 }
 
 // ---------- Departments (admin-managed list per company) ----------
 model Department {
+  id        String   @id @default(cuid())
+  companyId String
+  name      String
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+// ---------- Document types (admin-managed list per company) ----------
+model DocumentTypeOption {
   id        String   @id @default(cuid())
   companyId String
   name      String
@@ -260,7 +265,7 @@ model File {
 
   // ── Document creation module fields ─────────────────────────────────────────
   departamento         String?
-  tipoDocumento        DocumentType?
+  tipoDocumento        String?
 
   // ── Version history (retains exactly one prior approved version) ────────────
   previousStorageKey   String?

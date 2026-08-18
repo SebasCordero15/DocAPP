@@ -689,6 +689,11 @@ export default function TeamClient({ currentUserId, company }: Props) {
         {/* ── Departamentos ── */}
         <DepartamentosSection brand={brand} />
 
+        {/* ── Tipos de documento ── */}
+        <div style={{ marginTop: 20 }}>
+          <TiposDocumentoSection brand={brand} />
+        </div>
+
         {/* ── Pending invites ── */}
         {invites.length > 0 && (
           <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
@@ -881,6 +886,147 @@ function DepartamentosSection({ brand }: { brand: string }) {
                       style={{ background: "none", border: "1px solid #fecaca", color: "#dc2626", padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600 }}
                     >
                       {t("depts.delete")}
+                    </button>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── TiposDocumentoSection ─────────────────────────────────────────────────────
+
+interface DocumentTypeOption { id: string; name: string; }
+
+function TiposDocumentoSection({ brand }: { brand: string }) {
+  const t  = useTranslations("team");
+  const tc = useTranslations("common");
+  const [types,    setTypes]    = useState<DocumentTypeOption[]>([]);
+  const [loading,  setLoading]  = useState(true);
+  const [newName,  setNewName]  = useState("");
+  const [creating, setCreating] = useState(false);
+  const [editId,   setEditId]   = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [saving,   setSaving]   = useState(false);
+  const [error,    setError]    = useState("");
+
+  async function load() {
+    setLoading(true);
+    const d = await fetch("/api/admin/document-types").then((r) => r.json()).catch(() => ({}));
+    setTypes(d.documentTypes ?? []);
+    setLoading(false);
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function create() {
+    if (!newName.trim()) return;
+    setCreating(true); setError("");
+    const res = await fetch("/api/admin/document-types", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newName.trim() }),
+    });
+    const d = await res.json();
+    if (!res.ok) { setError(d.error ?? t("docTypes.errors.create")); }
+    else { setNewName(""); load(); }
+    setCreating(false);
+  }
+
+  async function save(id: string) {
+    if (!editName.trim()) return;
+    setSaving(true); setError("");
+    const res = await fetch(`/api/admin/document-types/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: editName.trim() }),
+    });
+    const d = await res.json();
+    if (!res.ok) { setError(d.error ?? t("docTypes.errors.save")); }
+    else { setEditId(null); load(); }
+    setSaving(false);
+  }
+
+  async function remove(type: DocumentTypeOption) {
+    setError("");
+    const res = await fetch(`/api/admin/document-types/${type.id}`, { method: "DELETE" });
+    const d = await res.json();
+    if (!res.ok) { setError(d.error ?? t("docTypes.errors.delete")); }
+    else { load(); }
+  }
+
+  return (
+    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
+      <div style={{ padding: "18px 24px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#1e293b" }}>{t("docTypes.title")}</h2>
+          <p style={{ margin: "2px 0 0", fontSize: 13, color: "#64748b" }}>{t("docTypes.desc")}</p>
+        </div>
+      </div>
+
+      <div style={{ padding: "18px 24px" }}>
+        {/* Create new */}
+        <div style={{ display: "flex", gap: 10, marginBottom: 18 }}>
+          <input
+            style={{ ...inp, flex: 1 }}
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder={t("docTypes.placeholder")}
+            onKeyDown={(e) => e.key === "Enter" && create()}
+          />
+          <button
+            onClick={create}
+            disabled={creating || !newName.trim()}
+            style={{ ...actionBtn, background: brand, opacity: newName.trim() ? 1 : 0.5, whiteSpace: "nowrap" }}
+          >
+            {creating ? t("docTypes.adding") : t("docTypes.add")}
+          </button>
+        </div>
+
+        {error && (
+          <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 7, padding: "10px 14px", marginBottom: 14, fontSize: 13, color: "#dc2626" }}>
+            {error}
+          </div>
+        )}
+
+        {loading ? (
+          <p style={{ color: "#94a3b8", fontSize: 14, textAlign: "center", padding: "20px 0" }}>{t("docTypes.loading")}</p>
+        ) : types.length === 0 ? (
+          <p style={{ color: "#94a3b8", fontSize: 14, textAlign: "center", padding: "20px 0" }}>{t("docTypes.empty")}</p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {types.map((ty) => (
+              <div key={ty.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "10px 14px" }}>
+                {editId === ty.id ? (
+                  <>
+                    <input
+                      style={{ ...inp, flex: 1, padding: "7px 10px" }}
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && save(ty.id)}
+                      autoFocus
+                    />
+                    <button onClick={() => save(ty.id)} disabled={saving} style={{ ...actionBtn, background: brand, padding: "7px 14px" }}>
+                      {saving ? "…" : t("docTypes.save")}
+                    </button>
+                    <button onClick={() => setEditId(null)} style={cancelBtn}>{tc("cancel")}</button>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: "#1e293b" }}>{ty.name}</span>
+                    <button
+                      onClick={() => { setEditId(ty.id); setEditName(ty.name); setError(""); }}
+                      style={{ background: "none", border: "1px solid #e2e8f0", color: "#64748b", padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+                    >
+                      {t("docTypes.edit")}
+                    </button>
+                    <button
+                      onClick={() => remove(ty)}
+                      style={{ background: "none", border: "1px solid #fecaca", color: "#dc2626", padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+                    >
+                      {t("docTypes.delete")}
                     </button>
                   </>
                 )}
