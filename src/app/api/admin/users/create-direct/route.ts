@@ -4,6 +4,7 @@ import { requireActiveSession, hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/audit";
 import { checkUserLimit } from "@/lib/userLimit";
+import { sendUserWelcomeEmail } from "@/lib/email";
 
 const schema = z.object({
   name:     z.string().min(1).max(100),
@@ -12,13 +13,19 @@ const schema = z.object({
   password: z.string().min(8).max(100),
 });
 
+const ROLE_LABELS: Record<string, string> = {
+  COMPANY_ADMIN: "Administrador de empresa",
+  EDITOR: "Editor",
+  VIEWER: "Lector",
+};
+
 function isStrongEnough(pw: string): boolean {
   return pw.length >= 8 && /[A-Z]/.test(pw) && /[a-z]/.test(pw) && /[0-9]/.test(pw);
 }
 
 // POST /api/admin/users/create-direct
-// Creates a user immediately with a password the admin assigns (no invite link needed).
-// The plaintext password is returned ONCE so the admin can share it manually.
+// Creates a user immediately with a password the admin assigns and emails them
+// their credentials (no invite link needed).
 export async function POST(req: NextRequest) {
   const session = await requireActiveSession();
   if (!session || !session.companyId || session.role !== "COMPANY_ADMIN") {
@@ -78,10 +85,23 @@ export async function POST(req: NextRequest) {
     detail: `${email} como ${role} — creación directa con contraseña asignada`,
   });
 
+  const company = await prisma.company.findUnique({ where: { id: companyId }, select: { name: true } });
+  const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/login`;
+  const { sent, error: emailError } = await sendUserWelcomeEmail({
+    to: email,
+    userName: name,
+    companyName: company?.name ?? "",
+    role: ROLE_LABELS[role] ?? role,
+    password,
+    loginUrl,
+  });
+
   return NextResponse.json(
     {
       user: { ...user, lastLoginAt: null, createdAt: user.createdAt.toISOString() },
       password, // plaintext echoed back ONCE — not stored anywhere in plaintext
+      emailSent: sent,
+      emailError: emailError ?? null,
     },
     { status: 201 }
   );

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useTranslations } from "next-intl";
-import { Copy, Check, KeyRound, Pencil, X, UserPlus, Send } from "lucide-react";
+import { Copy, Check, KeyRound, Pencil, X, UserPlus } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -16,14 +16,6 @@ interface TeamUser {
   isActive: boolean;
   forcePasswordChange: boolean;
   lastLoginAt: string | null;
-  createdAt: string;
-}
-
-interface PendingInvite {
-  id: string;
-  email: string;
-  role: Role;
-  expiresAt: string;
   createdAt: string;
 }
 
@@ -280,23 +272,13 @@ export default function TeamClient({ currentUserId, company }: Props) {
   }
 
   const [users,           setUsers]           = useState<TeamUser[]>([]);
-  const [invites,         setInvites]         = useState<PendingInvite[]>([]);
   const [maxUsers,        setMaxUsers]        = useState<number>(10);
   const [activeUserCount, setActiveUserCount] = useState<number>(0);
   const [loading,         setLoading]         = useState(true);
 
-  // Create mode: "invite" (email link) | "direct" (temp password)
-  const [createMode,  setCreateMode]  = useState<"invite" | "direct">("direct");
   const [showCreate,  setShowCreate]  = useState(false);
 
-  // Invite form
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole,  setInviteRole]  = useState<Role>("VIEWER");
-  const [inviting,    setInviting]    = useState(false);
-  const [inviteResult, setInviteResult] = useState<{ inviteUrl: string; emailSent: boolean } | null>(null);
-  const [inviteError,  setInviteError]  = useState<string | null>(null);
-
-  // Direct create form
+  // Create-user form (admin assigns the password; a welcome email is sent automatically)
   const [dcName,     setDcName]     = useState("");
   const [dcEmail,    setDcEmail]    = useState("");
   const [dcRole,     setDcRole]     = useState<Role>("VIEWER");
@@ -304,7 +286,7 @@ export default function TeamClient({ currentUserId, company }: Props) {
   const [dcShowPw,   setDcShowPw]   = useState(false);
   const [dcSaving,   setDcSaving]   = useState(false);
   const [dcError,    setDcError]    = useState<string | null>(null);
-  const [dcResult,   setDcResult]   = useState<{ password: string; user: TeamUser } | null>(null);
+  const [dcResult,   setDcResult]   = useState<{ password: string; user: TeamUser; emailSent: boolean } | null>(null);
 
   // Per-user actions
   const [mutating,     setMutating]     = useState<Record<string, boolean>>({});
@@ -318,7 +300,6 @@ export default function TeamClient({ currentUserId, company }: Props) {
     if (res.ok) {
       const d = await res.json();
       setUsers(d.users);
-      setInvites(d.invites);
       setMaxUsers(d.maxUsers ?? 10);
       setActiveUserCount(d.activeUserCount ?? 0);
     }
@@ -349,28 +330,6 @@ export default function TeamClient({ currentUserId, company }: Props) {
     }
   }
 
-  async function sendInvite(e: React.FormEvent) {
-    e.preventDefault();
-    setInviting(true);
-    setInviteError(null);
-    setInviteResult(null);
-    const res = await fetch("/api/admin/users/invite", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
-    });
-    const d = await res.json();
-    if (!res.ok) {
-      setInviteError(d.error ?? t("errors.sendInvite"));
-    } else {
-      setInviteResult({ inviteUrl: d.inviteUrl, emailSent: d.emailSent });
-      setInviteEmail("");
-      setInviteRole("VIEWER");
-      await load();
-    }
-    setInviting(false);
-  }
-
   async function createDirect(e: React.FormEvent) {
     e.preventDefault();
     if (!isStrongEnough(dcPassword)) {
@@ -389,7 +348,7 @@ export default function TeamClient({ currentUserId, company }: Props) {
     if (!res.ok) {
       setDcError(d.error ?? t("errors.createUser"));
     } else {
-      setDcResult({ password: d.password, user: d.user });
+      setDcResult({ password: d.password, user: d.user, emailSent: d.emailSent });
       setDcName("");
       setDcEmail("");
       setDcRole("VIEWER");
@@ -399,15 +358,8 @@ export default function TeamClient({ currentUserId, company }: Props) {
     setDcSaving(false);
   }
 
-  async function revokeInvite(id: string) {
-    const res = await fetch(`/api/admin/users/${id}?inviteId=${id}`, { method: "DELETE" });
-    if (res.ok) setInvites((prev) => prev.filter((i) => i.id !== id));
-  }
-
   function openCreate() {
     setShowCreate(true);
-    setInviteResult(null);
-    setInviteError(null);
     setDcResult(null);
     setDcError(null);
     setDcPassword("");
@@ -432,7 +384,6 @@ export default function TeamClient({ currentUserId, company }: Props) {
               <span style={{ fontWeight: 700, color: atLimit ? "#dc2626" : "#374151" }}>
                 {t("userCount", { active: activeUserCount, max: maxUsers })}
               </span>
-              {invites.length > 0 && t("pendingInvites", { count: invites.length })}
             </p>
             {atLimit && (
               <p style={{ margin: "4px 0 0", fontSize: 13, color: "#dc2626" }}>
@@ -451,122 +402,69 @@ export default function TeamClient({ currentUserId, company }: Props) {
         {/* ── Add user panel ── */}
         {showCreate && (
           <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "22px 24px", marginBottom: 24 }}>
-            {/* Mode tabs */}
-            <div style={{ display: "flex", gap: 0, borderBottom: "2px solid #e2e8f0", marginBottom: 20 }}>
-              {([["direct", <><UserPlus size={13} /> {t("tabDirect")}</>], ["invite", <><Send size={13} /> {t("tabInvite")}</>]] as const).map(([mode, label]) => (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => setCreateMode(mode as "direct" | "invite")}
-                  style={{ background: "none", border: "none", padding: "8px 18px", cursor: "pointer", fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", gap: 6, color: createMode === mode ? brand : "#64748b", borderBottom: `3px solid ${createMode === mode ? brand : "transparent"}`, marginBottom: -2 }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            <h3 style={{ margin: "0 0 4px", fontSize: 15, fontWeight: 700, color: "#1e293b", display: "flex", alignItems: "center", gap: 8 }}>
+              <UserPlus size={16} color={brand} /> {t("addUser")}
+            </h3>
+            <p style={{ margin: "0 0 16px", fontSize: 13, color: "#64748b" }}>
+              {t("directDesc")}
+            </p>
+            <form onSubmit={createDirect}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                <div>
+                  <label style={lbl}>{t("labels.fullName")}</label>
+                  <input type="text" required value={dcName} onChange={(e) => setDcName(e.target.value)} placeholder="Juan Pérez" style={inp} />
+                </div>
+                <div>
+                  <label style={lbl}>{t("labels.email")}</label>
+                  <input type="email" required value={dcEmail} onChange={(e) => setDcEmail(e.target.value)} placeholder="juan@empresa.com" style={inp} />
+                </div>
+                <div>
+                  <label style={lbl}>{t("labels.role")}</label>
+                  <select value={dcRole} onChange={(e) => setDcRole(e.target.value as Role)} style={inp}>
+                    <option value="VIEWER">{t("roleOptions.viewer")}</option>
+                    <option value="EDITOR">{t("roleOptions.editor")}</option>
+                    <option value="COMPANY_ADMIN">{t("roleOptions.admin")}</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={lbl}>{t("labels.tempPwLabel")}</label>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <input
+                      type={dcShowPw ? "text" : "password"}
+                      required
+                      value={dcPassword}
+                      onChange={(e) => setDcPassword(e.target.value)}
+                      placeholder={t("labels.tempPwPlaceholder")}
+                      style={{ ...inp, flex: 1 }}
+                    />
+                    <button type="button" onClick={() => setDcShowPw((v) => !v)} style={{ ...cancelBtn, padding: "8px 10px" }}>
+                      {dcShowPw ? "🙈" : "👁"}
+                    </button>
+                    <button type="button" onClick={() => { setDcPassword(generateStrongPassword()); setDcShowPw(true); }} style={{ ...cancelBtn, padding: "8px 10px", whiteSpace: "nowrap" }}>
+                      {t("actions.generate")}
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <button type="submit" disabled={dcSaving || atLimit} style={{ ...actionBtn, opacity: (dcSaving || atLimit) ? 0.6 : 1 }}>
+                {dcSaving ? t("actions.creating") : t("actions.create")}
+              </button>
+              {dcError && <p style={{ color: "#dc2626", fontSize: 13, margin: "8px 0 0" }}>{dcError}</p>}
+            </form>
 
-            {/* Direct create form */}
-            {createMode === "direct" && (
+            {dcResult && (
               <>
-                <p style={{ margin: "0 0 16px", fontSize: 13, color: "#64748b" }}>
-                  {t("directDesc")}
-                </p>
-                <form onSubmit={createDirect}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-                    <div>
-                      <label style={lbl}>{t("labels.fullName")}</label>
-                      <input type="text" required value={dcName} onChange={(e) => setDcName(e.target.value)} placeholder="Juan Pérez" style={inp} />
-                    </div>
-                    <div>
-                      <label style={lbl}>{t("labels.email")}</label>
-                      <input type="email" required value={dcEmail} onChange={(e) => setDcEmail(e.target.value)} placeholder="juan@empresa.com" style={inp} />
-                    </div>
-                    <div>
-                      <label style={lbl}>{t("labels.role")}</label>
-                      <select value={dcRole} onChange={(e) => setDcRole(e.target.value as Role)} style={inp}>
-                        <option value="VIEWER">{t("roleOptions.viewer")}</option>
-                        <option value="EDITOR">{t("roleOptions.editor")}</option>
-                        <option value="COMPANY_ADMIN">{t("roleOptions.admin")}</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label style={lbl}>{t("labels.tempPwLabel")}</label>
-                      <div style={{ display: "flex", gap: 6 }}>
-                        <input
-                          type={dcShowPw ? "text" : "password"}
-                          required
-                          value={dcPassword}
-                          onChange={(e) => setDcPassword(e.target.value)}
-                          placeholder={t("labels.tempPwPlaceholder")}
-                          style={{ ...inp, flex: 1 }}
-                        />
-                        <button type="button" onClick={() => setDcShowPw((v) => !v)} style={{ ...cancelBtn, padding: "8px 10px" }}>
-                          {dcShowPw ? "🙈" : "👁"}
-                        </button>
-                        <button type="button" onClick={() => { setDcPassword(generateStrongPassword()); setDcShowPw(true); }} style={{ ...cancelBtn, padding: "8px 10px", whiteSpace: "nowrap" }}>
-                          {t("actions.generate")}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  <button type="submit" disabled={dcSaving || atLimit} style={{ ...actionBtn, opacity: (dcSaving || atLimit) ? 0.6 : 1 }}>
-                    {dcSaving ? t("actions.creating") : t("actions.create")}
-                  </button>
-                  {dcError && <p style={{ color: "#dc2626", fontSize: 13, margin: "8px 0 0" }}>{dcError}</p>}
-                </form>
-
-                {dcResult && (
-                  <TempPasswordBox
-                    password={dcResult.password}
-                    userName={dcResult.user.name}
-                    userEmail={dcResult.user.email}
-                    onClose={() => setDcResult(null)}
-                  />
-                )}
-              </>
-            )}
-
-            {/* Invite form */}
-            {createMode === "invite" && (
-              <>
-                <p style={{ margin: "0 0 16px", fontSize: 13, color: "#64748b" }}>
-                  {t("inviteDesc")}
-                </p>
-                <form onSubmit={sendInvite} style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
-                  <div style={{ flex: "1 1 220px" }}>
-                    <label style={lbl}>{t("labels.email")}</label>
-                    <input type="email" required value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="colega@empresa.com" style={inp} />
-                  </div>
-                  <div style={{ flex: "0 0 180px" }}>
-                    <label style={lbl}>{t("labels.role")}</label>
-                    <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value as Role)} style={inp}>
-                      <option value="VIEWER">{t("roleOptions.viewerShort")}</option>
-                      <option value="EDITOR">{t("roleOptions.editorShort")}</option>
-                      <option value="COMPANY_ADMIN">{t("roleOptions.admin")}</option>
-                    </select>
-                  </div>
-                  <button type="submit" disabled={inviting || atLimit} style={{ ...actionBtn, opacity: (inviting || atLimit) ? 0.6 : 1 }}>
-                    {inviting ? t("actions.sending") : t("actions.sendInvite")}
-                  </button>
-                </form>
-                {inviteError && <p style={{ color: "#dc2626", fontSize: 13, marginTop: 10 }}>{inviteError}</p>}
-                {inviteResult && (
-                  <div style={{ marginTop: 14, background: inviteResult.emailSent ? "#f0fdf4" : "#fff7ed", border: `1px solid ${inviteResult.emailSent ? "#bbf7d0" : "#fed7aa"}`, borderRadius: 8, padding: "12px 16px" }}>
-                    {inviteResult.emailSent ? (
-                      <p style={{ margin: 0, color: "#166534", fontSize: 13 }}>{t("inviteSent")}</p>
-                    ) : (
-                      <>
-                        <p style={{ margin: "0 0 8px", color: "#92400e", fontSize: 13, fontWeight: 600 }}>{t("inviteNoEmail")}</p>
-                        <div style={{ display: "flex", gap: 8 }}>
-                          <code style={{ flex: 1, background: "#fff", border: "1px solid #fed7aa", borderRadius: 6, padding: "8px 12px", fontSize: 12, wordBreak: "break-all" }}>
-                            {inviteResult.inviteUrl}
-                          </code>
-                          <CopyButton text={inviteResult.inviteUrl} />
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
+                <div style={{ marginTop: 16, background: dcResult.emailSent ? "#f0fdf4" : "#fff7ed", border: `1px solid ${dcResult.emailSent ? "#bbf7d0" : "#fed7aa"}`, borderRadius: 8, padding: "10px 14px", fontSize: 13, color: dcResult.emailSent ? "#166534" : "#9a3412" }}>
+                  {dcResult.emailSent
+                    ? t("emailSent", { email: dcResult.user.email })
+                    : t("emailNotSent")}
+                </div>
+                <TempPasswordBox
+                  password={dcResult.password}
+                  userName={dcResult.user.name}
+                  userEmail={dcResult.user.email}
+                  onClose={() => setDcResult(null)}
+                />
               </>
             )}
           </div>
@@ -694,50 +592,6 @@ export default function TeamClient({ currentUserId, company }: Props) {
           <TiposDocumentoSection brand={brand} />
         </div>
 
-        {/* ── Pending invites ── */}
-        {invites.length > 0 && (
-          <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
-            <div style={{ padding: "16px 24px", borderBottom: "1px solid #f1f5f9" }}>
-              <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#1e293b" }}>
-                {t("pendingInvitesTitle")} <span style={{ fontSize: 13, fontWeight: 400, color: "#94a3b8" }}>({invites.length})</span>
-              </h2>
-            </div>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ borderBottom: "1px solid #f1f5f9" }}>
-                  {[t("tableHeaders.email"), t("tableHeaders.role"), t("inviteTableHeaders.sent"), t("inviteTableHeaders.expires"), ""].map((h) => (
-                    <th key={h} style={{ padding: "10px 18px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5 }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {invites.map((inv) => {
-                  const rc = ROLE_COLORS[inv.role] ?? ROLE_COLORS.VIEWER;
-                  return (
-                    <tr key={inv.id} style={{ borderBottom: "1px solid #f8fafc" }}>
-                      <td style={{ padding: "11px 18px", fontSize: 14, color: "#374151" }}>{inv.email}</td>
-                      <td style={{ padding: "11px 18px" }}>
-                        <span style={{ background: rc.bg, color: rc.fg, padding: "2px 8px", borderRadius: 4, fontSize: 12, fontWeight: 600 }}>{ROLE_LABELS[inv.role]}</span>
-                      </td>
-                      <td style={{ padding: "11px 18px", fontSize: 13, color: "#64748b" }}>{fmtTimeAgo(inv.createdAt)}</td>
-                      <td style={{ padding: "11px 18px", fontSize: 13, color: "#64748b" }}>
-                        {new Date(inv.expiresAt).toLocaleDateString("es-CR", { day: "2-digit", month: "2-digit", year: "numeric" })}
-                      </td>
-                      <td style={{ padding: "11px 18px" }}>
-                        <button
-                          onClick={() => revokeInvite(inv.id)}
-                          style={{ background: "none", border: "1px solid #fecaca", color: "#dc2626", padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600 }}
-                        >
-                          {t("actions.revoke")}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
 
       {/* ── Modals ── */}

@@ -673,29 +673,29 @@
     "selectPrompt": "Selecciona una carpeta o archivo para gestionar sus permisos.",
     "legend": {
       "heading": "Cómo funcionan los permisos:",
-      "rolBase": "rol base",
-      "explicit": "permiso explícito",
-      "inherit": "Heredar"
+      "body": "Cada usuario tiene un rol base (Editor, Lector, etc.) que aplica en toda la empresa. Puedes darle un acceso distinto solo para este archivo o carpeta desde la columna “Asignar acceso”, lo cual sobrescribe su rol aquí. Elige “Heredar del rol base” para quitar esa excepción."
     },
     "cols": {
       "user": "Usuario",
-      "rolBase": "Rol base",
-      "explicit": "Permiso explícito",
-      "effective": "Acceso efectivo",
-      "source": "Origen",
+      "rolBase": "Rol",
+      "access": "Acceso en {resource}",
       "assign": "Asignar acceso"
     },
-    "sources": {
-      "admin": "Rol de admin",
-      "direct": "Permiso directo",
-      "folder": "↑ Carpeta:"
+    "resourceNoun": {
+      "folder": "esta carpeta",
+      "file": "este archivo"
+    },
+    "captions": {
+      "direct": "Asignado directamente aquí",
+      "folder": "Heredado de la carpeta “{name}”",
+      "role": "Según su rol base"
     },
     "levels": {
       "MANAGE": "Gestión total",
       "EDIT": "Editar",
       "READ": "Solo lectura",
       "NONE": "Sin acceso",
-      "alwaysManage": "Siempre MANAGE"
+      "alwaysManage": "Siempre gestión total"
     },
     "options": {
       "inherit": "— Heredar del rol base",
@@ -706,13 +706,22 @@
     }
   },
   "reportes": {
-    "header": "Reporte de Cambios",
+    "header": "Reportes",
     "exportCsv": "Exportar CSV",
+    "exportExcel": "Exportar Excel",
     "filters": {
       "from": "Desde",
       "to": "Hasta",
       "user": "Usuario",
       "allUsers": "Todos los usuarios",
+      "folder": "Carpeta",
+      "allFolders": "Todas las carpetas",
+      "department": "Departamento",
+      "allDepartments": "Todos los departamentos",
+      "docType": "Tipo de documento",
+      "allDocTypes": "Todos los tipos",
+      "encargado": "Encargado",
+      "allEncargados": "Todos los encargados",
       "apply": "Aplicar",
       "clear": "Limpiar"
     },
@@ -724,7 +733,30 @@
       "rejected": "Rechazadas",
       "pending": "Pendientes"
     },
-    "detailTitle": "Detalle de solicitudes",
+    "activitySection": "Actividad del período",
+    "healthSection": "Estado de documentos",
+    "docStats": {
+      "total": "Documentos activos",
+      "overdue": "Vencidos",
+      "dueThisWeek": "Por revisar esta semana"
+    },
+    "distributionSection": "Distribución",
+    "charts": {
+      "byStatus": "Por estado",
+      "byDepartment": "Por departamento",
+      "byType": "Por tipo de documento",
+      "byUser": "Actividad por usuario",
+      "total": "Total",
+      "noData": "Sin datos para este período/filtro."
+    },
+    "docStatus": {
+      "DRAFT": "Borrador",
+      "IN_REVIEW": "En revisión",
+      "REVIEWED": "Revisado",
+      "PENDING_APPROVAL": "Esperando admin",
+      "OBSOLETE": "Obsoleto"
+    },
+    "detailTitle": "Detalle de solicitudes de cambio",
     "records": "registros",
     "empty": "No hay datos para el período seleccionado.",
     "cols": {
@@ -755,13 +787,11 @@
     "header": "Equipo",
     "pageTitle": "Equipo",
     "userCount": "Usuarios: {active} / {max}",
-    "pendingInvites": "{count, plural, one {· # invitación pendiente} other {· # invitaciones pendientes}}",
     "atLimitMsg": "Límite de usuarios alcanzado. Desactiva un usuario o contacta soporte para ampliar el plan.",
     "addUser": "Agregar usuario",
-    "tabDirect": "Crear con contraseña asignada",
-    "tabInvite": "Enviar enlace de invitación",
-    "directDesc": "Crea el usuario inmediatamente y define tú mismo su contraseña de acceso, que puedes compartir directamente (sin necesitar correo electrónico).",
-    "inviteDesc": "Envía un enlace de invitación. El usuario hará clic en el enlace y creará su propia contraseña.",
+    "directDesc": "Define la contraseña de acceso del usuario. Se creará de inmediato y se le enviará un correo de bienvenida con sus credenciales.",
+    "emailSent": "✓ Correo de bienvenida enviado a {email}",
+    "emailNotSent": "Correo no enviado (configura RESEND_API_KEY) — comparte la contraseña manualmente",
     "labels": {
       "fullName": "Nombre completo *",
       "email": "Correo electrónico *",
@@ -788,15 +818,12 @@
     "actions": {
       "creating": "Creando…",
       "create": "Crear usuario",
-      "sending": "Enviando…",
-      "sendInvite": "Enviar invitación",
       "reset": "Restablecer",
       "close": "Cerrar",
       "edit": "Editar",
       "password": "Contraseña",
       "deactivate": "Desactivar",
       "activate": "Activar",
-      "revoke": "Revocar",
       "saving": "Guardando…",
       "save": "Guardar",
       "generate": "Generar"
@@ -821,13 +848,6 @@
       "EDITOR": "Editor",
       "VIEWER": "Lector"
     },
-    "pendingInvitesTitle": "Invitaciones pendientes",
-    "inviteTableHeaders": {
-      "sent": "Enviada",
-      "expires": "Expira"
-    },
-    "inviteSent": "✓ Correo de invitación enviado.",
-    "inviteNoEmail": "Correo no enviado (RESEND_API_KEY no configurado) — comparte este enlace manualmente:",
     "resetModal": {
       "title": "Restablecer contraseña",
       "desc": "Restableciendo contraseña de {name} ({email}).",
@@ -1063,6 +1083,7 @@
       "empty": "No hay solicitudes de cambio registradas para este documento.",
       "changeTask": "Cambio a realizar",
       "assigned": "Asignados:",
+      "assignedOn": "Asignado:",
       "result": "Resultado:",
       "approvedOn": "aprobado",
       "finalNote": "Nota final:"

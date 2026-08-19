@@ -154,6 +154,111 @@ export async function sendCompanyWelcomeEmail(
   return { sent: true };
 }
 
+interface UserWelcomeEmailParams {
+  to: string;
+  userName: string;
+  companyName: string;
+  role: string;
+  password: string;
+  loginUrl: string;
+}
+
+export async function sendUserWelcomeEmail(
+  p: UserWelcomeEmailParams
+): Promise<{ sent: boolean; error?: string }> {
+  if (!resend) {
+    console.warn("[email] RESEND_API_KEY not set — skipping user welcome email");
+    return { sent: false, error: "RESEND_API_KEY not configured" };
+  }
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Bienvenido a KE-Control</title></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:'Segoe UI',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:40px 16px;">
+  <tr><td align="center">
+    <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+      <!-- HEADER -->
+      <tr><td style="background:#1B3A6B;border-radius:12px 12px 0 0;padding:36px 40px;text-align:center;">
+        <div style="font-size:28px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">KE-Control</div>
+        <div style="font-size:13px;color:rgba(255,255,255,0.65);margin-top:4px;letter-spacing:1px;text-transform:uppercase;">Plataforma Documental</div>
+        <div style="width:48px;height:3px;background:#3CB54A;margin:18px auto 0;border-radius:2px;"></div>
+      </td></tr>
+
+      <!-- WELCOME BODY -->
+      <tr><td style="background:#ffffff;padding:40px 40px 32px;border-radius:0 0 12px 12px;">
+        <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#3CB54A;text-transform:uppercase;letter-spacing:1px;">¡Bienvenido!</p>
+        <h1 style="margin:0 0 16px;font-size:24px;font-weight:800;color:#1B3A6B;line-height:1.2;">Hola, ${p.userName}</h1>
+        <p style="margin:0 0 28px;font-size:15px;color:#475569;line-height:1.7;">
+          Has sido agregado al espacio de trabajo <strong style="color:#1B3A6B;">${p.companyName}</strong> en KE-Control como <strong style="color:#1B3A6B;">${p.role}</strong>.
+          A continuación encontrarás tus credenciales de acceso.
+        </p>
+
+        <!-- CREDENTIALS BOX -->
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:32px;">
+          <tr><td style="padding:20px 24px;">
+            <p style="margin:0 0 14px;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;">Tus credenciales de acceso</p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;">
+              <tr>
+                <td style="color:#64748b;padding:7px 0;width:110px;vertical-align:top;">Empresa</td>
+                <td style="color:#1e293b;font-weight:600;padding:7px 0;">${p.companyName}</td>
+              </tr>
+              <tr style="border-top:1px solid #e2e8f0;">
+                <td style="color:#64748b;padding:7px 0;vertical-align:top;">Correo</td>
+                <td style="color:#1e293b;font-weight:600;padding:7px 0;">${p.to}</td>
+              </tr>
+              <tr style="border-top:1px solid #e2e8f0;">
+                <td style="color:#64748b;padding:7px 0;vertical-align:top;">Contraseña</td>
+                <td style="padding:7px 0;">
+                  <code style="background:#1B3A6B;color:#ffffff;padding:5px 12px;border-radius:6px;font-size:14px;font-weight:700;letter-spacing:1px;">${p.password}</code>
+                </td>
+              </tr>
+            </table>
+          </td></tr>
+        </table>
+
+        <!-- CTA BUTTON -->
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:12px;">
+          <tr><td align="center">
+            <a href="${p.loginUrl}" style="display:inline-block;background:#3CB54A;color:#ffffff;padding:15px 40px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;letter-spacing:0.3px;">
+              Iniciar Sesión en KE-Control →
+            </a>
+          </td></tr>
+        </table>
+        <p style="text-align:center;margin:0;font-size:12px;color:#94a3b8;">${p.loginUrl}</p>
+      </td></tr>
+
+      <!-- FOOTER -->
+      <tr><td style="background:#1B3A6B;border-radius:0 0 12px 12px;padding:28px 40px;text-align:center;">
+        <p style="margin:0 0 6px;font-size:14px;font-weight:700;color:#ffffff;">KE-Control — Plataforma Documental</p>
+        <p style="margin:0 0 16px;font-size:12px;color:rgba(255,255,255,0.55);">
+          Este correo fue generado automáticamente al agregarte como usuario en la plataforma.<br>
+          Si no esperabas este mensaje, puedes ignorarlo de forma segura.
+        </p>
+        <div style="width:32px;height:2px;background:#3CB54A;margin:0 auto;border-radius:1px;"></div>
+      </td></tr>
+
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>`;
+
+  const { error } = await resend.emails.send({
+    from: FROM,
+    to: p.to,
+    subject: `Bienvenido a KE-Control — ${p.companyName}`,
+    html,
+  });
+
+  if (error) {
+    console.error("[email] Send failed:", error);
+    return { sent: false, error: "message" in error ? error.message : String(error) };
+  }
+  return { sent: true };
+}
+
 interface ReviewReminderParams {
   to: string;
   recipientName: string;
@@ -210,6 +315,121 @@ export async function sendReviewReminderEmail(
 
   if (error) {
     console.error("[email] Review reminder send failed:", error);
+    return { sent: false, error: "message" in error ? error.message : String(error) };
+  }
+  return { sent: true };
+}
+
+interface WeeklyReportEmailParams {
+  to: string;
+  adminName: string;
+  companyName: string;
+  periodLabel: string; // e.g. "11 – 18 ago 2026"
+  subidas: number;
+  eliminaciones: number;
+  revisiones: number;
+  aprobadas: number;
+  rechazadas: number;
+  pendientes: number;
+  totalDocumentos: number;
+  documentosVencidos: number;
+  porRevisarSemana: number;
+  reportUrl: string;
+}
+
+export async function sendWeeklyReportEmail(
+  p: WeeklyReportEmailParams
+): Promise<{ sent: boolean; error?: string }> {
+  if (!resend) {
+    console.warn("[email] RESEND_API_KEY not set — skipping weekly report email");
+    return { sent: false, error: "RESEND_API_KEY not configured" };
+  }
+
+  const stat = (label: string, value: number, color: string) => `
+    <td style="padding:14px 10px;text-align:center;">
+      <div style="font-size:24px;font-weight:800;color:${color};">${value}</div>
+      <div style="font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-top:2px;">${label}</div>
+    </td>`;
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Resumen semanal — KE-Control</title></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:'Segoe UI',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:40px 16px;">
+  <tr><td align="center">
+    <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+      <!-- HEADER -->
+      <tr><td style="background:#1B3A6B;border-radius:12px 12px 0 0;padding:36px 40px;text-align:center;">
+        <div style="font-size:28px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">KE-Control</div>
+        <div style="font-size:13px;color:rgba(255,255,255,0.65);margin-top:4px;letter-spacing:1px;text-transform:uppercase;">Resumen Semanal</div>
+        <div style="width:48px;height:3px;background:#3CB54A;margin:18px auto 0;border-radius:2px;"></div>
+      </td></tr>
+
+      <!-- BODY -->
+      <tr><td style="background:#ffffff;padding:36px 40px 28px;">
+        <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#3CB54A;text-transform:uppercase;letter-spacing:1px;">${p.periodLabel}</p>
+        <h1 style="margin:0 0 20px;font-size:22px;font-weight:800;color:#1B3A6B;line-height:1.2;">Hola, ${p.adminName}</h1>
+        <p style="margin:0 0 24px;font-size:14px;color:#475569;line-height:1.7;">
+          Este es el resumen semanal de <strong style="color:#1B3A6B;">${p.companyName}</strong> en KE-Control.
+        </p>
+
+        <!-- DOCUMENT HEALTH -->
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:16px;">
+          <tr>
+            ${stat("Documentos activos", p.totalDocumentos, "#334155")}
+            ${stat("Vencidos", p.documentosVencidos, "#dc2626")}
+            ${stat("Por revisar (7 días)", p.porRevisarSemana, "#d97706")}
+          </tr>
+        </table>
+
+        <!-- ACTIVITY -->
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:32px;">
+          <tr>
+            ${stat("Subidas", p.subidas, "#2563eb")}
+            ${stat("Aprobadas", p.aprobadas, "#16a34a")}
+            ${stat("Rechazadas", p.rechazadas, "#dc2626")}
+          </tr>
+          <tr>
+            ${stat("Eliminaciones", p.eliminaciones, "#dc2626")}
+            ${stat("Revisiones", p.revisiones, "#7c3aed")}
+            ${stat("Pendientes", p.pendientes, "#d97706")}
+          </tr>
+        </table>
+
+        <!-- CTA BUTTON -->
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr><td align="center">
+            <a href="${p.reportUrl}" style="display:inline-block;background:#3CB54A;color:#ffffff;padding:14px 36px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px;letter-spacing:0.3px;">
+              Ver reportes completos →
+            </a>
+          </td></tr>
+        </table>
+      </td></tr>
+
+      <!-- FOOTER -->
+      <tr><td style="background:#1B3A6B;border-radius:0 0 12px 12px;padding:24px 40px;text-align:center;">
+        <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#ffffff;">KE-Control — Plataforma Documental</p>
+        <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.55);">
+          Recibes este correo por ser administrador de ${p.companyName}.
+        </p>
+      </td></tr>
+
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>`;
+
+  const { error } = await resend.emails.send({
+    from: FROM,
+    to: p.to,
+    subject: `Resumen semanal — ${p.companyName} (${p.periodLabel})`,
+    html,
+  });
+
+  if (error) {
+    console.error("[email] Weekly report send failed:", error);
     return { sent: false, error: "message" in error ? error.message : String(error) };
   }
   return { sent: true };

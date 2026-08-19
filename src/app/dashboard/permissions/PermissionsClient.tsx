@@ -107,8 +107,8 @@ function FolderTree({
   );
 }
 
-// Coloured badge for an access level.
-function AccessBadge({ level }: { level: string | null }) {
+// Coloured badge for an access level (label must already be translated).
+function AccessBadge({ level, label }: { level: string | null; label: string }) {
   if (!level) return <span style={{ color: "#aaa" }}>—</span>;
   const colors: Record<string, { bg: string; fg: string }> = {
     MANAGE: { bg: "#ede9fe", fg: "#6d28d9" },
@@ -128,19 +128,19 @@ function AccessBadge({ level }: { level: string | null }) {
         fontWeight: 600,
       }}
     >
-      {{ MANAGE: "Full management", EDIT: "Edit", READ: "Read only", NONE: "No access" }[level] ?? level}
+      {label}
     </span>
   );
 }
 
-// Human-readable source label.
-function SourceLabel({ source }: { source: string }) {
-  if (source === "admin") return <span style={{ fontSize: 12, color: "#6d28d9" }}>Admin role</span>;
-  if (source === "direct") return <span style={{ fontSize: 12, color: "#059669" }}>Direct permission</span>;
-  if (source === "none")   return <span style={{ fontSize: 12, color: "#aaa" }}>—</span>;
-  // "folder:FolderName"
-  const name = source.replace(/^folder:/, "");
-  return <span style={{ fontSize: 12, color: "#d97706" }}>↑ Folder: {name}</span>;
+// Short human-readable explanation of *why* the user has this effective access.
+// Returns null when no extra context is needed (admins, or no access at all).
+function accessCaption(entry: PermEntry, t: (key: string, values?: Record<string, string>) => string): string | null {
+  if (entry.user.role === "COMPANY_ADMIN") return null;
+  if (entry.source === "direct") return t("captions.direct");
+  if (entry.source.startsWith("folder:")) return t("captions.folder", { name: entry.source.replace(/^folder:/, "") });
+  if (entry.source === "none" && entry.effective !== "NONE") return t("captions.role");
+  return null;
 }
 
 // ─── main component ───────────────────────────────────────────────────────────
@@ -361,10 +361,7 @@ export default function PermissionsClient({ company }: Props) {
 
               {/* Legend */}
               <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "10px 16px", marginBottom: 20, fontSize: 12, color: "#64748b", lineHeight: 1.6 }}>
-                <strong style={{ color: "#374151" }}>{t("legend.heading")}</strong> Each user has a{" "}
-                <strong>{t("legend.rolBase")}</strong> (EDITOR, VIEWER, etc.) that applies to everything. You can add an{" "}
-                <strong>{t("legend.explicit")}</strong> on this folder/file to override that role.
-                Choosing <em>{t("legend.inherit")}</em> removes the explicit permission and access is inherited from the base role or parent folder.
+                <strong style={{ color: "#374151" }}>{t("legend.heading")}</strong> {t("legend.body")}
               </div>
 
               {loadingEntries ? (
@@ -373,7 +370,12 @@ export default function PermissionsClient({ company }: Props) {
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
                     <tr style={{ borderBottom: "2px solid #eee" }}>
-                      {[t("cols.user"), t("cols.rolBase"), t("cols.explicit"), t("cols.effective"), t("cols.source"), t("cols.assign")].map(
+                      {[
+                        t("cols.user"),
+                        t("cols.rolBase"),
+                        t("cols.access", { resource: selected.type === "folder" ? t("resourceNoun.folder") : t("resourceNoun.file") }),
+                        t("cols.assign"),
+                      ].map(
                         (h) => (
                           <th
                             key={h}
@@ -444,19 +446,14 @@ export default function PermissionsClient({ company }: Props) {
                             </span>
                           </td>
 
-                          {/* Explicit */}
+                          {/* Access on this resource (badge + short explanation) */}
                           <td style={styles.td}>
-                            <AccessBadge level={entry.explicit} />
-                          </td>
-
-                          {/* Effective */}
-                          <td style={styles.td}>
-                            <AccessBadge level={entry.effective} />
-                          </td>
-
-                          {/* Source */}
-                          <td style={styles.td}>
-                            <SourceLabel source={entry.source} />
+                            <AccessBadge level={entry.effective} label={t(`levels.${entry.effective}`)} />
+                            {accessCaption(entry, t) && (
+                              <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>
+                                {accessCaption(entry, t)}
+                              </div>
+                            )}
                           </td>
 
                           {/* Set access dropdown */}

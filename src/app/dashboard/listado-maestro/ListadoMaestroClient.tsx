@@ -643,7 +643,7 @@ export default function ListadoMaestroClient({ company, userRole }: Props) {
                       {r.pendingVersionStr && r.status === "APPROVED" && (
                         <code style={{ background: "#f0fdf4", color: "#166534", padding: "1px 7px", borderRadius: 4, fontSize: 11 }}>{r.pendingVersionStr}</code>
                       )}
-                      <span style={{ fontSize: 11, color: "#94a3b8", marginLeft: "auto" }}>{fmtDate(r.createdAt)}</span>
+                      <span style={{ fontSize: 11, color: "#94a3b8", marginLeft: "auto" }}>{t("flowModal.assignedOn")} {fmtDate(r.createdAt)}</span>
                     </div>
 
                     {r.instructions && (

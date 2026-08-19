@@ -3,7 +3,8 @@
 import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Download, BarChart2, FileCheck, FileX, Upload, Trash2, Clock } from "lucide-react";
+import * as XLSX from "xlsx";
+import { Download, FileCheck, FileX, Upload, Trash2, Clock, AlertTriangle, CalendarClock, Files } from "lucide-react";
 
 interface Summary {
   subidas: number;
@@ -26,11 +27,108 @@ interface DetailRow {
   notas: string;
 }
 
+interface CountEntry { label: string; count: number; }
+
+interface UserActivity {
+  name: string;
+  subidas: number;
+  eliminaciones: number;
+  revisiones: number;
+  aprobadas: number;
+  rechazadas: number;
+  total: number;
+}
+
+interface DocMetrics {
+  totalDocumentos: number;
+  documentosVencidos: number;
+  porRevisarSemana: number;
+  porEstado: CountEntry[];
+  porDepartamento: CountEntry[];
+  porTipo: CountEntry[];
+  actividadUsuarios: UserActivity[];
+}
+
+interface Option { id: string; name: string; }
 interface UserOption { id: string; name: string; email: string; }
 interface Props {
   company: { name: string; primaryColor: string; accentColor: string; fontFamily: string };
 }
 
+// ─── horizontal bar list (no charting library — hand-rolled) ──────────────────
+
+function BarList({ data, color, translateLabel, emptyLabel }: {
+  data: CountEntry[];
+  color: string;
+  translateLabel?: (label: string) => string;
+  emptyLabel: string;
+}) {
+  if (data.length === 0) {
+    return <p style={{ fontSize: 13, color: "#94a3b8", padding: "16px 0", textAlign: "center" }}>{emptyLabel}</p>;
+  }
+  const max = Math.max(...data.map((d) => d.count), 1);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {data.map((d) => (
+        <div key={d.label}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#374151", marginBottom: 3 }}>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 180 }}>
+              {translateLabel ? translateLabel(d.label) : d.label}
+            </span>
+            <span style={{ fontWeight: 700, color: "#1e293b" }}>{d.count}</span>
+          </div>
+          <div style={{ background: "#f1f5f9", borderRadius: 4, height: 8, overflow: "hidden" }}>
+            <div style={{ width: `${(d.count / max) * 100}%`, background: color, height: "100%", borderRadius: 4 }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── per-user activity breakdown (each column is a specific action type) ──────
+
+function UserActivityTable({ data, labels, emptyLabel }: {
+  data: UserActivity[];
+  labels: { user: string; uploads: string; deletes: string; reviews: string; approved: string; rejected: string; total: string };
+  emptyLabel: string;
+}) {
+  if (data.length === 0) {
+    return <p style={{ fontSize: 13, color: "#94a3b8", padding: "16px 0", textAlign: "center" }}>{emptyLabel}</p>;
+  }
+  const cellStyle: React.CSSProperties = { padding: "6px 8px", textAlign: "center", fontSize: 12, color: "#374151" };
+  const headStyle: React.CSSProperties = { padding: "0 8px 6px", textAlign: "center", fontSize: 10, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", whiteSpace: "nowrap" };
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <thead>
+          <tr>
+            <th style={{ ...headStyle, textAlign: "left" }}>{labels.user}</th>
+            <th style={headStyle}>{labels.uploads}</th>
+            <th style={headStyle}>{labels.deletes}</th>
+            <th style={headStyle}>{labels.reviews}</th>
+            <th style={headStyle}>{labels.approved}</th>
+            <th style={headStyle}>{labels.rejected}</th>
+            <th style={{ ...headStyle, textAlign: "right" }}>{labels.total}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((u) => (
+            <tr key={u.name} style={{ borderTop: "1px solid #f1f5f9" }}>
+              <td style={{ ...cellStyle, textAlign: "left", fontWeight: 600, color: "#1e293b", whiteSpace: "nowrap" }}>{u.name}</td>
+              <td style={cellStyle}>{u.subidas}</td>
+              <td style={cellStyle}>{u.eliminaciones}</td>
+              <td style={cellStyle}>{u.revisiones}</td>
+              <td style={cellStyle}>{u.aprobadas}</td>
+              <td style={cellStyle}>{u.rechazadas}</td>
+              <td style={{ ...cellStyle, textAlign: "right", fontWeight: 700, color: "#1e293b" }}>{u.total}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 export default function ReportesClient({ company }: Props) {
   const router = useRouter();
@@ -53,15 +151,31 @@ export default function ReportesClient({ company }: Props) {
     PENDING:  { label: t("status.PENDING"),  bg: "#fef3c7", color: "#92400e" },
   };
 
-  const [summary, setSummary]   = useState<Summary | null>(null);
-  const [details, setDetails]   = useState<DetailRow[]>([]);
-  const [users,   setUsers]     = useState<UserOption[]>([]);
-  const [total,   setTotal]     = useState(0);
-  const [loading, setLoading]   = useState(true);
+  const DOC_STATUS_LABELS: Record<string, string> = {
+    DRAFT: t("docStatus.DRAFT"),
+    IN_REVIEW: t("docStatus.IN_REVIEW"),
+    REVIEWED: t("docStatus.REVIEWED"),
+    PENDING_APPROVAL: t("docStatus.PENDING_APPROVAL"),
+    OBSOLETE: t("docStatus.OBSOLETE"),
+  };
+
+  const [summary, setSummary]       = useState<Summary | null>(null);
+  const [docMetrics, setDocMetrics] = useState<DocMetrics | null>(null);
+  const [details, setDetails]       = useState<DetailRow[]>([]);
+  const [users,   setUsers]         = useState<UserOption[]>([]);
+  const [folders, setFolders]       = useState<Option[]>([]);
+  const [departments, setDepartments] = useState<Option[]>([]);
+  const [documentTypes, setDocumentTypes] = useState<Option[]>([]);
+  const [total,   setTotal]         = useState(0);
+  const [loading, setLoading]       = useState(true);
 
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo,   setDateTo]   = useState("");
   const [userId,   setUserId]   = useState("");
+  const [folderId, setFolderId] = useState("");
+  const [departamento, setDepartamento] = useState("");
+  const [tipoDocumento, setTipoDocumento] = useState("");
+  const [encargadoId, setEncargadoId] = useState("");
 
   const fetchReport = useCallback(async () => {
     setLoading(true);
@@ -69,18 +183,31 @@ export default function ReportesClient({ company }: Props) {
     if (dateFrom) p.set("dateFrom", dateFrom);
     if (dateTo)   p.set("dateTo",   dateTo);
     if (userId)   p.set("userId",   userId);
+    if (folderId) p.set("folderId", folderId);
+    if (departamento) p.set("departamento", departamento);
+    if (tipoDocumento) p.set("tipoDocumento", tipoDocumento);
+    if (encargadoId) p.set("encargadoId", encargadoId);
     const res = await fetch(`/api/reportes?${p}`);
     if (res.ok) {
       const data = await res.json();
       setSummary(data.summary);
+      setDocMetrics(data.docMetrics);
       setDetails(data.details);
       setUsers(data.users);
+      setFolders(data.filters?.folders ?? []);
+      setDepartments(data.filters?.departments ?? []);
+      setDocumentTypes(data.filters?.documentTypes ?? []);
       setTotal(data.total);
     }
     setLoading(false);
-  }, [dateFrom, dateTo, userId]);
+  }, [dateFrom, dateTo, userId, folderId, departamento, tipoDocumento, encargadoId]);
 
   useEffect(() => { fetchReport(); }, [fetchReport]);
+
+  function clearFilters() {
+    setDateFrom(""); setDateTo(""); setUserId("");
+    setFolderId(""); setDepartamento(""); setTipoDocumento(""); setEncargadoId("");
+  }
 
   function exportCSV() {
     const headers = [t("cols.fecha"), t("cols.tipo"), t("cols.documento"), t("cols.codigo"), t("cols.requestedBy"), t("cols.estado"), t("cols.reviewedBy"), t("cols.fecha"), t("cols.notas")];
@@ -105,6 +232,41 @@ export default function ReportesClient({ company }: Props) {
     a.click(); URL.revokeObjectURL(url);
   }
 
+  function exportExcel() {
+    const wb = XLSX.utils.book_new();
+
+    if (summary && docMetrics) {
+      const resumenRows = [
+        { Métrica: t("stats.uploads"),    Valor: summary.subidas },
+        { Métrica: t("stats.deletes"),    Valor: summary.eliminaciones },
+        { Métrica: t("stats.reviews"),    Valor: summary.revisiones },
+        { Métrica: t("stats.approved"),   Valor: summary.aprobadas },
+        { Métrica: t("stats.rejected"),   Valor: summary.rechazadas },
+        { Métrica: t("stats.pending"),    Valor: summary.pendientes },
+        { Métrica: t("docStats.total"),       Valor: docMetrics.totalDocumentos },
+        { Métrica: t("docStats.overdue"),     Valor: docMetrics.documentosVencidos },
+        { Métrica: t("docStats.dueThisWeek"), Valor: docMetrics.porRevisarSemana },
+      ];
+      const wsResumen = XLSX.utils.json_to_sheet(resumenRows);
+      XLSX.utils.book_append_sheet(wb, wsResumen, "Resumen");
+    }
+
+    const detailRows = details.map((r) => ({
+      [t("cols.fecha")]:       new Date(r.fecha).toLocaleDateString('es-CR'),
+      [t("cols.tipo")]:        TIPO_LABELS[r.tipo] ?? r.tipo,
+      [t("cols.documento")]:   r.documento,
+      [t("cols.codigo")]:      r.codigo,
+      [t("cols.requestedBy")]: r.solicitadoPor,
+      [t("cols.estado")]:      STATUS_LABELS[r.estado]?.label ?? r.estado,
+      [t("cols.reviewedBy")]:  r.revisadoPor,
+      [t("cols.notas")]:       r.notas,
+    }));
+    const wsDetalle = XLSX.utils.json_to_sheet(detailRows);
+    XLSX.utils.book_append_sheet(wb, wsDetalle, "Detalle");
+
+    XLSX.writeFile(wb, `reportes-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  }
+
   const fmtDate = (iso: string) =>
     new Date(iso).toLocaleDateString('es-CR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
@@ -117,58 +279,157 @@ export default function ReportesClient({ company }: Props) {
     { label: t("stats.pending"),    value: summary.pendientes,    icon: <Clock size={20} />,     color: "#d97706" },
   ] : [];
 
+  const DOC_CARDS = docMetrics ? [
+    { label: t("docStats.total"),       value: docMetrics.totalDocumentos,   icon: <Files size={20} />,         color: "#334155" },
+    { label: t("docStats.overdue"),     value: docMetrics.documentosVencidos, icon: <AlertTriangle size={20} />, color: "#dc2626" },
+    { label: t("docStats.dueThisWeek"), value: docMetrics.porRevisarSemana,   icon: <CalendarClock size={20} />, color: "#d97706" },
+  ] : [];
+
   return (
     <div style={{ flex: 1, overflowY: "auto", background: "#f1f5f9", fontFamily: `'${company.fontFamily}', Inter, system-ui, sans-serif` }}>
       {/* Section header */}
       <div style={{ background: brand, color: "#fff", padding: "12px 28px", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, zIndex: 10 }}>
         <strong style={{ fontSize: 16 }}>{t("header")}</strong>
-        <button
-          onClick={exportCSV}
-          disabled={details.length === 0}
-          style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", color: "#fff", padding: "7px 14px", borderRadius: 7, cursor: details.length ? "pointer" : "not-allowed", fontSize: 13, fontWeight: 600, opacity: details.length ? 1 : 0.6 }}
-        >
-          <Download size={14} /> {t("exportCsv")}
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={exportCSV}
+            disabled={details.length === 0}
+            style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", color: "#fff", padding: "7px 14px", borderRadius: 7, cursor: details.length ? "pointer" : "not-allowed", fontSize: 13, fontWeight: 600, opacity: details.length ? 1 : 0.6 }}
+          >
+            <Download size={14} /> {t("exportCsv")}
+          </button>
+          <button
+            onClick={exportExcel}
+            disabled={details.length === 0}
+            style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", color: "#fff", padding: "7px 14px", borderRadius: 7, cursor: details.length ? "pointer" : "not-allowed", fontSize: 13, fontWeight: 600, opacity: details.length ? 1 : 0.6 }}
+          >
+            <Download size={14} /> {t("exportExcel")}
+          </button>
+        </div>
       </div>
 
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 24px" }}>
 
         {/* Filters */}
         <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px 20px", marginBottom: 24, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
-          <div style={{ flex: "1 1 140px" }}>
+          <div style={{ flex: "1 1 130px" }}>
             <label style={labelStyle}>{t("filters.from")}</label>
             <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={inputStyle} />
           </div>
-          <div style={{ flex: "1 1 140px" }}>
+          <div style={{ flex: "1 1 130px" }}>
             <label style={labelStyle}>{t("filters.to")}</label>
             <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={inputStyle} />
           </div>
-          <div style={{ flex: "2 1 180px" }}>
+          <div style={{ flex: "1 1 160px" }}>
             <label style={labelStyle}>{t("filters.user")}</label>
             <select value={userId} onChange={(e) => setUserId(e.target.value)} style={inputStyle}>
               <option value="">{t("filters.allUsers")}</option>
               {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
           </div>
+          <div style={{ flex: "1 1 150px" }}>
+            <label style={labelStyle}>{t("filters.folder")}</label>
+            <select value={folderId} onChange={(e) => setFolderId(e.target.value)} style={inputStyle}>
+              <option value="">{t("filters.allFolders")}</option>
+              {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+            </select>
+          </div>
+          <div style={{ flex: "1 1 150px" }}>
+            <label style={labelStyle}>{t("filters.department")}</label>
+            <select value={departamento} onChange={(e) => setDepartamento(e.target.value)} style={inputStyle}>
+              <option value="">{t("filters.allDepartments")}</option>
+              {departments.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
+            </select>
+          </div>
+          <div style={{ flex: "1 1 150px" }}>
+            <label style={labelStyle}>{t("filters.docType")}</label>
+            <select value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)} style={inputStyle}>
+              <option value="">{t("filters.allDocTypes")}</option>
+              {documentTypes.map((dt) => <option key={dt.id} value={dt.name}>{dt.name}</option>)}
+            </select>
+          </div>
+          <div style={{ flex: "1 1 150px" }}>
+            <label style={labelStyle}>{t("filters.encargado")}</label>
+            <select value={encargadoId} onChange={(e) => setEncargadoId(e.target.value)} style={inputStyle}>
+              <option value="">{t("filters.allEncargados")}</option>
+              {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </select>
+          </div>
           <button onClick={fetchReport} style={{ background: brand, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 7, cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
             {t("filters.apply")}
           </button>
-          <button onClick={() => { setDateFrom(""); setDateTo(""); setUserId(""); }} style={{ background: "#f1f5f9", color: "#64748b", border: "1px solid #e2e8f0", padding: "8px 14px", borderRadius: 7, cursor: "pointer", fontSize: 13 }}>
+          <button onClick={clearFilters} style={{ background: "#f1f5f9", color: "#64748b", border: "1px solid #e2e8f0", padding: "8px 14px", borderRadius: 7, cursor: "pointer", fontSize: 13 }}>
             {t("filters.clear")}
           </button>
         </div>
 
-        {/* Summary cards */}
+        {/* Document-health cards */}
+        {!loading && docMetrics && (
+          <>
+            <p style={sectionTitleStyle}>{t("healthSection")}</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12, marginBottom: 24 }}>
+              {DOC_CARDS.map((s) => (
+                <div key={s.label} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px 20px" }}>
+                  <div style={{ color: s.color, marginBottom: 4 }}>{s.icon}</div>
+                  <div style={{ fontSize: 28, fontWeight: 800, color: s.color }}>{s.value}</div>
+                  <div style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 2 }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Activity cards (change requests / audit log) */}
         {!loading && summary && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12, marginBottom: 24 }}>
-            {STAT_CARDS.map((s) => (
-              <div key={s.label} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px 20px" }}>
-                <div style={{ color: s.color, marginBottom: 4 }}>{s.icon}</div>
-                <div style={{ fontSize: 28, fontWeight: 800, color: s.color }}>{s.value}</div>
-                <div style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 2 }}>{s.label}</div>
+          <>
+            <p style={sectionTitleStyle}>{t("activitySection")}</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12, marginBottom: 24 }}>
+              {STAT_CARDS.map((s) => (
+                <div key={s.label} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px 20px" }}>
+                  <div style={{ color: s.color, marginBottom: 4 }}>{s.icon}</div>
+                  <div style={{ fontSize: 28, fontWeight: 800, color: s.color }}>{s.value}</div>
+                  <div style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 2 }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Distribution charts */}
+        {!loading && docMetrics && (
+          <>
+            <p style={sectionTitleStyle}>{t("distributionSection")}</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, marginBottom: 24 }}>
+              <div style={panelStyle}>
+                <p style={panelTitleStyle}>{t("charts.byStatus")}</p>
+                <BarList data={docMetrics.porEstado} color={brand} translateLabel={(l) => DOC_STATUS_LABELS[l] ?? l} emptyLabel={t("charts.noData")} />
               </div>
-            ))}
-          </div>
+              <div style={panelStyle}>
+                <p style={panelTitleStyle}>{t("charts.byDepartment")}</p>
+                <BarList data={docMetrics.porDepartamento} color="#7c3aed" emptyLabel={t("charts.noData")} />
+              </div>
+              <div style={panelStyle}>
+                <p style={panelTitleStyle}>{t("charts.byType")}</p>
+                <BarList data={docMetrics.porTipo} color="#0891b2" emptyLabel={t("charts.noData")} />
+              </div>
+              <div style={{ ...panelStyle, gridColumn: "1 / -1" }}>
+                <p style={panelTitleStyle}>{t("charts.byUser")}</p>
+                <UserActivityTable
+                  data={docMetrics.actividadUsuarios}
+                  labels={{
+                    user: t("filters.user"),
+                    uploads: t("stats.uploads"),
+                    deletes: t("stats.deletes"),
+                    reviews: t("stats.reviews"),
+                    approved: t("stats.approved"),
+                    rejected: t("stats.rejected"),
+                    total: t("charts.total"),
+                  }}
+                  emptyLabel={t("charts.noData")}
+                />
+              </div>
+            </div>
+          </>
         )}
 
         {/* Detail table */}
@@ -223,3 +484,6 @@ export default function ReportesClient({ company }: Props) {
 
 const labelStyle: React.CSSProperties = { display: "block", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 };
 const inputStyle: React.CSSProperties = { width: "100%", padding: "7px 10px", border: "1px solid #e2e8f0", borderRadius: 6, fontSize: 13, background: "#fff", boxSizing: "border-box" };
+const sectionTitleStyle: React.CSSProperties = { fontSize: 12, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, margin: "0 0 10px" };
+const panelStyle: React.CSSProperties = { background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px 18px" };
+const panelTitleStyle: React.CSSProperties = { margin: "0 0 12px", fontSize: 13, fontWeight: 700, color: "#1e293b" };
