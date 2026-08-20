@@ -709,6 +709,61 @@
     "header": "Reportes",
     "exportCsv": "Exportar CSV",
     "exportExcel": "Exportar Excel",
+    "tabs": {
+      "resumen": "Resumen",
+      "documentos": "Documentos",
+      "actividad": "Actividad",
+      "cambios": "Solicitudes de cambio"
+    },
+    "clickHint": "Clic para ver el detalle",
+    "docFilters": {
+      "estado": "Estado",
+      "allEstados": "Todos los estados",
+      "vencidoOnly": "Solo vencidos",
+      "porRevisarOnly": "Solo por revisar (7 días)",
+      "search": "Buscar",
+      "searchPlaceholder": "Nombre o código…",
+      "clearDrill": "Quitar filtro",
+      "showing": "{count} de {total} documentos"
+    },
+    "actFilters": {
+      "accion": "Acción",
+      "allActions": "Todas las acciones",
+      "search": "Buscar",
+      "searchPlaceholder": "Usuario o detalle…",
+      "showing": "{count} de {total} registros"
+    },
+    "docCols": {
+      "codigo": "Código",
+      "nombre": "Nombre",
+      "carpeta": "Carpeta",
+      "departamento": "Departamento",
+      "tipo": "Tipo",
+      "estado": "Estado",
+      "encargado": "Encargado",
+      "vencimiento": "Fecha de revisión",
+      "vencido": "Vencido",
+      "si": "Sí",
+      "no": "No",
+      "sinFecha": "Sin fecha",
+      "empty": "No hay documentos que coincidan con estos filtros."
+    },
+    "actCols": {
+      "fecha": "Fecha",
+      "usuario": "Usuario",
+      "accion": "Acción",
+      "detalle": "Detalle",
+      "empty": "No hay actividad registrada para estos filtros."
+    },
+    "actions": {
+      "FILE_UPLOAD": "Subida de archivo",
+      "FILE_DELETE": "Eliminación de archivo",
+      "FILE_REVIEW_COMPLETE": "Revisión completada",
+      "FILE_REVIEW_UPDATE": "Actualización de revisión",
+      "FILE_METADATA_UPDATE": "Edición de metadatos",
+      "CHANGE_REQUEST_APPROVED": "Solicitud aprobada",
+      "CHANGE_REQUEST_REJECTED": "Solicitud rechazada"
+    },
     "filters": {
       "from": "Desde",
       "to": "Hasta",

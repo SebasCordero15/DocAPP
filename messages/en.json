@@ -709,6 +709,61 @@
     "header": "Reports",
     "exportCsv": "Export CSV",
     "exportExcel": "Export Excel",
+    "tabs": {
+      "resumen": "Summary",
+      "documentos": "Documents",
+      "actividad": "Activity",
+      "cambios": "Change requests"
+    },
+    "clickHint": "Click to see the detail",
+    "docFilters": {
+      "estado": "Status",
+      "allEstados": "All statuses",
+      "vencidoOnly": "Overdue only",
+      "porRevisarOnly": "Due for review only (7 days)",
+      "search": "Search",
+      "searchPlaceholder": "Name or code…",
+      "clearDrill": "Clear filter",
+      "showing": "{count} of {total} documents"
+    },
+    "actFilters": {
+      "accion": "Action",
+      "allActions": "All actions",
+      "search": "Search",
+      "searchPlaceholder": "User or detail…",
+      "showing": "{count} of {total} records"
+    },
+    "docCols": {
+      "codigo": "Code",
+      "nombre": "Name",
+      "carpeta": "Folder",
+      "departamento": "Department",
+      "tipo": "Type",
+      "estado": "Status",
+      "encargado": "Owner",
+      "vencimiento": "Review date",
+      "vencido": "Overdue",
+      "si": "Yes",
+      "no": "No",
+      "sinFecha": "No date",
+      "empty": "No documents match these filters."
+    },
+    "actCols": {
+      "fecha": "Date",
+      "usuario": "User",
+      "accion": "Action",
+      "detalle": "Detail",
+      "empty": "No activity recorded for these filters."
+    },
+    "actions": {
+      "FILE_UPLOAD": "File upload",
+      "FILE_DELETE": "File deletion",
+      "FILE_REVIEW_COMPLETE": "Review completed",
+      "FILE_REVIEW_UPDATE": "Review update",
+      "FILE_METADATA_UPDATE": "Metadata edit",
+      "CHANGE_REQUEST_APPROVED": "Request approved",
+      "CHANGE_REQUEST_REJECTED": "Request rejected"
+    },
     "filters": {
       "from": "From",
       "to": "To",

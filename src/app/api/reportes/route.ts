@@ -127,11 +127,35 @@ export async function GET(req: NextRequest) {
     select: {
       id: true, status: true, departamento: true, tipoDocumento: true,
       fechaRevision: true, reviewDueDate: true,
+      codigo: true, nombreDocumento: true, name: true,
+      folder: { select: { name: true } },
       encargadoDocumento: { select: { id: true, name: true } },
     },
+    orderBy: { nombreDocumento: "asc" },
   });
 
   const dueDateOf = (d: (typeof docs)[number]) => d.fechaRevision ?? d.reviewDueDate;
+
+  // Full per-document detail — powers every drill-down table (overdue, due
+  // this week, by status/department/type) and its Excel export, so an
+  // auditor can always see exactly which documents make up a number.
+  const documentos = docs.map((d) => {
+    const due = dueDateOf(d);
+    const diasParaVencer = due ? Math.ceil((due.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)) : null;
+    return {
+      id: d.id,
+      codigo: d.codigo ?? "—",
+      nombre: d.nombreDocumento ?? d.name,
+      carpeta: d.folder?.name ?? "—",
+      departamento: d.departamento ?? "—",
+      tipoDocumento: d.tipoDocumento ?? "—",
+      status: d.status,
+      encargado: d.encargadoDocumento?.name ?? "—",
+      fechaVencimiento: due ? due.toISOString() : null,
+      diasParaVencer,
+      estaVencido: due ? due < now && d.status !== "OBSOLETE" : false,
+    };
+  });
 
   const documentosVencidos = docs.filter((d) => {
     const due = dueDateOf(d);
@@ -163,6 +187,7 @@ export async function GET(req: NextRequest) {
   // (from audit logs, independent of document filters) so each number is
   // traceable to something concrete instead of one opaque total.
   interface UserActivity {
+    userId: string;
     name: string;
     subidas: number;
     eliminaciones: number;
@@ -175,7 +200,7 @@ export async function GET(req: NextRequest) {
   for (const log of auditLogs) {
     if (!log.user) continue;
     const entry = activityCounts.get(log.user.id) ?? {
-      name: log.user.name, subidas: 0, eliminaciones: 0, revisiones: 0, aprobadas: 0, rechazadas: 0, total: 0,
+      userId: log.user.id, name: log.user.name, subidas: 0, eliminaciones: 0, revisiones: 0, aprobadas: 0, rechazadas: 0, total: 0,
     };
     if (log.action === "FILE_UPLOAD") entry.subidas++;
     else if (log.action === "FILE_DELETE") entry.eliminaciones++;
@@ -189,12 +214,25 @@ export async function GET(req: NextRequest) {
     .sort((a, b) => b.total - a.total)
     .slice(0, 8);
 
+  // Full activity log detail — powers the "Actividad" tab and its export,
+  // and lets a click on a user's row in the activity breakdown drill down
+  // into exactly what they did.
+  const activityLog = auditLogs.map((l) => ({
+    id: l.id,
+    fecha: l.createdAt.toISOString(),
+    usuarioId: l.user?.id ?? null,
+    usuario: l.user?.name ?? "—",
+    accion: l.action,
+    detalle: l.detail ?? "—",
+  }));
+
   return NextResponse.json({
     summary,
     details,
     users,
     total: details.length,
     filters: { folders, departments, documentTypes },
+    activityLog,
     docMetrics: {
       totalDocumentos: docs.length,
       documentosVencidos,
@@ -203,6 +241,7 @@ export async function GET(req: NextRequest) {
       porDepartamento,
       porTipo,
       actividadUsuarios,
+      documentos,
     },
   });
 }
