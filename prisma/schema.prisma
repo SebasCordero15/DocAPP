@@ -35,6 +35,19 @@ enum Plan {
   ENTERPRISE
 }
 
+// Superadmin choice made at company-creation time: does this company go
+// through the payment-link gate (CHARGED), or get immediate access with a
+// self-service plan pick (FREE)?
+enum CompanyBillingMode {
+  FREE
+  CHARGED
+}
+
+enum CompanyPaymentStatus {
+  PENDING
+  PAID
+}
+
 enum FileStatus {
   DRAFT
   IN_REVIEW
@@ -72,21 +85,6 @@ enum TaskStatus {
   COMPLETED
 }
 
-enum Industry {
-  // Legacy values — kept so existing DB rows remain valid; displayed as "Otro" in UI
-  LEGAL
-  FINANCE
-  HEALTHCARE
-  REAL_ESTATE
-  TECH
-  OTHER
-  // Current values
-  FARMACIA
-  ALIMENTOS
-  MATERIALES
-  SERVICIOS
-  OTRO
-}
 
 enum ReviewChainStatus {
   IN_REVIEW
@@ -121,7 +119,7 @@ model Company {
   secondaryColor String    @default("#1e40af")
   accentColor    String    @default("#7c3aed")
   fontFamily     String    @default("Inter")
-  industry       Industry  @default(OTRO)
+  industry       String    @default("Otro")
   customDomain   String?
   plan           Plan      @default(BASIC)
   maxUsers       Int       @default(10)
@@ -130,6 +128,17 @@ model Company {
   deletedAt      DateTime? // soft-delete: set to signal archival; null = active
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+
+  // ── Payment gate (set at creation, superadmin flow) ─────────────────────────
+  // FREE: admin user is created immediately, no gate.
+  // CHARGED: no User is created until paymentStatus flips to PAID via the
+  // "confirm payment" action — pendingAdmin* holds the intended admin's
+  // identity until then (never a password — that's generated at confirmation).
+  billingMode       CompanyBillingMode    @default(FREE)
+  paymentStatus     CompanyPaymentStatus?
+  paymentLink       String?
+  pendingAdminName  String?
+  pendingAdminEmail String?
 
   users          User[]
   folders        Folder[]
@@ -170,6 +179,13 @@ model DocumentTypeOption {
 
   @@unique([companyId, name])
   @@index([companyId])
+}
+
+// ---------- Industries (superadmin-managed, platform-wide — not per-company) ----------
+model IndustryOption {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
 }
 
 // ---------- Users ----------

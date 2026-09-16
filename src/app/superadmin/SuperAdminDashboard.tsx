@@ -3,17 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-const INDUSTRY_LABELS: Record<string, string> = {
-  FARMACIA: "Farmacia",
-  ALIMENTOS: "Alimentos",
-  MATERIALES: "Materiales",
-  SERVICIOS: "Servicios",
-  OTRO: "Otro",
-  // Legacy values — display as Otro
-  LEGAL: "Otro", FINANCE: "Otro", HEALTHCARE: "Otro",
-  REAL_ESTATE: "Otro", TECH: "Otro", OTHER: "Otro",
-};
-
 interface CompanySummary {
   id: string;
   name: string;
@@ -29,6 +18,8 @@ interface CompanySummary {
   industry: string;
   lastAccess: string | null;
   activeUsers30d: number;
+  billingMode: "FREE" | "CHARGED";
+  paymentStatus: "PENDING" | "PAID" | null;
 }
 
 interface ArchivedCompanySummary {
@@ -42,6 +33,8 @@ interface ArchivedCompanySummary {
   deletedAt: string;
   logoUrl?: string | null;
   industry: string;
+  billingMode: "FREE" | "CHARGED";
+  paymentStatus: "PENDING" | "PAID" | null;
 }
 
 interface Stats {
@@ -130,6 +123,8 @@ export default function SuperAdminDashboard({ stats, companies: initial, archive
             createdAt: company.createdAt,
             logoUrl: company.logoUrl,
             industry: company.industry,
+            billingMode: company.billingMode,
+            paymentStatus: company.paymentStatus,
             activeUserCount: 0,
             fileCount: 0,
             storageBytes: 0,
@@ -216,12 +211,20 @@ export default function SuperAdminDashboard({ stats, companies: initial, archive
                 </button>
               </div>
             </div>
-            <button
-              onClick={() => router.push("/superadmin/companies/new")}
-              style={{ background: "#1B3A6B", color: "#fff", border: "2px solid #3CB54A", padding: "8px 18px", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
-            >
-              + Crear empresa
-            </button>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={() => router.push("/superadmin/industries")}
+                style={{ background: "#fff", color: "#1B3A6B", border: "2px solid #e2e8f0", padding: "8px 18px", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
+              >
+                Industrias
+              </button>
+              <button
+                onClick={() => router.push("/superadmin/companies/new")}
+                style={{ background: "#1B3A6B", color: "#fff", border: "2px solid #3CB54A", padding: "8px 18px", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
+              >
+                + Crear empresa
+              </button>
+            </div>
           </div>
 
           {restoreError && (
@@ -268,11 +271,18 @@ export default function SuperAdminDashboard({ stats, companies: initial, archive
                               {c.name}
                             </button>
                           </td>
-                          <td style={{ padding: "12px 16px", fontSize: 13, color: "#374151" }}>{INDUSTRY_LABELS[c.industry] ?? "Otro"}</td>
+                          <td style={{ padding: "12px 16px", fontSize: 13, color: "#374151" }}>{c.industry}</td>
                           <td style={{ padding: "12px 16px" }}>
-                            <span style={{ background: pc.bg, color: pc.fg, padding: "2px 8px", borderRadius: 4, fontSize: 12, fontWeight: 600 }}>
-                              {PLAN_LABELS[c.plan] ?? c.plan}
-                            </span>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
+                              <span style={{ background: pc.bg, color: pc.fg, padding: "2px 8px", borderRadius: 4, fontSize: 12, fontWeight: 600 }}>
+                                {PLAN_LABELS[c.plan] ?? c.plan}
+                              </span>
+                              {c.billingMode === "CHARGED" && c.paymentStatus === "PENDING" && (
+                                <span style={{ background: "#fef3c7", color: "#92400e", padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>
+                                  ⏳ Pago pendiente
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td style={{ padding: "12px 16px", fontSize: 14, color: "#374151", fontWeight: 600 }}>{c.activeUserCount} / {c.maxUsers}</td>
                           <td style={{ padding: "12px 16px", fontSize: 14, color: "#374151" }}>{c.fileCount}</td>
@@ -346,7 +356,7 @@ export default function SuperAdminDashboard({ stats, companies: initial, archive
                               <span style={{ fontSize: 11, background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a", borderRadius: 4, padding: "1px 6px", fontWeight: 600 }}>Archivada</span>
                             </div>
                           </td>
-                          <td style={{ padding: "12px 16px", fontSize: 13, color: "#64748b" }}>{INDUSTRY_LABELS[c.industry] ?? "Otro"}</td>
+                          <td style={{ padding: "12px 16px", fontSize: 13, color: "#64748b" }}>{c.industry}</td>
                           <td style={{ padding: "12px 16px" }}>
                             <span style={{ background: pc.bg, color: pc.fg, padding: "2px 8px", borderRadius: 4, fontSize: 12, fontWeight: 600 }}>
                               {PLAN_LABELS[c.plan] ?? c.plan}

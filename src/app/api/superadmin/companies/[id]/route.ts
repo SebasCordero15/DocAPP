@@ -73,8 +73,8 @@ export async function GET(
 
 const PLAN_LIMITS: Record<string, { maxUsers: number; maxStorageMB: number }> = {
   BASIC:      { maxUsers: 10,  maxStorageMB: 5120   }, // 5 GB
-  PRO:        { maxUsers: 50,  maxStorageMB: 15360  }, // 15 GB
-  ENTERPRISE: { maxUsers: 250, maxStorageMB: 30720  }, // 30 GB
+  PRO:        { maxUsers: 30,  maxStorageMB: 15360  }, // 15 GB
+  ENTERPRISE: { maxUsers: 50,  maxStorageMB: 30720  }, // 30 GB
 };
 
 const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
@@ -86,7 +86,7 @@ const patchSchema = z.object({
   plan: z.enum(["BASIC", "PRO", "ENTERPRISE"]).optional(),
   // Company info
   name: z.string().min(1).max(100).optional(),
-  industry: z.enum(["FARMACIA", "ALIMENTOS", "MATERIALES", "SERVICIOS", "OTRO", "LEGAL", "FINANCE", "HEALTHCARE", "REAL_ESTATE", "TECH", "OTHER"]).optional(),
+  industry: z.string().min(1).max(100).optional(),
   customDomain: z.string().max(200).nullable().optional(),
   // Branding
   primaryColor:   z.string().regex(COLOR_RE).optional(),
@@ -132,7 +132,7 @@ export async function PATCH(
       ...(isActive       !== undefined ? { isActive }         : {}),
       ...(plan           !== undefined ? { plan, maxUsers: newLimits!.maxUsers, maxStorageMB: newLimits!.maxStorageMB } : {}),
       ...(name           !== undefined ? { name }             : {}),
-      ...(industry       !== undefined ? { industry: industry as Parameters<typeof prisma.company.update>[0]["data"]["industry"] } : {}),
+      ...(industry       !== undefined ? { industry }           : {}),
       ...(customDomain   !== undefined ? { customDomain }     : {}),
       ...(primaryColor   !== undefined ? { primaryColor }     : {}),
       ...(secondaryColor !== undefined ? { secondaryColor }   : {}),

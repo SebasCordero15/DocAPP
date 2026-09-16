@@ -22,6 +22,7 @@ export default async function SuperAdminPage() {
       select: {
         id: true, name: true, slug: true, plan: true, maxUsers: true,
         isActive: true, createdAt: true, logoUrl: true, industry: true,
+        billingMode: true, paymentStatus: true,
       },
     }),
     prisma.company.findMany({
@@ -30,6 +31,7 @@ export default async function SuperAdminPage() {
       select: {
         id: true, name: true, slug: true, plan: true, maxUsers: true,
         isActive: true, createdAt: true, logoUrl: true, industry: true, deletedAt: true,
+        billingMode: true, paymentStatus: true,
       },
     }),
     prisma.user.groupBy({

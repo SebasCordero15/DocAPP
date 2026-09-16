@@ -13,6 +13,7 @@ interface WelcomeEmailParams {
   companySlug: string;
   password: string;
   loginUrl: string;
+  maxUsers?: number; // defaults to 10 (BASIC) for callers that don't pass it
 }
 
 export async function sendCompanyWelcomeEmail(
@@ -100,7 +101,7 @@ export async function sendCompanyWelcomeEmail(
 
         ${[
           ["1. Objeto del Servicio", "La plataforma documental tiene como finalidad permitir a las empresas gestionar de forma digital su documentación, facilitando el almacenamiento, consulta, edición, control de acceso y administración de documentos en un entorno seguro y accesible vía web.<br><br>La plataforma ha sido diseñada para apoyar los procesos de gestión documental y facilitar el cumplimiento de los requisitos documentales establecidos por normas ISO aplicables a los sistemas de gestión."],
-          ["2. Alcance de la Suscripción", "La suscripción contratada incluye:<br><br>• Acceso a la plataforma vía web.<br>• Hasta diez (10) usuarios autorizados por empresa.<br>• Almacenamiento y administración de documentos.<br>• Asignación de permisos y niveles de acceso a los usuarios.<br>• Consulta y visualización de la información registrada.<br>• Capacitación inicial para el uso de la plataforma.<br>• Soporte técnico y atención de consultas relacionadas con el funcionamiento del sistema.<br><br>Cualquier ampliación de usuarios o servicios adicionales podrá estar sujeta a costos adicionales."],
+          ["2. Alcance de la Suscripción", `La suscripción contratada incluye:<br><br>• Acceso a la plataforma vía web.<br>• Hasta ${p.maxUsers ?? 10} usuarios autorizados por empresa.<br>• Almacenamiento y administración de documentos.<br>• Asignación de permisos y niveles de acceso a los usuarios.<br>• Consulta y visualización de la información registrada.<br>• Capacitación inicial para el uso de la plataforma.<br>• Soporte técnico y atención de consultas relacionadas con el funcionamiento del sistema.<br><br>Cualquier ampliación de usuarios o servicios adicionales podrá estar sujeta a costos adicionales.`],
           ["3. Pago del Servicio", "El servicio se presta bajo la modalidad de suscripción mensual.<br><br>El cliente autoriza el cobro automático mediante tarjeta de crédito o débito registrada al momento de la contratación. El cobro se realizará el día 1 de cada mes correspondiente al período de servicio.<br><br>La empresa emitirá la respectiva factura electrónica por cada pago recibido, de conformidad con la legislación vigente."],
           ["4. Suspensión por Falta de Pago", "En caso de que el cobro automático no pueda procesarse o el pago mensual no sea recibido en la fecha correspondiente, el acceso a la plataforma podrá ser suspendido automáticamente hasta que se regularice la situación de pago.<br><br>La suspensión del servicio no exime al cliente de las obligaciones económicas pendientes. Una vez confirmado el pago, el acceso será restablecido en un plazo razonable."],
           ["5. Responsabilidades del Cliente", "El cliente se compromete a:<br><br>• Mantener actualizada la información de pago.<br>• Utilizar la plataforma únicamente para fines lícitos y relacionados con su actividad empresarial.<br>• Administrar adecuadamente los permisos de acceso otorgados a sus usuarios.<br>• Mantener la confidencialidad de las credenciales de acceso.<br>• Resguardar la información que considere crítica mediante sus propios mecanismos internos de respaldo.<br>• Contar con conexión a internet adecuada considerando que la plataforma se utiliza vía web."],
@@ -149,6 +150,90 @@ export async function sendCompanyWelcomeEmail(
 
   if (error) {
     console.error("[email] Send failed:", error);
+    return { sent: false, error: "message" in error ? error.message : String(error) };
+  }
+  return { sent: true };
+}
+
+interface PaymentLinkEmailParams {
+  to: string;
+  contactName: string;
+  companyName: string;
+  paymentLink: string;
+}
+
+// Sent instead of the welcome email when a company is created with
+// billingMode = CHARGED. Login credentials are NOT included here — they're
+// generated and sent separately once the superadmin confirms payment
+// (see sendCompanyWelcomeEmail, called from the confirm-payment route).
+export async function sendPaymentLinkEmail(
+  p: PaymentLinkEmailParams
+): Promise<{ sent: boolean; error?: string }> {
+  if (!resend) {
+    console.warn("[email] RESEND_API_KEY not set — skipping payment link email");
+    return { sent: false, error: "RESEND_API_KEY not configured" };
+  }
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Completa tu pago — KE-Control</title></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:'Segoe UI',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:40px 16px;">
+  <tr><td align="center">
+    <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+      <!-- HEADER -->
+      <tr><td style="background:#1B3A6B;border-radius:12px 12px 0 0;padding:36px 40px;text-align:center;">
+        <div style="font-size:28px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">KE-Control</div>
+        <div style="font-size:13px;color:rgba(255,255,255,0.65);margin-top:4px;letter-spacing:1px;text-transform:uppercase;">Plataforma Documental</div>
+        <div style="width:48px;height:3px;background:#3CB54A;margin:18px auto 0;border-radius:2px;"></div>
+      </td></tr>
+
+      <!-- BODY -->
+      <tr><td style="background:#ffffff;padding:40px 40px 32px;border-radius:0 0 12px 12px;">
+        <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#3CB54A;text-transform:uppercase;letter-spacing:1px;">Un paso más</p>
+        <h1 style="margin:0 0 16px;font-size:24px;font-weight:800;color:#1B3A6B;line-height:1.2;">Hola, ${p.contactName}</h1>
+        <p style="margin:0 0 28px;font-size:15px;color:#475569;line-height:1.7;">
+          Tu espacio de trabajo <strong style="color:#1B3A6B;">${p.companyName}</strong> está listo para activarse en KE-Control.
+          Para habilitar el acceso, completa el pago desde el siguiente enlace. Tan pronto se confirme, te enviaremos tus credenciales de acceso por este mismo correo.
+        </p>
+
+        <!-- CTA BUTTON -->
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:12px;">
+          <tr><td align="center">
+            <a href="${p.paymentLink}" style="display:inline-block;background:#3CB54A;color:#ffffff;padding:15px 40px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;letter-spacing:0.3px;">
+              Completar pago →
+            </a>
+          </td></tr>
+        </table>
+        <p style="text-align:center;margin:0;font-size:12px;color:#94a3b8;">${p.paymentLink}</p>
+      </td></tr>
+
+      <!-- FOOTER -->
+      <tr><td style="background:#1B3A6B;border-radius:0 0 12px 12px;padding:28px 40px;text-align:center;">
+        <p style="margin:0 0 6px;font-size:14px;font-weight:700;color:#ffffff;">KE-Control — Plataforma Documental</p>
+        <p style="margin:0 0 16px;font-size:12px;color:rgba(255,255,255,0.55);">
+          Este correo fue generado automáticamente al crear tu espacio de trabajo en la plataforma.<br>
+          Si no esperabas este mensaje, puedes ignorarlo de forma segura.
+        </p>
+        <div style="width:32px;height:2px;background:#3CB54A;margin:0 auto;border-radius:1px;"></div>
+      </td></tr>
+
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>`;
+
+  const { error } = await resend.emails.send({
+    from: FROM,
+    to: p.to,
+    subject: `Completa tu pago para activar ${p.companyName} en KE-Control`,
+    html,
+  });
+
+  if (error) {
+    console.error("[email] Payment link send failed:", error);
     return { sent: false, error: "message" in error ? error.message : String(error) };
   }
   return { sent: true };

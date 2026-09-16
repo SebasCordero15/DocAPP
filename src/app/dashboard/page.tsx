@@ -19,12 +19,12 @@ export default async function DashboardPage() {
         prisma.company.findMany({
           where: { deletedAt: null },
           orderBy: { createdAt: "desc" },
-          select: { id: true, name: true, slug: true, plan: true, maxUsers: true, isActive: true, createdAt: true, logoUrl: true, industry: true },
+          select: { id: true, name: true, slug: true, plan: true, maxUsers: true, isActive: true, createdAt: true, logoUrl: true, industry: true, billingMode: true, paymentStatus: true },
         }),
         prisma.company.findMany({
           where: { deletedAt: { not: null } },
           orderBy: { deletedAt: "desc" },
-          select: { id: true, name: true, slug: true, plan: true, maxUsers: true, isActive: true, createdAt: true, logoUrl: true, industry: true, deletedAt: true },
+          select: { id: true, name: true, slug: true, plan: true, maxUsers: true, isActive: true, createdAt: true, logoUrl: true, industry: true, deletedAt: true, billingMode: true, paymentStatus: true },
         }),
         prisma.user.groupBy({
           by: ["companyId"],

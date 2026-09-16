@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Copy, Check, Pencil, X, Trash2, KeyRound, ImagePlus, ArchiveRestore } from "lucide-react";
 
@@ -48,6 +48,11 @@ interface CompanyData {
   fileCount: number;
   storageBytes: number;
   users: CompanyUser[];
+  billingMode: "FREE" | "CHARGED";
+  paymentStatus: "PENDING" | "PAID" | null;
+  paymentLink: string | null;
+  pendingAdminName: string | null;
+  pendingAdminEmail: string | null;
 }
 
 interface Props {
@@ -88,29 +93,23 @@ const PLAN_COLORS: Record<string, { bg: string; fg: string }> = {
 };
 
 const PLAN_LIMITS: Record<string, { maxUsers: number; maxStorageMB: number }> = {
-  BASIC:      { maxUsers: 10,  maxStorageMB: 5120  },
-  PRO:        { maxUsers: 50,  maxStorageMB: 15360 },
-  ENTERPRISE: { maxUsers: 250, maxStorageMB: 30720 },
+  BASIC:      { maxUsers: 10, maxStorageMB: 5120  },
+  PRO:        { maxUsers: 30, maxStorageMB: 15360 },
+  ENTERPRISE: { maxUsers: 50, maxStorageMB: 30720 },
 };
 
+// EDITOR/VIEWER are the same "regular user" role now — access is driven by
+// per-file/folder permissions, not by this base role.
 const ROLE_COLORS: Record<string, { bg: string; fg: string }> = {
   COMPANY_ADMIN: { bg: "#fef3c7", fg: "#92400e" },
   ADMIN:         { bg: "#fef3c7", fg: "#92400e" },
-  EDITOR:        { bg: "#e0f2fe", fg: "#0369a1" },
-  VIEWER:        { bg: "#f3f4f6", fg: "#374151" },
 };
+const DEFAULT_ROLE_COLOR = { bg: "#e0f2fe", fg: "#0369a1" };
 
 const ROLE_LABELS: Record<string, string> = {
   COMPANY_ADMIN: "Admin", ADMIN: "Admin",
-  EDITOR: "Editor", VIEWER: "Lector",
 };
-
-const INDUSTRY_LABELS: Record<string, string> = {
-  FARMACIA: "Farmacia", ALIMENTOS: "Alimentos", MATERIALES: "Materiales",
-  SERVICIOS: "Servicios", OTRO: "Otro",
-  LEGAL: "Otro", FINANCE: "Otro", HEALTHCARE: "Otro",
-  REAL_ESTATE: "Otro", TECH: "Otro", OTHER: "Otro",
-};
+const DEFAULT_ROLE_LABEL = "Usuario";
 
 // ─── CopyButton ───────────────────────────────────────────────────────────────
 
@@ -252,6 +251,91 @@ function PasswordResetModal({
   );
 }
 
+// ─── PendingPaymentBanner ──────────────────────────────────────────────────────
+// Shown when billingMode = CHARGED and payment hasn't been confirmed yet — no
+// admin user exists for this company until "Confirmar pago" is clicked.
+
+function PendingPaymentBanner({
+  company,
+  onConfirmed,
+}: {
+  company: CompanyData;
+  onConfirmed: (creds: { adminName: string; adminEmail: string; password: string }) => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
+  const [resendMsg, setResendMsg] = useState<string | null>(null);
+
+  async function resendLink() {
+    setResendMsg(null);
+    setResending(true);
+    try {
+      const res = await fetch(`/api/superadmin/companies/${company.id}/resend-payment-link`, { method: "POST" });
+      const d = await res.json();
+      setResendMsg(res.ok && d.sent ? "Link reenviado por correo." : (d.error ?? "No se pudo reenviar (configura RESEND_API_KEY) — comparte el link manualmente."));
+    } catch {
+      setResendMsg("Error de conexión");
+    } finally {
+      setResending(false);
+    }
+  }
+
+  async function confirmPayment() {
+    setError(null);
+    setConfirming(true);
+    try {
+      const res = await fetch(`/api/superadmin/companies/${company.id}/confirm-payment`, { method: "POST" });
+      const d = await res.json();
+      if (!res.ok) {
+        setError(d.error ?? "Error al confirmar el pago");
+      } else {
+        onConfirmed({ adminName: d.adminName, adminEmail: d.adminEmail, password: d.password });
+      }
+    } catch {
+      setError("Error de conexión");
+    } finally {
+      setConfirming(false);
+    }
+  }
+
+  return (
+    <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, padding: "16px 18px", marginBottom: 20 }}>
+      <p style={{ margin: "0 0 6px", fontWeight: 700, fontSize: 14, color: "#92400e" }}>⏳ Pago pendiente</p>
+      <p style={{ margin: "0 0 12px", fontSize: 13, color: "#78350f" }}>
+        Esta empresa se creó en modo &ldquo;se cobra&rdquo; y todavía no tiene acceso — no existe un administrador hasta confirmar el pago.
+        Administrador propuesto: <strong>{company.pendingAdminName}</strong> ({company.pendingAdminEmail}).
+      </p>
+      {company.paymentLink && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+          <code style={{ flex: "1 1 260px", background: "#fff", border: "1px solid #fde68a", borderRadius: 6, padding: "8px 12px", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {company.paymentLink}
+          </code>
+          <CopyButton text={company.paymentLink} label="Copiar link" />
+        </div>
+      )}
+      {error && <p style={{ color: "#dc2626", fontSize: 13, margin: "0 0 10px" }}>{error}</p>}
+      {resendMsg && <p style={{ color: "#78350f", fontSize: 12, margin: "0 0 10px" }}>{resendMsg}</p>}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button
+          onClick={confirmPayment}
+          disabled={confirming}
+          style={{ background: "#16a34a", color: "#fff", border: "none", padding: "9px 18px", borderRadius: 8, cursor: confirming ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 700, opacity: confirming ? 0.6 : 1 }}
+        >
+          {confirming ? "Confirmando…" : "Confirmar pago y crear credenciales"}
+        </button>
+        <button
+          onClick={resendLink}
+          disabled={resending}
+          style={{ background: "#fff", color: "#92400e", border: "1px solid #fde68a", padding: "9px 18px", borderRadius: 8, cursor: resending ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 700, opacity: resending ? 0.6 : 1 }}
+        >
+          {resending ? "Enviando…" : "Reenviar link de pago"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── DeleteModal ──────────────────────────────────────────────────────────────
 
 function DeleteModal({
@@ -366,6 +450,13 @@ function EditCompanyModal({
   const [error,          setError]          = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [industries, setIndustries] = useState<{ id: string; name: string }[]>([]);
+  useEffect(() => {
+    fetch("/api/superadmin/industries")
+      .then((r) => r.json())
+      .then((d) => setIndustries(d.industries ?? []));
+  }, []);
+
   function handleLogoFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -457,11 +548,10 @@ function EditCompanyModal({
           <div>
             <label style={lbl}>Industria</label>
             <select value={industry} onChange={(e) => setIndustry(e.target.value)} style={inp}>
-              <option value="FARMACIA">Farmacia</option>
-              <option value="ALIMENTOS">Alimentos</option>
-              <option value="MATERIALES">Materiales</option>
-              <option value="SERVICIOS">Servicios</option>
-              <option value="OTRO">Otro</option>
+              {!industries.some((i) => i.name === industry) && industry && (
+                <option value={industry}>{industry}</option>
+              )}
+              {industries.map((i) => <option key={i.id} value={i.name}>{i.name}</option>)}
             </select>
           </div>
 
@@ -557,6 +647,7 @@ export default function CompanyDetail({ company: initial, auditLogs }: Props) {
   const [showEdit,   setShowEdit]   = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [resetTarget, setResetTarget] = useState<CompanyUser | null>(null);
+  const [paymentConfirmed, setPaymentConfirmed] = useState<{ adminName: string; adminEmail: string; password: string } | null>(null);
 
   async function restoreCompany() {
     setRestoring(true);
@@ -650,6 +741,32 @@ export default function CompanyDetail({ company: initial, auditLogs }: Props) {
           </div>
         )}
 
+        {/* ── Pending payment banner (CHARGED + PENDING, no admin yet) ── */}
+        {!company.deletedAt && company.billingMode === "CHARGED" && company.paymentStatus === "PENDING" && !paymentConfirmed && (
+          <PendingPaymentBanner
+            company={company}
+            onConfirmed={(creds) => { setPaymentConfirmed(creds); router.refresh(); }}
+          />
+        )}
+
+        {/* ── Payment just confirmed — show the generated password once ── */}
+        {paymentConfirmed && (
+          <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: "16px 18px", marginBottom: 20 }}>
+            <p style={{ margin: "0 0 6px", fontWeight: 700, fontSize: 14, color: "#166534" }}>
+              ✓ Pago confirmado — {paymentConfirmed.adminName} ({paymentConfirmed.adminEmail})
+            </p>
+            <p style={{ margin: "0 0 12px", fontSize: 12, color: "#64748b" }}>
+              Esta contraseña se muestra <strong>una sola vez</strong>. El correo de bienvenida ya fue enviado, pero guárdala por si acaso.
+            </p>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <code style={{ flex: 1, background: "#fff", border: "1px solid #bbf7d0", borderRadius: 7, padding: "10px 14px", fontSize: 16, fontWeight: 700, letterSpacing: 2, color: "#1e293b" }}>
+                {paymentConfirmed.password}
+              </code>
+              <CopyButton text={paymentConfirmed.password} label="Copiar" />
+            </div>
+          </div>
+        )}
+
         {/* ── Company header card ── */}
         <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "24px 28px", marginBottom: 24 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
@@ -673,7 +790,7 @@ export default function CompanyDetail({ company: initial, auditLogs }: Props) {
                   <span style={{ fontSize: 13, color: "#64748b" }}>
                     <code style={{ background: "#f1f5f9", padding: "2px 7px", borderRadius: 4 }}>{company.slug}</code>
                   </span>
-                  <span style={{ fontSize: 13, color: "#64748b" }}>{INDUSTRY_LABELS[company.industry] ?? company.industry}</span>
+                  <span style={{ fontSize: 13, color: "#64748b" }}>{company.industry}</span>
                   {company.customDomain && (
                     <span style={{ fontSize: 13, color: "#64748b" }}>{company.customDomain}</span>
                   )}
@@ -812,7 +929,7 @@ export default function CompanyDetail({ company: initial, auditLogs }: Props) {
                 </thead>
                 <tbody>
                   {company.users.map((u) => {
-                    const rc = ROLE_COLORS[u.role] ?? ROLE_COLORS.VIEWER;
+                    const rc = ROLE_COLORS[u.role] ?? DEFAULT_ROLE_COLOR;
                     return (
                       <tr key={u.id} style={{ borderBottom: "1px solid #f8fafc" }}>
                         <td style={{ padding: "12px 18px", fontWeight: 600, color: u.isActive ? "#1e293b" : "#94a3b8" }}>
@@ -824,7 +941,7 @@ export default function CompanyDetail({ company: initial, auditLogs }: Props) {
                         <td style={{ padding: "12px 18px", fontSize: 13, color: "#64748b" }}>{u.email}</td>
                         <td style={{ padding: "12px 18px" }}>
                           <span style={{ background: rc.bg, color: rc.fg, padding: "2px 8px", borderRadius: 4, fontSize: 12, fontWeight: 600 }}>
-                            {ROLE_LABELS[u.role] ?? u.role}
+                            {ROLE_LABELS[u.role] ?? DEFAULT_ROLE_LABEL}
                           </span>
                         </td>
                         <td style={{ padding: "12px 18px" }}>
