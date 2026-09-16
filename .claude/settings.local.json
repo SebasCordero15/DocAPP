@@ -23,7 +23,8 @@
       "Bash(npx vitest *)",
       "Bash(npx tsx -e ' *)",
       "Bash(npx tsx *)",
-      "Bash(python3 -c ' *)"
+      "Bash(python3 -c ' *)",
+      "Bash(python3 *)"
     ]
   }
 }
