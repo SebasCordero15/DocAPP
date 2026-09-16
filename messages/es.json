@@ -274,7 +274,7 @@
       "entrantes": "Entrantes",
       "salientes": "Salientes"
     },
-    "infoBanner": "Los usuarios con nivel Editor deben solicitar aprobación para subir, editar o eliminar documentos. Revisa cada solicitud y acepta o rechaza con un motivo.",
+    "infoBanner": "Los usuarios sin permiso de Gestión total deben solicitar aprobación para subir, editar o eliminar documentos. Revisa cada solicitud y acepta o rechaza con un motivo.",
     "emptyTitle": "No hay solicitudes pendientes",
     "emptyMsg": "Todas las solicitudes han sido revisadas.",
     "proposedChange": "Cambio propuesto",
@@ -564,7 +564,10 @@
     "confirmSection": "Confirmar y crear",
     "confirmLabels": {
       "nombre": "Nombre",
+      "departamento": "Departamento",
       "tipo": "Tipo",
+      "version": "Versión",
+      "carpeta": "Carpeta",
       "archivo": "Archivo",
       "reviewers": "Cadena de revisores",
       "paso": "Paso"
@@ -574,16 +577,6 @@
     "creating": "Creando documento…",
     "preparingUpload": "Preparando subida…",
     "uploadingFile": "Subiendo archivo…",
-    "confirmLabels": {
-      "nombre": "Nombre",
-      "departamento": "Departamento",
-      "tipo": "Tipo",
-      "version": "Versión",
-      "carpeta": "Carpeta",
-      "archivo": "Archivo",
-      "reviewers": "Cadena de revisores",
-      "paso": "Paso"
-    },
     "noFolder": "Sin carpeta",
     "errors": {
       "prepareError": "Error al preparar la subida",
@@ -670,10 +663,12 @@
     "foldersLabel": "Carpetas",
     "filesLabel": "Archivos",
     "emptyResources": "Sin recursos aún.",
+    "searchFilesPlaceholder": "Buscar por código o nombre…",
+    "noSearchResults": "Sin resultados para esa búsqueda.",
     "selectPrompt": "Selecciona una carpeta o archivo para gestionar sus permisos.",
     "legend": {
       "heading": "Cómo funcionan los permisos:",
-      "body": "Cada usuario tiene un rol base (Editor, Lector, etc.) que aplica en toda la empresa. Puedes darle un acceso distinto solo para este archivo o carpeta desde la columna “Asignar acceso”, lo cual sobrescribe su rol aquí. Elige “Heredar del rol base” para quitar esa excepción."
+      "body": "Solo el Admin tiene acceso completo por defecto. Todos los demás usuarios no tienen acceso a un archivo o carpeta salvo que: lo hayan subido o sean el encargado (reciben edición automáticamente), o el admin les asigne un permiso puntual en la columna “Asignar acceso”. Un permiso asignado en una carpeta se hereda en todo su contenido salvo que definas uno distinto más adentro."
     },
     "cols": {
       "user": "Usuario",
@@ -685,10 +680,14 @@
       "folder": "esta carpeta",
       "file": "este archivo"
     },
+    "roleBadge": {
+      "admin": "Admin",
+      "user": "Usuario"
+    },
     "captions": {
       "direct": "Asignado directamente aquí",
       "folder": "Heredado de la carpeta “{name}”",
-      "role": "Según su rol base"
+      "ownerOrUploader": "Lo subió o es el encargado de este documento"
     },
     "levels": {
       "MANAGE": "Gestión total",
@@ -698,7 +697,7 @@
       "alwaysManage": "Siempre gestión total"
     },
     "options": {
-      "inherit": "— Heredar del rol base",
+      "inherit": "— Sin permiso específico aquí",
       "NONE": "Sin acceso",
       "READ": "Solo lectura",
       "EDIT": "Editar",
@@ -713,18 +712,25 @@
       "resumen": "Resumen",
       "documentos": "Documentos",
       "actividad": "Actividad",
-      "cambios": "Solicitudes de cambio"
+      "cambios": "Historial de cambios",
+      "aprobaciones": "Aprobaciones"
     },
     "clickHint": "Clic para ver el detalle",
     "docFilters": {
       "estado": "Estado",
       "allEstados": "Todos los estados",
       "vencidoOnly": "Solo vencidos",
-      "porRevisarOnly": "Solo por revisar (7 días)",
       "search": "Buscar",
       "searchPlaceholder": "Nombre o código…",
       "clearDrill": "Quitar filtro",
-      "showing": "{count} de {total} documentos"
+      "showing": "{count} de {total} documentos",
+      "horizonte": "Por vencer en",
+      "horizonteOff": "Cualquiera",
+      "horizonte7": "7 días",
+      "horizonte15": "15 días",
+      "horizonte30": "30 días",
+      "horizonte60": "60 días",
+      "horizonte90": "90 días"
     },
     "actFilters": {
       "accion": "Acción",
@@ -762,7 +768,8 @@
       "FILE_REVIEW_UPDATE": "Actualización de revisión",
       "FILE_METADATA_UPDATE": "Edición de metadatos",
       "CHANGE_REQUEST_APPROVED": "Solicitud aprobada",
-      "CHANGE_REQUEST_REJECTED": "Solicitud rechazada"
+      "CHANGE_REQUEST_REJECTED": "Solicitud rechazada",
+      "FILE_OBSOLETE": "Archivado como obsoleto"
     },
     "filters": {
       "from": "Desde",
@@ -793,7 +800,9 @@
     "docStats": {
       "total": "Documentos activos",
       "overdue": "Vencidos",
-      "dueThisWeek": "Por revisar esta semana"
+      "dueThisWeek": "Por revisar esta semana",
+      "pendingApprovals": "Aprobaciones pendientes",
+      "compliance": "Cumplimiento"
     },
     "distributionSection": "Distribución",
     "charts": {
@@ -807,11 +816,11 @@
     "docStatus": {
       "DRAFT": "Borrador",
       "IN_REVIEW": "En revisión",
-      "REVIEWED": "Revisado",
-      "PENDING_APPROVAL": "Esperando admin",
+      "REVIEWED": "Vigente",
+      "PENDING_APPROVAL": "En aprobación",
       "OBSOLETE": "Obsoleto"
     },
-    "detailTitle": "Detalle de solicitudes de cambio",
+    "detailTitle": "Historial de cambios y versiones",
     "records": "registros",
     "empty": "No hay datos para el período seleccionado.",
     "cols": {
@@ -821,8 +830,10 @@
       "codigo": "Código",
       "requestedBy": "Solicitado por",
       "estado": "Estado",
-      "reviewedBy": "Revisado por",
-      "notas": "Notas"
+      "reviewedBy": "Decidido por",
+      "notas": "Notas",
+      "version": "Versión",
+      "motivo": "Motivo"
     },
     "status": {
       "APPROVED": "Aprobado",
@@ -835,7 +846,76 @@
       "REPLACE_FILE": "Reemplazo de archivo",
       "DELETE": "Eliminación",
       "REVISION_DATE_CHANGE": "Cambio de fecha de revisión",
-      "OTHER": "Cambio de documento"
+      "OTHER": "Cambio de documento",
+      "REVIEW_STEP": "Paso de revisión en cadena",
+      "OUT_ACTUALIZACION": "Actualización de versión",
+      "OUT_REVISION": "Revisión aprobada",
+      "OUT_CORRECCION": "Corrección aprobada",
+      "FILE_DELETE": "Eliminación directa",
+      "FILE_OBSOLETE": "Archivado como obsoleto"
+    },
+    "trendSection": "Tendencia mensual",
+    "trendHint": "Últimos 12 meses — compare un mes, trimestre o año contra el anterior.",
+    "trendCols": {
+      "mes": "Mes"
+    },
+    "complianceSection": "Cumplimiento por departamento",
+    "aprSections": {
+      "pendientes": "Pendientes de aprobación",
+      "pendientesHint": "Solicitudes y pasos de revisión esperando una decisión, sin importar la fecha.",
+      "tiempos": "Tiempos de aprobación",
+      "tiemposPorUsuario": "Por persona",
+      "tiemposPorDepartamento": "Por departamento",
+      "historial": "Historial de aprobaciones"
+    },
+    "aprCols": {
+      "documento": "Documento",
+      "codigo": "Código",
+      "tipo": "Tipo",
+      "esperandoDe": "Esperando a",
+      "desde": "Desde",
+      "dias": "Días esperando",
+      "resultado": "Resultado",
+      "decididoPor": "Decidido por",
+      "fecha": "Fecha",
+      "diasQueTomo": "Días que tomó",
+      "casos": "casos",
+      "promedioDias": "Promedio (días)",
+      "adminLabel": "Administrador",
+      "emptyPendientes": "No hay aprobaciones pendientes para estos filtros.",
+      "emptyTiempos": "Sin datos suficientes para calcular tiempos.",
+      "emptyHistorial": "No hay aprobaciones resueltas en este período.",
+      "diasPromedio": "días promedio",
+      "tendenciaTiempos": "Tendencia de tiempos de aprobación",
+      "tendenciaTiemposHint": "Promedio de días entre solicitud y decisión, por mes (últimos 12 meses). Sin línea = sin casos resueltos ese mes.",
+      "sinCasos": "Sin casos",
+      "tendenciaCasosTitle": "Casos resueltos por período",
+      "tendenciaTiemposHintTrimestral": "Promedio de días por trimestre, ponderado según cuántos casos se resolvieron cada trimestre.",
+      "tendenciaTiemposHintAnual": "Promedio de días de los últimos 12 meses, calculado con todos los casos resueltos en ese período."
+    },
+    "resultado": {
+      "APPROVED": "Aprobado",
+      "REJECTED": "Rechazado",
+      "COMPLETED": "Completado"
+    },
+    "complianceHint": "Cumplimiento actual: % de documentos con fecha de revisión vigente hoy (no vencida). No es un promedio histórico — el sistema no guarda un registro de vencimientos pasados todavía.",
+    "comparativo": {
+      "title": "Comparativo vs. mes anterior",
+      "vsAnterior": "vs. mes anterior",
+      "sinDatos": "Aún no hay dos meses con datos para comparar.",
+      "vsAnteriorTrimestre": "vs. trimestre anterior",
+      "anualHint": "Vista de los últimos 12 meses acumulados. Aún no hay un año anterior completo para comparar — esta vista se irá enriqueciendo con más historial con el tiempo.",
+      "sinDatosTrimestre": "Aún no hay dos trimestres con datos para comparar."
+    },
+    "periodRollup": {
+      "quarterly": "Resumen trimestral",
+      "yearly": "Total (últimos 12 meses)",
+      "period": "Período"
+    },
+    "trendView": {
+      "mensual": "Mensual",
+      "trimestral": "Trimestral",
+      "anual": "Anual"
     }
   },
   "team": {
@@ -858,17 +938,14 @@
       "specifyManual": "Especificar contraseña manualmente"
     },
     "roleOptions": {
-      "viewer": "Lector (solo lectura)",
-      "editor": "Editor (puede subir y editar)",
+      "user": "Usuario",
       "admin": "Admin de empresa",
-      "viewerShort": "Lector",
-      "editorShort": "Editor",
+      "userShort": "Usuario",
       "adminShort": "Admin"
     },
     "roleLegend": {
       "adminDesc": "Acceso completo: gestiona usuarios, permisos, carpetas, aprueba solicitudes y ve todos los documentos.",
-      "editorDesc": "Puede subir y editar documentos en carpetas con permiso. Los cambios de metadatos requieren aprobación del Admin.",
-      "viewerDesc": "Solo lectura en las carpetas o archivos que tenga asignados."
+      "userDesc": "Sin acceso a un archivo o carpeta salvo que lo haya subido, sea el encargado, o el admin le asigne un permiso puntual en Permisos."
     },
     "actions": {
       "creating": "Creando…",
@@ -900,8 +977,7 @@
     },
     "roleLabels": {
       "COMPANY_ADMIN": "Admin",
-      "EDITOR": "Editor",
-      "VIEWER": "Lector"
+      "USER": "Usuario"
     },
     "resetModal": {
       "title": "Restablecer contraseña",

@@ -274,7 +274,7 @@
       "entrantes": "Incoming",
       "salientes": "Outgoing"
     },
-    "infoBanner": "Editor-level users must request approval to upload, edit, or delete documents. Review each request and accept or reject with a reason.",
+    "infoBanner": "Users without full-management permission must request approval to upload, edit, or delete documents. Review each request and accept or reject with a reason.",
     "emptyTitle": "No pending requests",
     "emptyMsg": "All requests have been reviewed.",
     "proposedChange": "Proposed change",
@@ -564,7 +564,10 @@
     "confirmSection": "Confirm and create",
     "confirmLabels": {
       "nombre": "Name",
+      "departamento": "Department",
       "tipo": "Type",
+      "version": "Version",
+      "carpeta": "Folder",
       "archivo": "File",
       "reviewers": "Reviewer chain",
       "paso": "Step"
@@ -574,16 +577,6 @@
     "creating": "Creating document…",
     "preparingUpload": "Preparing upload…",
     "uploadingFile": "Uploading file…",
-    "confirmLabels": {
-      "nombre": "Name",
-      "departamento": "Department",
-      "tipo": "Type",
-      "version": "Version",
-      "carpeta": "Folder",
-      "archivo": "File",
-      "reviewers": "Reviewer chain",
-      "paso": "Step"
-    },
     "noFolder": "No folder",
     "errors": {
       "prepareError": "Error preparing the upload",
@@ -670,10 +663,12 @@
     "foldersLabel": "Folders",
     "filesLabel": "Files",
     "emptyResources": "No resources yet.",
+    "searchFilesPlaceholder": "Search by code or name…",
+    "noSearchResults": "No results for that search.",
     "selectPrompt": "Select a folder or file to manage its permissions.",
     "legend": {
       "heading": "How permissions work:",
-      "body": "Each user has a base role (Editor, Viewer, etc.) that applies across the company. You can give them a different access level for just this file or folder using the “Assign access” column, which overrides their role here. Choose “Inherit from base role” to remove that override."
+      "body": "Only the Admin has full access by default. Every other user has no access to a file or folder unless: they uploaded it or are its owner (they get edit access automatically), or the admin assigns them a specific permission in the “Assign access” column. A permission assigned on a folder is inherited by everything inside it unless you set a different one further down."
     },
     "cols": {
       "user": "User",
@@ -685,10 +680,14 @@
       "folder": "this folder",
       "file": "this file"
     },
+    "roleBadge": {
+      "admin": "Admin",
+      "user": "User"
+    },
     "captions": {
       "direct": "Assigned directly here",
       "folder": "Inherited from folder “{name}”",
-      "role": "From their base role"
+      "ownerOrUploader": "They uploaded it or are this document's owner"
     },
     "levels": {
       "MANAGE": "Full management",
@@ -698,7 +697,7 @@
       "alwaysManage": "Always full management"
     },
     "options": {
-      "inherit": "— Inherit from base role",
+      "inherit": "— No specific permission here",
       "NONE": "No access",
       "READ": "Read only",
       "EDIT": "Edit",
@@ -713,18 +712,25 @@
       "resumen": "Summary",
       "documentos": "Documents",
       "actividad": "Activity",
-      "cambios": "Change requests"
+      "cambios": "Change history",
+      "aprobaciones": "Approvals"
     },
     "clickHint": "Click to see the detail",
     "docFilters": {
       "estado": "Status",
       "allEstados": "All statuses",
       "vencidoOnly": "Overdue only",
-      "porRevisarOnly": "Due for review only (7 days)",
       "search": "Search",
       "searchPlaceholder": "Name or code…",
       "clearDrill": "Clear filter",
-      "showing": "{count} of {total} documents"
+      "showing": "{count} of {total} documents",
+      "horizonte": "Due within",
+      "horizonteOff": "Any",
+      "horizonte7": "7 days",
+      "horizonte15": "15 days",
+      "horizonte30": "30 days",
+      "horizonte60": "60 days",
+      "horizonte90": "90 days"
     },
     "actFilters": {
       "accion": "Action",
@@ -762,7 +768,8 @@
       "FILE_REVIEW_UPDATE": "Review update",
       "FILE_METADATA_UPDATE": "Metadata edit",
       "CHANGE_REQUEST_APPROVED": "Request approved",
-      "CHANGE_REQUEST_REJECTED": "Request rejected"
+      "CHANGE_REQUEST_REJECTED": "Request rejected",
+      "FILE_OBSOLETE": "Archived as obsolete"
     },
     "filters": {
       "from": "From",
@@ -793,7 +800,9 @@
     "docStats": {
       "total": "Active documents",
       "overdue": "Overdue",
-      "dueThisWeek": "Due for review this week"
+      "dueThisWeek": "Due for review this week",
+      "pendingApprovals": "Pending approvals",
+      "compliance": "Compliance"
     },
     "distributionSection": "Distribution",
     "charts": {
@@ -807,11 +816,11 @@
     "docStatus": {
       "DRAFT": "Draft",
       "IN_REVIEW": "In review",
-      "REVIEWED": "Reviewed",
-      "PENDING_APPROVAL": "Awaiting admin",
+      "REVIEWED": "Current",
+      "PENDING_APPROVAL": "Awaiting approval",
       "OBSOLETE": "Obsolete"
     },
-    "detailTitle": "Change request details",
+    "detailTitle": "Change and version history",
     "records": "records",
     "empty": "No data for the selected period.",
     "cols": {
@@ -821,8 +830,10 @@
       "codigo": "Code",
       "requestedBy": "Requested by",
       "estado": "Status",
-      "reviewedBy": "Reviewed by",
-      "notas": "Notes"
+      "reviewedBy": "Decided by",
+      "notas": "Notes",
+      "version": "Version",
+      "motivo": "Reason"
     },
     "status": {
       "APPROVED": "Approved",
@@ -835,7 +846,76 @@
       "REPLACE_FILE": "File replacement",
       "DELETE": "Deletion",
       "REVISION_DATE_CHANGE": "Review date change",
-      "OTHER": "Document change"
+      "OTHER": "Document change",
+      "REVIEW_STEP": "Chain review step",
+      "OUT_ACTUALIZACION": "Version update",
+      "OUT_REVISION": "Approved review",
+      "OUT_CORRECCION": "Approved correction",
+      "FILE_DELETE": "Direct deletion",
+      "FILE_OBSOLETE": "Archived as obsolete"
+    },
+    "trendSection": "Monthly trend",
+    "trendHint": "Last 12 months — compare a month, quarter, or year against the previous one.",
+    "trendCols": {
+      "mes": "Month"
+    },
+    "complianceSection": "Compliance by department",
+    "aprSections": {
+      "pendientes": "Pending approvals",
+      "pendientesHint": "Requests and review steps awaiting a decision, regardless of date.",
+      "tiempos": "Approval turnaround",
+      "tiemposPorUsuario": "By person",
+      "tiemposPorDepartamento": "By department",
+      "historial": "Approval history"
+    },
+    "aprCols": {
+      "documento": "Document",
+      "codigo": "Code",
+      "tipo": "Type",
+      "esperandoDe": "Waiting on",
+      "desde": "Since",
+      "dias": "Days waiting",
+      "resultado": "Outcome",
+      "decididoPor": "Decided by",
+      "fecha": "Date",
+      "diasQueTomo": "Days it took",
+      "casos": "cases",
+      "promedioDias": "Average (days)",
+      "adminLabel": "Admin",
+      "emptyPendientes": "No pending approvals for these filters.",
+      "emptyTiempos": "Not enough data to compute turnaround.",
+      "emptyHistorial": "No approvals resolved in this period.",
+      "diasPromedio": "days average",
+      "tendenciaTiempos": "Approval turnaround trend",
+      "tendenciaTiemposHint": "Average days between request and decision, per month (last 12 months). No line = no cases resolved that month.",
+      "sinCasos": "No cases",
+      "tendenciaCasosTitle": "Cases resolved per period",
+      "tendenciaTiemposHintTrimestral": "Average days per quarter, weighted by how many cases were resolved that quarter.",
+      "tendenciaTiemposHintAnual": "Average days over the last 12 months, calculated from every case resolved in that period."
+    },
+    "resultado": {
+      "APPROVED": "Approved",
+      "REJECTED": "Rejected",
+      "COMPLETED": "Completed"
+    },
+    "complianceHint": "Current compliance: % of documents whose review date is still current (not overdue) today. This is not a historical average — the system doesn't keep a log of past overdue periods yet.",
+    "comparativo": {
+      "title": "Compared to last month",
+      "vsAnterior": "vs. last month",
+      "sinDatos": "Not enough months with data to compare yet.",
+      "vsAnteriorTrimestre": "vs. last quarter",
+      "anualHint": "View of the trailing 12 months, totaled. There isn't a full prior year to compare against yet — this view will get richer as more history accumulates.",
+      "sinDatosTrimestre": "Not enough quarters with data to compare yet."
+    },
+    "periodRollup": {
+      "quarterly": "Quarterly summary",
+      "yearly": "Total (last 12 months)",
+      "period": "Period"
+    },
+    "trendView": {
+      "mensual": "Monthly",
+      "trimestral": "Quarterly",
+      "anual": "Yearly"
     }
   },
   "team": {
@@ -858,17 +938,14 @@
       "specifyManual": "Specify password manually"
     },
     "roleOptions": {
-      "viewer": "Viewer (read-only)",
-      "editor": "Editor (can upload and edit)",
+      "user": "User",
       "admin": "Company admin",
-      "viewerShort": "Viewer",
-      "editorShort": "Editor",
+      "userShort": "User",
       "adminShort": "Admin"
     },
     "roleLegend": {
       "adminDesc": "Full access: manages users, permissions, folders, approves requests and sees all documents.",
-      "editorDesc": "Can upload and edit documents in folders with permission. Metadata changes require Admin approval.",
-      "viewerDesc": "Read-only in assigned folders or files."
+      "userDesc": "No access to a file or folder unless they uploaded it, are its owner, or the admin assigns them a specific permission in Permissions."
     },
     "actions": {
       "creating": "Creating…",
@@ -900,8 +977,7 @@
     },
     "roleLabels": {
       "COMPANY_ADMIN": "Admin",
-      "EDITOR": "Editor",
-      "VIEWER": "Viewer"
+      "USER": "User"
     },
     "resetModal": {
       "title": "Reset password",
