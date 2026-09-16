@@ -55,28 +55,31 @@ export async function GET(
     };
   }
 
-  let subfolders: typeof allSubfolders;
-  let serializedFiles: ReturnType<typeof serializeFile>[];
+  let subfolders: (typeof allSubfolders[number] & { canEdit: boolean })[];
+  let serializedFiles: (ReturnType<typeof serializeFile> & { canEdit: boolean })[];
+  let folderCanEdit: boolean;
 
   if (isAdmin) {
-    subfolders = allSubfolders;
-    serializedFiles = allFiles.map(serializeFile);
+    subfolders = allSubfolders.map((f) => ({ ...f, canEdit: true }));
+    serializedFiles = allFiles.map((f) => ({ ...serializeFile(f), canEdit: true }));
+    folderCanEdit = true;
   } else {
     const results = await Promise.all([
       Promise.all(
         allSubfolders.map(async (f) => {
           const lvl = await resolveFolderAccess(session.userId, companyId, session.role, f.id);
-          return atLeast(lvl, "READ") ? f : null;
+          return atLeast(lvl, "READ") ? { ...f, canEdit: atLeast(lvl, "EDIT") } : null;
         })
-      ).then((r) => r.filter((x): x is (typeof allSubfolders)[number] => x !== null)),
+      ).then((r) => r.filter((x): x is (typeof allSubfolders)[number] & { canEdit: boolean } => x !== null)),
       Promise.all(
         allFiles.map(async (f) => {
           const lvl = await resolveFileAccess(session.userId, companyId, session.role, f.id);
-          return atLeast(lvl, "READ") ? serializeFile(f) : null;
+          return atLeast(lvl, "READ") ? { ...serializeFile(f), canEdit: atLeast(lvl, "EDIT") } : null;
         })
-      ).then((r) => r.filter((x): x is ReturnType<typeof serializeFile> => x !== null)),
+      ).then((r) => r.filter((x): x is ReturnType<typeof serializeFile> & { canEdit: boolean } => x !== null)),
     ]);
     [subfolders, serializedFiles] = results;
+    folderCanEdit = atLeast(level, "EDIT");
   }
 
   // Walk up the tree to build breadcrumb.
@@ -91,7 +94,7 @@ export async function GET(
     });
   }
 
-  return NextResponse.json({ folder, subfolders, files: serializedFiles, breadcrumb });
+  return NextResponse.json({ folder: { ...folder, canEdit: folderCanEdit }, subfolders, files: serializedFiles, breadcrumb });
 }
 
 const patchSchema = z.object({
@@ -100,7 +103,7 @@ const patchSchema = z.object({
   isExternal: z.boolean().optional(),
 });
 
-// PATCH /api/folders/[id] — rename or move (requires MANAGE on this folder).
+// PATCH /api/folders/[id] — rename or move (requires EDIT on this folder).
 export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -111,8 +114,6 @@ export async function PATCH(
 
   const companyId = session.companyId;
 
-  if (session.role === "VIEWER") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
   const folder = await prisma.folder.findFirst({
     where: { id: params.id, companyId, deletedAt: null },
   });
@@ -120,7 +121,7 @@ export async function PATCH(
 
   const level = await resolveFolderAccess(session.userId, companyId, session.role, folder.id);
   if (level === "NONE") return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (!atLeast(level, "MANAGE")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!atLeast(level, "EDIT")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json().catch(() => null);
   const parsed = patchSchema.safeParse(body);
@@ -171,7 +172,7 @@ export async function PATCH(
   return NextResponse.json({ folder: updated });
 }
 
-// DELETE /api/folders/[id] — soft delete / move to trash (requires MANAGE).
+// DELETE /api/folders/[id] — soft delete / move to trash (requires EDIT).
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: { id: string } }
@@ -182,8 +183,6 @@ export async function DELETE(
 
   const companyId = session.companyId;
 
-  if (session.role === "VIEWER") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
   const folder = await prisma.folder.findFirst({
     where: { id: params.id, companyId, deletedAt: null },
   });
@@ -191,7 +190,7 @@ export async function DELETE(
 
   const level = await resolveFolderAccess(session.userId, companyId, session.role, folder.id);
   if (level === "NONE") return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (!atLeast(level, "MANAGE")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!atLeast(level, "EDIT")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   await prisma.folder.update({
     where: { id: folder.id },

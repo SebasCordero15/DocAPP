@@ -19,18 +19,20 @@ export async function GET() {
     select: { id: true, name: true, parentId: true, isExternal: true },
   });
 
-  // Filter folders by user permissions
-  let visibleFolders: typeof allFolders;
+  // Filter folders by user permissions, carrying along whether they may
+  // upload into each one (Externos writes directly, no review chain, so
+  // this still requires real EDIT permission on that specific folder).
+  let visibleFolders: (typeof allFolders[number] & { canEdit: boolean })[];
   if (isAdmin) {
-    visibleFolders = allFolders;
+    visibleFolders = allFolders.map((f) => ({ ...f, canEdit: true }));
   } else {
     const results = await Promise.all(
       allFolders.map(async (f) => {
         const lvl = await resolveFolderAccess(userId, companyId, role, f.id);
-        return atLeast(lvl, "READ") ? f : null;
+        return atLeast(lvl, "READ") ? { ...f, canEdit: atLeast(lvl, "EDIT") } : null;
       })
     );
-    visibleFolders = results.filter((f): f is (typeof allFolders)[number] => f !== null);
+    visibleFolders = results.filter((f): f is (typeof allFolders)[number] & { canEdit: boolean } => f !== null);
   }
 
   const visibleFolderIds = visibleFolders.map((f) => f.id);

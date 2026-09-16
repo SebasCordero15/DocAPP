@@ -14,6 +14,7 @@ interface ExternalFolder {
   name: string;
   parentId?: string | null;
   isExternal?: boolean;
+  canEdit?: boolean;
 }
 
 interface ExternalFile {
@@ -51,7 +52,6 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
   const tc = useTranslations("common");
   const brand   = company.primaryColor;
   const isAdmin = userRole === "COMPANY_ADMIN";
-  const canEdit = userRole === "COMPANY_ADMIN" || userRole === "EDITOR";
 
   const TIPOS = [
     { value: "PROCEDIMIENTO", label: t("tipos.PROCEDIMIENTO") },
@@ -65,13 +65,14 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
   const [rootFolders, setRootFolders]   = useState<ExternalFolder[]>([]);
   const [loading, setLoading]           = useState(true);
 
-  const [navStack, setNavStack]         = useState<{ id: string; name: string }[]>([]);
+  const [navStack, setNavStack]         = useState<{ id: string; name: string; canEdit: boolean }[]>([]);
   const [currentSubfolders, setCurrentSubfolders] = useState<ExternalFolder[]>([]);
   const [currentFiles, setCurrentFiles] = useState<ExternalFile[]>([]);
   const [navLoading, setNavLoading]     = useState(false);
 
   const currentFolderId   = navStack.length > 0 ? navStack[navStack.length - 1].id : null;
   const currentFolderName = navStack.length > 0 ? navStack[navStack.length - 1].name : "";
+  const currentFolderCanEdit = navStack.length > 0 ? navStack[navStack.length - 1].canEdit : false;
 
   const [renamingId, setRenamingId]     = useState<string | null>(null);
   const [renameValue, setRenameValue]   = useState("");
@@ -129,12 +130,12 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
 
   function selectRoot(folder: ExternalFolder) {
     if (renamingId) return;
-    setNavStack([{ id: folder.id, name: folder.name }]);
+    setNavStack([{ id: folder.id, name: folder.name, canEdit: folder.canEdit ?? false }]);
     fetchFolder(folder.id);
   }
 
   function navigateInto(folder: ExternalFolder) {
-    setNavStack(prev => [...prev, { id: folder.id, name: folder.name }]);
+    setNavStack(prev => [...prev, { id: folder.id, name: folder.name, canEdit: folder.canEdit ?? false }]);
     fetchFolder(folder.id);
   }
 
@@ -172,8 +173,8 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
         });
         if (!res.ok) throw new Error(t("errors.createFolder"));
         const { folder } = await res.json();
-        setRootFolders(prev => [...prev, folder]);
-        setNavStack([{ id: folder.id, name: folder.name }]);
+        setRootFolders(prev => [...prev, { ...folder, canEdit: true }]);
+        setNavStack([{ id: folder.id, name: folder.name, canEdit: true }]);
         fetchFolder(folder.id);
       } else {
         const res = await fetch("/api/folders", {
@@ -182,7 +183,7 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
         });
         if (!res.ok) throw new Error(t("errors.createFolder"));
         const { folder } = await res.json();
-        setCurrentSubfolders(prev => [...prev, folder]);
+        setCurrentSubfolders(prev => [...prev, { ...folder, canEdit: true }]);
       }
       setNewFolderName("");
       setShowNewFolder(false);
@@ -408,7 +409,7 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
               <FolderPlus size={14} /> {t("newSubfolder")}
             </button>
           )}
-          {currentFolderId && canEdit && (
+          {currentFolderId && currentFolderCanEdit && (
             <button onClick={openUpload}
               style={{ display: "flex", alignItems: "center", gap: 6, background: brand, color: "#fff", border: "none", padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
               <Upload size={14} /> {t("uploadBtn")}
@@ -565,7 +566,7 @@ export default function ExternosClient({ company, userRole, currentUserId }: Pro
                   <div style={{ textAlign: "center", padding: "48px 20px", color: "#aaa" }}>
                     <FileText size={36} strokeWidth={1} style={{ marginBottom: 12 }} />
                     <p style={{ margin: 0, fontSize: 14 }}>{t("emptyFolder")}</p>
-                    {canEdit && (
+                    {currentFolderCanEdit && (
                       <button onClick={openUpload}
                         style={{ marginTop: 14, background: brand, color: "#fff", border: "none", padding: "8px 18px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
                         {t("uploadFirst")}

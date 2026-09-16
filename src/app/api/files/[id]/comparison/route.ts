@@ -42,7 +42,6 @@ export async function POST(
 ) {
   const session = await requireActiveSession();
   if (!session || !session.companyId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (session.role === "VIEWER") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const file = await prisma.file.findFirst({
     where: { id: params.id, companyId: session.companyId, deletedAt: null },
@@ -77,7 +76,6 @@ export async function PATCH(
 ) {
   const session = await requireActiveSession();
   if (!session || !session.companyId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (session.role === "VIEWER") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const file = await prisma.file.findFirst({
     where: { id: params.id, companyId: session.companyId, deletedAt: null },

@@ -46,8 +46,6 @@ export async function PATCH(
   if (!session.companyId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const companyId = session.companyId;
 
-  if (session.role === "VIEWER") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
   const file = await prisma.file.findFirst({
     where: { id: params.id, companyId, deletedAt: null },
   });
@@ -222,8 +220,6 @@ export async function DELETE(
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!session.companyId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const companyId = session.companyId;
-
-  if (session.role === "VIEWER") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const file = await prisma.file.findFirst({
     where: { id: params.id, companyId, deletedAt: null },

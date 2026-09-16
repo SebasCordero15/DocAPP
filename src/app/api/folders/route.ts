@@ -46,23 +46,28 @@ export async function GET() {
   }
 
   if (isAdmin) {
-    return NextResponse.json({ folders: allFolders, files: allFiles.map(serializeFile) });
+    return NextResponse.json({
+      folders: allFolders.map((f) => ({ ...f, canEdit: true })),
+      files: allFiles.map((f) => ({ ...serializeFile(f), canEdit: true })),
+    });
   }
 
-  // Non-admins: filter each item by their effective permission.
+  // Non-admins: filter each item by their effective permission, and carry
+  // along whether they may edit it so the UI can show the right controls
+  // per-item instead of guessing from role.
   const [folders, files] = await Promise.all([
     Promise.all(
       allFolders.map(async (f) => {
         const lvl = await resolveFolderAccess(session.userId, companyId, session.role, f.id);
-        return atLeast(lvl, "READ") ? f : null;
+        return atLeast(lvl, "READ") ? { ...f, canEdit: atLeast(lvl, "EDIT") } : null;
       })
-    ).then((r) => r.filter(Boolean)),
+    ).then((r) => r.filter((x): x is NonNullable<typeof x> => x !== null)),
     Promise.all(
       allFiles.map(async (f) => {
         const lvl = await resolveFileAccess(session.userId, companyId, session.role, f.id);
-        return atLeast(lvl, "READ") ? serializeFile(f) : null;
+        return atLeast(lvl, "READ") ? { ...serializeFile(f), canEdit: atLeast(lvl, "EDIT") } : null;
       })
-    ).then((r) => r.filter(Boolean)),
+    ).then((r) => r.filter((x): x is NonNullable<typeof x> => x !== null)),
   ]);
 
   return NextResponse.json({ folders, files });
@@ -81,8 +86,6 @@ export async function POST(req: NextRequest) {
   if (!session.companyId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const companyId = session.companyId;
-
-  if (session.role === "VIEWER") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json().catch(() => null);
   const parsed = createSchema.safeParse(body);

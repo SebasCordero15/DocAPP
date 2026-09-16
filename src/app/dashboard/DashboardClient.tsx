@@ -6,14 +6,14 @@ import { useTranslations } from "next-intl";
 import {
   Bell, Search, LayoutGrid, List as ListIcon, ChevronLeft, ChevronRight,
   LogOut, Files, Users, Shield, ClipboardList, ScrollText, Plus, Eye,
-  Download, Pencil, Trash2, CheckCircle, Calendar, X, FolderOpen, ClipboardCheck, Inbox, Clock,
+  Download, Pencil, Trash2, Calendar, X, FolderOpen, ClipboardCheck, Inbox, Clock,
   History, FilePlus, BarChart2, UserCheck, Archive, Paperclip, Loader2,
 } from "lucide-react";
 import FileIcon from "@/components/FileIcon";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface FolderItem { id: string; name: string; isExternal: boolean; createdAt: string; }
+interface FolderItem { id: string; name: string; isExternal: boolean; createdAt: string; canEdit?: boolean; }
 
 interface FileItem {
   id: string; name: string; mimeType: string; size: number; createdAt: string;
@@ -22,6 +22,7 @@ interface FileItem {
   status?: string | null; uploadedByUserId?: string | null;
   nombreDocumento?: string | null; codigo?: string | null;
   comparisonStorageKey?: string | null; comparisonName?: string | null;
+  canEdit?: boolean;
 }
 
 interface Notification {
@@ -54,18 +55,6 @@ const WORD_TYPES = new Set([
 function isWord(m: string) { return WORD_TYPES.has(m); }
 function isViewable(m: string) { return m === "application/pdf" || isSpreadsheet(m) || isWord(m); }
 
-function dueDateColor(iso: string): string {
-  const d = (new Date(iso).getTime() - Date.now()) / 86_400_000;
-  return d < 0 ? "#dc2626" : d <= 1 ? "#dc2626" : d <= 7 ? "#d97706" : "#16a34a";
-}
-function dueDateLabel(iso: string): string {
-  const d = (new Date(iso).getTime() - Date.now()) / 86_400_000;
-  const fmt = (d: Date) => d.toLocaleDateString('es-CR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  if (d < 0) return `Overdue (${fmt(new Date(iso))})`;
-  if (d < 1) return "Due today";
-  if (d < 2) return "Due tomorrow";
-  return `Due ${fmt(new Date(iso))}`;
-}
 function timeAgo(iso: string): string {
   const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
   if (m < 1) return "just now";
@@ -90,7 +79,6 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
   const brand = company.primaryColor;
   const accent = company.accentColor;
   const font = company.fontFamily;
-  const canEdit = userRole === "COMPANY_ADMIN" || userRole === "EDITOR";
   const isAdmin = userRole === "COMPANY_ADMIN";
 
   // ── existing state ──────────────────────────────────────────────────────────
@@ -99,6 +87,9 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
   const [subfolders, setSubfolders] = useState<FolderItem[]>([]);
   const [files, setFiles] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(true);
+  // Whether the user can edit the folder currently being viewed (root always
+  // requires admin; inside a folder it's whatever /api/folders/[id] resolved).
+  const [currentFolderCanEdit, setCurrentFolderCanEdit] = useState(false);
 
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
@@ -174,13 +165,15 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
         setSubfolders(data.subfolders ?? []);
         setFiles(data.files ?? []);
         setBreadcrumb(data.breadcrumb ?? []);
+        setCurrentFolderCanEdit(data.folder?.canEdit ?? false);
       } else {
         setSubfolders(data.folders ?? []);
         setFiles(data.files ?? []);
         setBreadcrumb([]);
+        setCurrentFolderCanEdit(isAdmin);
       }
     } finally { setLoading(false); }
-  }, []);
+  }, [isAdmin]);
 
   const fetchNotifications = useCallback(async () => {
     const res = await fetch("/api/notifications");
@@ -360,15 +353,6 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
     setSavingReview(false);
   }
 
-  async function completeReview(file: FileItem) {
-    const res = await fetch(`/api/files/${file.id}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ completeReview: true }),
-    });
-    if (res.ok) fetchContents(folderId);
-    else alert("Failed to complete review");
-  }
-
   async function openPeerReviewModal(file: FileItem) {
     setPeerReviewFile(file);
     setPeerReviewAssignee("");
@@ -518,8 +502,6 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
 
   const pendingTotal = pendingCounts.enRevision + pendingCounts.atrasadas;
   const hasAnyPending = pendingTotal > 0 || myPendingCR > 0 || (isAdmin && pendingCRCount > 0);
-
-  const canCreate = userRole === "COMPANY_ADMIN" || userRole === "EDITOR";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden", minWidth: 0 }}>
@@ -811,7 +793,7 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
           {/* ── Action bar ── */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {canEdit && (
+              {currentFolderCanEdit && (
                 <>
                   <button
                     onClick={() => { setShowNewFolder(!showNewFolder); setRenamingId(null); }}
@@ -870,7 +852,7 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                 <>
                   <FolderOpen size={48} color="#cbd5e1" />
                   <p style={{ margin: "16px 0 6px", fontSize: 16, fontWeight: 600, color: "#64748b" }}>{t("emptyFolder")}</p>
-                  {canEdit && <p style={{ margin: 0, fontSize: 13 }}>{t("emptyFolderHint")}</p>}
+                  {currentFolderCanEdit && <p style={{ margin: 0, fontSize: 13 }}>{t("emptyFolderHint")}</p>}
                 </>
               )}
             </div>
@@ -898,10 +880,10 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                         <FileIcon isFolder size={18} />
                         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
                       </span>
-                      {canEdit && (
+                      {f.canEdit && (
                         <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                           <button className="ghost-btn" onClick={() => { setRenamingId(f.id); setRenameValue(f.name); }} style={ghostBtnStyle} title="Rename"><Pencil size={13} /></button>
-                          {isAdmin && <button className="danger-btn" onClick={() => deleteFolder(f.id, f.name)} style={dangerBtnStyle} title="Trash"><Trash2 size={13} /></button>}
+                          <button className="danger-btn" onClick={() => deleteFolder(f.id, f.name)} style={dangerBtnStyle} title="Trash"><Trash2 size={13} /></button>
                         </div>
                       )}
                     </>
@@ -928,11 +910,8 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                         <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 2 }}>
                           {f.nombreDocumento && <span style={{ fontSize: 11, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>}
                           <span style={{ fontSize: 12, color: "#94a3b8" }}>{fmtSize(f.size)}</span>
-                          {f.reviewDueDate && (
-                            <span style={{ fontSize: 11, color: dueDateColor(f.reviewDueDate), fontWeight: 600 }}>
-                              {dueDateLabel(f.reviewDueDate)}
-                              {f.assignedToName && <span style={{ color: "#94a3b8", fontWeight: 400 }}> · {f.assignedToName}</span>}
-                            </span>
+                          {f.reviewDueDate && f.assignedToName && (
+                            <span style={{ fontSize: 11, color: "#94a3b8" }}>{f.assignedToName}</span>
                           )}
                         </div>
                       </div>
@@ -944,18 +923,15 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                         </button>
                       )}
                       <button className="ghost-btn" onClick={() => downloadFile(f.id)} style={ghostBtnStyle} title="Descargar"><Download size={13} /></button>
-                      {isAdmin && f.reviewDueDate && (
-                        <button className="ghost-btn" onClick={() => completeReview(f)} style={{ ...ghostBtnStyle, color: "#16a34a", borderColor: "#bbf7d0" }} title="Marcar revisión completa"><CheckCircle size={13} /></button>
-                      )}
-                      {(isAdmin || canEdit) && f.comparisonStorageKey ? (
+                      {f.comparisonStorageKey ? (
                         <button className="ghost-btn" onClick={() => viewComparison(f.id)} style={{ ...ghostBtnStyle, color: "#15803d", borderColor: "#bbf7d0" }} title="Ver documento comparativo"><Paperclip size={13} /></button>
-                      ) : canEdit ? (
+                      ) : f.canEdit ? (
                         <button className="ghost-btn" onClick={() => { setCompModalFile(f); setCompPickedFile(null); setCompError(null); }} style={ghostBtnStyle} title="Adjuntar comparativa"><Paperclip size={13} /></button>
                       ) : null}
                       {isAdmin && f.status === "REVIEWED" && (
                         <button className="ghost-btn" onClick={() => markObsolete(f)} style={{ ...ghostBtnStyle, color: "#92400e", borderColor: "#fde68a" }} title="Archivar como obsoleto"><Archive size={13} /></button>
                       )}
-                      {isAdmin && <button className="danger-btn" onClick={() => deleteFile(f.id, f.nombreDocumento || f.name)} style={dangerBtnStyle} title="Trash"><Trash2 size={13} /></button>}
+                      {f.canEdit && <button className="danger-btn" onClick={() => deleteFile(f.id, f.nombreDocumento || f.name)} style={dangerBtnStyle} title="Trash"><Trash2 size={13} /></button>}
                     </div>
                   </div>
 
@@ -1042,10 +1018,10 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                           ) : (
                             <span style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", width: "100%", whiteSpace: "nowrap" }}>{f.name}</span>
                           )}
-                          {canEdit && !isRenaming && (
+                          {f.canEdit && !isRenaming && (
                             <div style={{ position: "absolute", top: 8, right: 8, display: "flex", gap: 4 }} onClick={(e) => e.stopPropagation()}>
                               <button className="ghost-btn" onClick={() => { setRenamingId(f.id); setRenameValue(f.name); }} style={{ ...ghostBtnStyle, padding: "3px 5px" }}><Pencil size={11} /></button>
-                              {isAdmin && <button className="danger-btn" onClick={() => deleteFolder(f.id, f.name)} style={{ ...dangerBtnStyle, padding: "3px 5px" }}><Trash2 size={11} /></button>}
+                              <button className="danger-btn" onClick={() => deleteFolder(f.id, f.name)} style={{ ...dangerBtnStyle, padding: "3px 5px" }}><Trash2 size={11} /></button>
                             </div>
                           )}
                         </div>
@@ -1066,12 +1042,7 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                         onMouseLeave={() => setHoveredItemId(null)}
                         style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "20px 14px 14px", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, boxShadow: "0 1px 3px rgba(0,0,0,0.05)", position: "relative", minHeight: 140 }}
                       >
-                        {f.reviewDueDate && (
-                          <span style={{ position: "absolute", top: 8, left: 10, fontSize: 10, fontWeight: 700, color: dueDateColor(f.reviewDueDate), background: `${dueDateColor(f.reviewDueDate)}18`, padding: "1px 6px", borderRadius: 4 }}>
-                            {dueDateLabel(f.reviewDueDate)}
-                          </span>
-                        )}
-                        <div style={{ marginTop: f.reviewDueDate ? 12 : 0 }}>
+                        <div>
                           <FileIcon mimeType={f.mimeType} size={36} />
                         </div>
                         <span style={{ fontSize: 12, fontWeight: 600, color: "#1e293b", textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", width: "100%", whiteSpace: "nowrap" }}>{f.nombreDocumento || f.name}</span>
@@ -1087,7 +1058,7 @@ export default function DashboardClient({ company, userRole, activeUserCount, ma
                           <div className="fade-up" style={{ position: "absolute", bottom: 8, left: 8, right: 8, display: "flex", gap: 4, justifyContent: "center" }} onClick={(e) => e.stopPropagation()}>
                             {isViewable(f.mimeType) && <button className="ghost-btn" onClick={() => openPreview(f)} style={{ ...ghostBtnStyle, fontSize: 11, padding: "3px 7px" }}><Eye size={12} /> Ver</button>}
                             <button className="ghost-btn" onClick={() => downloadFile(f.id)} style={{ ...ghostBtnStyle, padding: "3px 6px" }}><Download size={12} /></button>
-                            {isAdmin && <button className="danger-btn" onClick={() => deleteFile(f.id, f.nombreDocumento || f.name)} style={{ ...dangerBtnStyle, padding: "3px 6px" }}><Trash2 size={12} /></button>}
+                            {f.canEdit && <button className="danger-btn" onClick={() => deleteFile(f.id, f.nombreDocumento || f.name)} style={{ ...dangerBtnStyle, padding: "3px 6px" }}><Trash2 size={12} /></button>}
                           </div>
                         )}
                       </div>

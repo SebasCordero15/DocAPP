@@ -36,7 +36,6 @@ export default function DashboardShellClient({
   const brand    = company.primaryColor;
   const font     = company.fontFamily;
   const isAdmin  = userRole === "COMPANY_ADMIN";
-  const canCreate = userRole === "COMPANY_ADMIN" || userRole === "EDITOR";
 
   function switchLocale() {
     const next = locale === "es" ? "en" : "es";
@@ -148,9 +147,7 @@ export default function DashboardShellClient({
     { label: t("nav.listado"),        icon: <ClipboardList size={18} />,  href: "/dashboard/listado-maestro",    badge: 0 },
     { label: t("nav.pendientes"),     icon: <ClipboardCheck size={18} />, href: "/dashboard/pendientes",         badge: pendingTotal },
     { label: t("nav.controlCambios"), icon: <History size={18} />,        href: "/dashboard/control-cambios",    badge: 0 },
-    ...(canCreate ? [
-      { label: t("nav.crearDoc"),       icon: <FilePlus size={18} />,    href: "/dashboard/crear-documento",    badge: 0 },
-    ] : []),
+    { label: t("nav.crearDoc"),       icon: <FilePlus size={18} />,    href: "/dashboard/crear-documento",    badge: 0 },
     ...(!isAdmin ? [
       { label: t("nav.solicitarCambio"), icon: <FileEdit size={18} />,   href: "/dashboard/solicitar-cambio",   badge: 0 },
       { label: t("nav.eliminarDoc"),     icon: <Trash2 size={18} />,     href: "/dashboard/eliminar-documento", badge: 0 },

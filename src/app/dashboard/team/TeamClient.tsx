@@ -6,7 +6,15 @@ import { Copy, Check, KeyRound, Pencil, X, UserPlus } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+// EDITOR/VIEWER are stored identically in the DB going forward — the app no
+// longer distinguishes them. Access is entirely driven by per-file/folder
+// permissions (see /dashboard/permissions), not by this base role.
 type Role = "COMPANY_ADMIN" | "EDITOR" | "VIEWER";
+type SelectableRole = "COMPANY_ADMIN" | "EDITOR";
+
+function normalizeRole(role: Role): SelectableRole {
+  return role === "COMPANY_ADMIN" ? "COMPANY_ADMIN" : "EDITOR";
+}
 
 interface TeamUser {
   id: string;
@@ -41,11 +49,13 @@ function generateStrongPassword(length = 14): string {
   return pw.split("").sort(() => Math.random() - 0.5).join("");
 }
 
-const ROLE_COLORS: Record<Role, { bg: string; fg: string }> = {
+const ROLE_COLORS: Record<SelectableRole, { bg: string; fg: string }> = {
   COMPANY_ADMIN: { bg: "#fef3c7", fg: "#92400e" },
   EDITOR:        { bg: "#e0f2fe", fg: "#0369a1" },
-  VIEWER:        { bg: "#f3f4f6", fg: "#374151" },
 };
+function roleColor(role: Role) {
+  return ROLE_COLORS[normalizeRole(role)];
+}
 
 
 // ─── CopyButton ───────────────────────────────────────────────────────────────
@@ -180,7 +190,7 @@ function EditUserModal({ user, onSave, onClose }: { user: TeamUser; onSave: (u: 
   const t  = useTranslations("team");
   const tc = useTranslations("common");
   const [name,  setName]  = useState(user.name);
-  const [role,  setRole]  = useState<Role>(user.role);
+  const [role,  setRole]  = useState<SelectableRole>(normalizeRole(user.role));
   const [saving, setSaving] = useState(false);
   const [error, setError]  = useState<string | null>(null);
 
@@ -192,7 +202,7 @@ function EditUserModal({ user, onSave, onClose }: { user: TeamUser; onSave: (u: 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...(name !== user.name ? { name } : {}),
-        ...(role !== user.role ? { role } : {}),
+        ...(role !== normalizeRole(user.role) ? { role } : {}),
       }),
     });
     const d = await res.json();
@@ -226,9 +236,8 @@ function EditUserModal({ user, onSave, onClose }: { user: TeamUser; onSave: (u: 
         </div>
         <div style={{ marginBottom: 20 }}>
           <label style={lbl}>{t("labels.baseRole")}</label>
-          <select value={role} onChange={(e) => setRole(e.target.value as Role)} style={inp}>
-            <option value="VIEWER">{t("roleOptions.viewer")}</option>
-            <option value="EDITOR">{t("roleOptions.editor")}</option>
+          <select value={role} onChange={(e) => setRole(e.target.value as SelectableRole)} style={inp}>
+            <option value="EDITOR">{t("roleOptions.user")}</option>
             <option value="COMPANY_ADMIN">{t("roleOptions.admin")}</option>
           </select>
         </div>
@@ -253,11 +262,13 @@ export default function TeamClient({ currentUserId, company }: Props) {
   const tc = useTranslations("common");
   const brand = company.primaryColor;
 
-  const ROLE_LABELS: Record<Role, string> = {
+  const ROLE_LABELS: Record<SelectableRole, string> = {
     COMPANY_ADMIN: t("roleLabels.COMPANY_ADMIN"),
-    EDITOR:        t("roleLabels.EDITOR"),
-    VIEWER:        t("roleLabels.VIEWER"),
+    EDITOR:        t("roleLabels.USER"),
   };
+  function roleLabel(role: Role): string {
+    return ROLE_LABELS[normalizeRole(role)];
+  }
 
   function fmtTimeAgo(iso: string): string {
     const diff = Date.now() - new Date(iso).getTime();
@@ -281,7 +292,7 @@ export default function TeamClient({ currentUserId, company }: Props) {
   // Create-user form (admin assigns the password; a welcome email is sent automatically)
   const [dcName,     setDcName]     = useState("");
   const [dcEmail,    setDcEmail]    = useState("");
-  const [dcRole,     setDcRole]     = useState<Role>("VIEWER");
+  const [dcRole,     setDcRole]     = useState<SelectableRole>("EDITOR");
   const [dcPassword, setDcPassword] = useState("");
   const [dcShowPw,   setDcShowPw]   = useState(false);
   const [dcSaving,   setDcSaving]   = useState(false);
@@ -351,7 +362,7 @@ export default function TeamClient({ currentUserId, company }: Props) {
       setDcResult({ password: d.password, user: d.user, emailSent: d.emailSent });
       setDcName("");
       setDcEmail("");
-      setDcRole("VIEWER");
+      setDcRole("EDITOR");
       setDcPassword("");
       await load();
     }
@@ -420,9 +431,8 @@ export default function TeamClient({ currentUserId, company }: Props) {
                 </div>
                 <div>
                   <label style={lbl}>{t("labels.role")}</label>
-                  <select value={dcRole} onChange={(e) => setDcRole(e.target.value as Role)} style={inp}>
-                    <option value="VIEWER">{t("roleOptions.viewer")}</option>
-                    <option value="EDITOR">{t("roleOptions.editor")}</option>
+                  <select value={dcRole} onChange={(e) => setDcRole(e.target.value as SelectableRole)} style={inp}>
+                    <option value="EDITOR">{t("roleOptions.user")}</option>
                     <option value="COMPANY_ADMIN">{t("roleOptions.admin")}</option>
                   </select>
                 </div>
@@ -473,9 +483,8 @@ export default function TeamClient({ currentUserId, company }: Props) {
         {/* ── Leyenda de roles ── */}
         <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "16px 24px", marginBottom: 20, display: "flex", gap: 20, flexWrap: "wrap", alignItems: "flex-start" }}>
           {([
-            { role: "COMPANY_ADMIN" as Role, desc: t("roleLegend.adminDesc") },
-            { role: "EDITOR" as Role,        desc: t("roleLegend.editorDesc") },
-            { role: "VIEWER" as Role,        desc: t("roleLegend.viewerDesc") },
+            { role: "COMPANY_ADMIN" as SelectableRole, desc: t("roleLegend.adminDesc") },
+            { role: "EDITOR" as SelectableRole,         desc: t("roleLegend.userDesc") },
           ] as const).map(({ role, desc }) => {
             const rc = ROLE_COLORS[role];
             return (
@@ -512,7 +521,7 @@ export default function TeamClient({ currentUserId, company }: Props) {
                     const isSelf = u.id === currentUserId;
                     const busy   = mutating[u.id] ?? false;
                     const err    = mutateError[u.id] ?? "";
-                    const rc     = ROLE_COLORS[u.role] ?? ROLE_COLORS.VIEWER;
+                    const rc     = roleColor(u.role);
                     return (
                       <tr key={u.id} style={{ borderBottom: "1px solid #f8fafc", opacity: u.isActive ? 1 : 0.6 }}>
                         <td style={{ padding: "12px 18px", fontWeight: 600, color: "#1e293b", whiteSpace: "nowrap" }}>
@@ -523,16 +532,15 @@ export default function TeamClient({ currentUserId, company }: Props) {
                         <td style={{ padding: "12px 18px", fontSize: 13, color: "#64748b" }}>{u.email}</td>
                         <td style={{ padding: "12px 18px" }}>
                           {isSelf ? (
-                            <span style={{ background: rc.bg, color: rc.fg, padding: "3px 8px", borderRadius: 4, fontSize: 12, fontWeight: 600 }}>{ROLE_LABELS[u.role]}</span>
+                            <span style={{ background: rc.bg, color: rc.fg, padding: "3px 8px", borderRadius: 4, fontSize: 12, fontWeight: 600 }}>{roleLabel(u.role)}</span>
                           ) : (
                             <select
-                              value={u.role}
+                              value={normalizeRole(u.role)}
                               disabled={busy}
                               onChange={(e) => patchUser(u.id, { role: e.target.value as Role })}
                               style={{ background: rc.bg, color: rc.fg, border: "1px solid transparent", borderRadius: 4, fontSize: 12, fontWeight: 600, padding: "3px 6px", cursor: "pointer" }}
                             >
-                              <option value="VIEWER">{t("roleOptions.viewerShort")}</option>
-                              <option value="EDITOR">{t("roleOptions.editorShort")}</option>
+                              <option value="EDITOR">{t("roleOptions.userShort")}</option>
                               <option value="COMPANY_ADMIN">{t("roleOptions.adminShort")}</option>
                             </select>
                           )}

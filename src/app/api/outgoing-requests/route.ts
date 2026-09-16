@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
   // Check assignees are valid active company users
   const assignees = await prisma.user.findMany({
     where: { id: { in: assigneeIds }, companyId, isActive: true },
-    select: { id: true, name: true },
+    select: { id: true, name: true, role: true },
   });
   if (assignees.length !== assigneeIds.length) {
     return NextResponse.json({ error: "Uno o más asignados no son válidos" }, { status: 400 });
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
   // Check edit permissions per assignee — warn but don't block
   const permissionWarnings: { userId: string; name: string; currentLevel: string }[] = [];
   for (const a of orderedAssignees) {
-    const level = await resolveFileAccess(a.id, companyId, "EDITOR", fileId);
+    const level = await resolveFileAccess(a.id, companyId, a.role, fileId);
     if (!atLeast(level, "EDIT")) {
       permissionWarnings.push({ userId: a.id, name: a.name, currentLevel: level });
     }

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { requireActiveSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { resolveFolderAccess, atLeast } from "@/lib/permissions";
 import { logAction } from "@/lib/audit";
 import { downloadBytes } from "@/lib/storage";
 import { isSpreadsheet, parsePreview } from "@/lib/parseSpreadsheet";
@@ -51,9 +52,6 @@ export async function POST(req: NextRequest) {
   if (!session || !session.companyId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (session.role === "VIEWER") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
 
   const { companyId, userId } = session;
 
@@ -79,6 +77,16 @@ export async function POST(req: NextRequest) {
     });
     if (!folder) return NextResponse.json({ error: "Carpeta no encontrada" }, { status: 404 });
     isExternalFolder = folder.isExternal;
+  }
+
+  // External folders write the file directly with no review chain, so — unlike
+  // the normal request-a-review flow, which any company user may start — this
+  // still requires EDIT permission on that specific external folder.
+  if (isExternalFolder) {
+    const level = await resolveFolderAccess(userId, companyId, session.role, folderId!);
+    if (!atLeast(level, "EDIT")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
   }
 
   // Validate reviewers (required unless external folder)

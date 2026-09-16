@@ -6,7 +6,6 @@ import CrearDocumentoClient from "./CrearDocumentoClient";
 export default async function CrearDocumentoPage() {
   const session = await getSession();
   if (!session || !session.companyId) redirect("/login");
-  if (session.role === "VIEWER") redirect("/dashboard");
 
   const [company, folders, users] = await Promise.all([
     prisma.company.findUnique({

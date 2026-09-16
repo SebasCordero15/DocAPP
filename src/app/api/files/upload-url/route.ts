@@ -10,6 +10,10 @@ const schema = z.object({
   name: z.string().min(1).max(500),
   mimeType: z.string().min(1),
   size: z.number().int().positive().max(100 * 1024 * 1024), // 100 MB cap
+  // Set by Crear Documento: the file goes into a review chain rather than
+  // being written directly, so any company user may submit it regardless
+  // of their permission on the destination folder.
+  forReview: z.boolean().optional().default(false),
 });
 
 // POST /api/files/upload-url
@@ -25,7 +29,7 @@ export async function POST(req: NextRequest) {
   const parsed = schema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
-  const { folderId, name, mimeType, size } = parsed.data;
+  const { folderId, name, mimeType, size, forReview } = parsed.data;
 
   // Enforce storage quota
   const [company, storageStats] = await Promise.all([
@@ -48,12 +52,10 @@ export async function POST(req: NextRequest) {
     if (!folder) return NextResponse.json({ error: "Folder not found" }, { status: 404 });
   }
 
-  if (folderId) {
+  if (folderId && !forReview) {
     const level = await resolveFolderAccess(session.userId, companyId, session.role, folderId);
     if (level === "NONE") return NextResponse.json({ error: "Folder not found" }, { status: 404 });
     if (!atLeast(level, "EDIT")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  } else if (session.role === "VIEWER") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const storageKey = makeStorageKey(companyId, folderId ?? null, name);

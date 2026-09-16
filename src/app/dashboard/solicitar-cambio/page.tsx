@@ -8,7 +8,6 @@ export default async function SolicitarCambioPage() {
   const session = await requireActiveSession();
   if (!session) redirect("/login");
   if (isAdminRole(session.role)) redirect("/dashboard");
-  if (session.role === "VIEWER") redirect("/dashboard");
 
   const company = await prisma.company.findUnique({
     where: { id: session.companyId! },

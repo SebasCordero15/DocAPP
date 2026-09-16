@@ -19,7 +19,7 @@ export async function GET() {
     }),
     prisma.file.findMany({
       where: { companyId: session.companyId!, deletedAt: null },
-      select: { id: true, name: true, folderId: true, mimeType: true },
+      select: { id: true, name: true, folderId: true, mimeType: true, codigo: true, nombreDocumento: true },
       orderBy: { createdAt: "asc" },
     }),
   ]);

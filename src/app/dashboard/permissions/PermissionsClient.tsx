@@ -19,6 +19,8 @@ interface FileFlat {
   name: string;
   folderId: string | null;
   mimeType: string;
+  codigo: string | null;
+  nombreDocumento: string | null;
 }
 
 interface FolderNode extends FolderFlat {
@@ -139,7 +141,9 @@ function accessCaption(entry: PermEntry, t: (key: string, values?: Record<string
   if (entry.user.role === "COMPANY_ADMIN") return null;
   if (entry.source === "direct") return t("captions.direct");
   if (entry.source.startsWith("folder:")) return t("captions.folder", { name: entry.source.replace(/^folder:/, "") });
-  if (entry.source === "none" && entry.effective !== "NONE") return t("captions.role");
+  // The only way to reach non-NONE effective access with no explicit permission
+  // and no folder inheritance is the automatic uploader/encargado grant.
+  if (entry.source === "none" && entry.effective !== "NONE") return t("captions.ownerOrUploader");
   return null;
 }
 
@@ -159,6 +163,8 @@ export default function PermissionsClient({ company }: Props) {
   const [loadingEntries, setLoadingEntries] = useState(false);
   const [saving, setSaving] = useState<string | null>(null); // userId being saved
   const [permTab, setPermTab] = useState<"normal" | "external">("normal");
+  const [resourceView, setResourceView] = useState<"folders" | "files">("folders");
+  const [fileSearch, setFileSearch] = useState("");
 
   // ── fetch resource list on mount ─────────────────────────────────────────────
 
@@ -223,7 +229,15 @@ export default function PermissionsClient({ company }: Props) {
   const normalFiles   = files.filter((f) => !f.folderId || !externalFolderIds.has(f.folderId));
   const externalFiles = files.filter((f) => f.folderId && externalFolderIds.has(f.folderId));
   const activeFiles   = permTab === "normal" ? normalFiles : externalFiles;
-  const rootFiles     = activeFiles.filter((f) => f.folderId === null);
+
+  // Search by código/nombre only applies to normal documents, not Externos.
+  const q = fileSearch.trim().toLowerCase();
+  const visibleFiles = permTab === "normal" && q
+    ? activeFiles.filter((f) =>
+        (f.nombreDocumento ?? f.name).toLowerCase().includes(q) ||
+        (f.codigo ?? "").toLowerCase().includes(q)
+      )
+    : activeFiles;
 
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "#f5f7fa" }}>
@@ -249,7 +263,7 @@ export default function PermissionsClient({ company }: Props) {
             {(["normal", "external"] as const).map((tab) => (
               <button
                 key={tab}
-                onClick={() => { setPermTab(tab); setSelected(null); }}
+                onClick={() => { setPermTab(tab); setSelected(null); setResourceView("folders"); setFileSearch(""); }}
                 style={{
                   flex: 1, padding: "10px 6px", border: "none", background: "transparent",
                   cursor: "pointer", fontSize: 12, fontWeight: permTab === tab ? 700 : 400,
@@ -263,73 +277,103 @@ export default function PermissionsClient({ company }: Props) {
             ))}
           </div>
 
-          <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
-            <p style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
-              {t("foldersLabel")}
-            </p>
+          {/* Resource-type toggle: folders and files are shown one at a time */}
+          <div style={{ display: "flex", gap: 6, padding: "10px 12px 0", flexShrink: 0 }}>
+            {(["folders", "files"] as const).map((view) => (
+              <button
+                key={view}
+                onClick={() => setResourceView(view)}
+                style={{
+                  flex: 1, padding: "6px 8px", borderRadius: 6, cursor: "pointer",
+                  fontSize: 12, fontWeight: 700,
+                  border: `1px solid ${resourceView === view ? brand : "#e2e8f0"}`,
+                  background: resourceView === view ? brand : "#fff",
+                  color: resourceView === view ? "#fff" : "#64748b",
+                }}
+              >
+                {view === "folders" ? t("foldersLabel") : t("filesLabel")}
+              </button>
+            ))}
+          </div>
 
+          {/* Search by código/nombre — only for normal documents, not Externos */}
+          {resourceView === "files" && permTab === "normal" && (
+            <div style={{ padding: "10px 12px 0", flexShrink: 0 }}>
+              <input
+                type="text"
+                value={fileSearch}
+                onChange={(e) => setFileSearch(e.target.value)}
+                placeholder={t("searchFilesPlaceholder")}
+                style={{
+                  width: "100%", boxSizing: "border-box", padding: "7px 10px",
+                  border: "1px solid #e2e8f0", borderRadius: 6, fontSize: 13, outline: "none",
+                }}
+              />
+            </div>
+          )}
+
+          <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
             {loadingResources ? (
               <p style={{ fontSize: 13, color: "#aaa" }}>{tc("loading")}</p>
-            ) : tree.length === 0 && rootFiles.length === 0 ? (
-              <p style={{ fontSize: 13, color: "#aaa" }}>{t("emptyResources")}</p>
+            ) : resourceView === "folders" ? (
+              tree.length === 0 ? (
+                <p style={{ fontSize: 13, color: "#aaa" }}>{t("emptyResources")}</p>
+              ) : (
+                <FolderTree
+                  nodes={tree}
+                  selected={selected}
+                  onSelect={selectResource}
+                  brand={brand}
+                />
+              )
+            ) : visibleFiles.length === 0 ? (
+              <p style={{ fontSize: 13, color: "#aaa" }}>{q ? t("noSearchResults") : t("emptyResources")}</p>
             ) : (
-              <FolderTree
-                nodes={tree}
-                selected={selected}
-                onSelect={selectResource}
-                brand={brand}
-              />
-            )}
-
-            {activeFiles.length > 0 && (
-              <>
-                <p
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: "#999",
-                    textTransform: "uppercase",
-                    letterSpacing: 1,
-                    marginTop: 14,
-                    marginBottom: 6,
-                  }}
-                >
-                  {t("filesLabel")}
-                </p>
-                {activeFiles.map((file) => {
-                  const isSelected = selected?.type === "file" && selected.id === file.id;
-                  return (
-                    <div
-                      key={file.id}
-                      onClick={() =>
-                        selectResource({ type: "file", id: file.id, name: file.name })
-                      }
+              visibleFiles.map((file) => {
+                const isSelected = selected?.type === "file" && selected.id === file.id;
+                return (
+                  <div
+                    key={file.id}
+                    onClick={() =>
+                      selectResource({ type: "file", id: file.id, name: file.nombreDocumento ?? file.name })
+                    }
+                    style={{
+                      padding: "6px 10px",
+                      cursor: "pointer",
+                      borderRadius: 6,
+                      background: isSelected ? brand : "transparent",
+                      color: isSelected ? "#fff" : "#333",
+                      fontSize: 13,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <FileIcon mimeType={file.mimeType} size={15} />
+                    <span
                       style={{
-                        padding: "6px 10px",
-                        cursor: "pointer",
-                        borderRadius: 6,
-                        background: isSelected ? brand : "transparent",
-                        color: isSelected ? "#fff" : "#333",
-                        fontSize: 13,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        flex: 1,
+                        minWidth: 0,
                       }}
                     >
-                      <FileIcon mimeType={file.mimeType} size={15} />
-                      <span
-                        style={{
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {file.name}
+                      {file.nombreDocumento ?? file.name}
+                    </span>
+                    {file.codigo && (
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, flexShrink: 0,
+                        background: isSelected ? "rgba(255,255,255,0.25)" : "#e0f2fe",
+                        color: isSelected ? "#fff" : "#0369a1",
+                        borderRadius: 4, padding: "1px 5px",
+                      }}>
+                        {file.codigo}
                       </span>
-                    </div>
-                  );
-                })}
-              </>
+                    )}
+                  </div>
+                );
+              })
             )}
           </div>
         </aside>
@@ -428,21 +472,11 @@ export default function PermissionsClient({ company }: Props) {
                                 fontWeight: 700,
                                 padding: "2px 7px",
                                 borderRadius: 4,
-                                background:
-                                  entry.user.role === "COMPANY_ADMIN"
-                                    ? "#faf5ff"
-                                    : entry.user.role === "EDITOR"
-                                    ? "#eff6ff"
-                                    : "#f0fdf4",
-                                color:
-                                  entry.user.role === "COMPANY_ADMIN"
-                                    ? "#7c3aed"
-                                    : entry.user.role === "EDITOR"
-                                    ? "#1d4ed8"
-                                    : "#15803d",
+                                background: isAdmin ? "#faf5ff" : "#eff6ff",
+                                color: isAdmin ? "#7c3aed" : "#1d4ed8",
                               }}
                             >
-                              {entry.user.role}
+                              {isAdmin ? t("roleBadge.admin") : t("roleBadge.user")}
                             </span>
                           </td>
 

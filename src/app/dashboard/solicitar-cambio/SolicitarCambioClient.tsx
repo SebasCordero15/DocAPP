@@ -75,7 +75,7 @@ export default function SolicitarCambioClient({ company }: Props) {
       const urlRes = await fetch("/api/change-requests/proposal-upload-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: proposalFile.name, mimeType: proposalFile.type || "application/octet-stream", size: proposalFile.size }),
+        body: JSON.stringify({ fileId: selected.id, name: proposalFile.name, mimeType: proposalFile.type || "application/octet-stream", size: proposalFile.size }),
       });
       if (!urlRes.ok) {
         const d = await urlRes.json().catch(() => ({}));
