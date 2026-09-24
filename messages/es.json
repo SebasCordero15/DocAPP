@@ -1249,5 +1249,18 @@
       "carpeta": "Carpeta",
       "archivo": "Archivo"
     }
+  },
+  "home": {
+    "eyebrow": "Plataforma Documental",
+    "headline": "Gestión documental profesional para tu empresa",
+    "subtitle": "Almacená, controlá y aprobá tus documentos de forma segura, con accesos por equipo y trazabilidad completa.",
+    "feature1Title": "Multiempresa y permisos",
+    "feature1Desc": "Cada empresa cuenta con su propio espacio, con roles y accesos configurables por usuario.",
+    "feature2Title": "Aprobaciones y control de cambios",
+    "feature2Desc": "Flujos de revisión, historial unificado y auditoría completa de cada documento.",
+    "feature3Title": "Seguro y confiable",
+    "feature3Desc": "Almacenamiento cifrado y respaldado, con control total sobre quién accede a qué.",
+    "cta": "Iniciar sesión",
+    "footer": "KE-Control · Gestión Documental Confiable"
   }
 }

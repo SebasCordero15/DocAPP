@@ -1249,5 +1249,18 @@
       "carpeta": "Folder",
       "archivo": "File"
     }
+  },
+  "home": {
+    "eyebrow": "Document Platform",
+    "headline": "Professional document management for your company",
+    "subtitle": "Store, control, and approve your documents securely, with team-based access and full traceability.",
+    "feature1Title": "Multi-company & permissions",
+    "feature1Desc": "Each company gets its own workspace, with roles and access configurable per user.",
+    "feature2Title": "Approvals & change control",
+    "feature2Desc": "Review workflows, unified history, and full audit trail for every document.",
+    "feature3Title": "Secure & reliable",
+    "feature3Desc": "Encrypted, backed-up storage with full control over who accesses what.",
+    "cta": "Sign in",
+    "footer": "KE-Control · Reliable Document Management"
   }
 }
