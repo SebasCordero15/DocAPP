@@ -71,14 +71,14 @@ export default function Home() {
         }}>
           <div style={{
             background: "#fff",
-            padding: "40px 40px 24px",
+            padding: "36px 32px 22px",
             textAlign: "center",
             borderBottom: `3px solid ${GREEN}`,
           }}>
             <img
               src="/ke-control-logo.png"
               alt="KE-Control"
-              style={{ width: 220, height: "auto", display: "block", margin: "0 auto" }}
+              style={{ width: "100%", maxWidth: 380, height: "auto", display: "block", margin: "0 auto" }}
             />
           </div>
 
