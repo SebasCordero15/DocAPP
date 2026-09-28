@@ -84,7 +84,7 @@ export default function Home() {
 
           <div style={{ background: NAVY, padding: "40px 40px 36px", textAlign: "center" }}>
             <p style={{
-              margin: "0 0 10px", color: "#fff", fontSize: 22, fontWeight: 700,
+              margin: "0 0 10px", color: "#fff", fontSize: 19, fontWeight: 700,
               textTransform: "uppercase", letterSpacing: 1.5,
             }}>
               {t("eyebrow")}
