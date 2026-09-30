@@ -54,8 +54,6 @@ function generateStrongPassword(length = 14): string {
   return pw.split("").sort(() => Math.random() - 0.5).join("");
 }
 
-const FONTS = ["Inter", "Roboto", "Lato", "Montserrat", "Merriweather", "Playfair Display"];
-
 const PLANS: { value: Plan; label: string; maxUsers: number }[] = [
   { value: "BASIC",      label: "Basic",      maxUsers: 10 },
   { value: "PRO",        label: "Pro",        maxUsers: 30 },
@@ -126,7 +124,7 @@ function BrandingPreview({ d }: { d: WizardData }) {
             {d.logoPreview && (
               <img src={d.logoPreview} alt="" style={{ width: 24, height: 24, objectFit: "contain", borderRadius: 3, background: "#fff" }} />
             )}
-            <strong style={{ fontFamily: d.fontFamily }}>{name} · KE-Control</strong>
+            <strong>{name} · KE-Control</strong>
           </div>
           <span style={{ fontSize: 11, opacity: 0.75 }}>COMPANY_ADMIN</span>
         </div>
@@ -147,7 +145,7 @@ function BrandingPreview({ d }: { d: WizardData }) {
           {["Contracts", "Reports", "Templates"].map((f) => (
             <div key={f} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 7, padding: "8px 12px", display: "flex", alignItems: "center", gap: 8 }}>
               <FileIcon isFolder size={16} />
-              <span style={{ fontWeight: 600, color: d.secondaryColor, fontFamily: d.fontFamily }}>{f}</span>
+              <span style={{ fontWeight: 600, color: d.secondaryColor }}>{f}</span>
             </div>
           ))}
         </div>
@@ -159,11 +157,6 @@ function BrandingPreview({ d }: { d: WizardData }) {
           </span>
         </div>
       </div>
-
-      {/* Font sample */}
-      <p style={{ marginTop: 14, fontSize: 12, color: "#64748b" }}>
-        Fuente: <span style={{ fontFamily: d.fontFamily, fontWeight: 600 }}>{d.fontFamily} — Aa Bb Cc 123</span>
-      </p>
     </div>
   );
 }
@@ -350,7 +343,7 @@ export default function CompanyWizard() {
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 36 }}>
+      <div style={{ display: "grid", gridTemplateColumns: step === 1 ? "1fr" : "1fr 380px", gap: 36 }}>
 
         {/* ── Left: form ── */}
         <div>
@@ -463,13 +456,6 @@ export default function CompanyWizard() {
                     </div>
                   </label>
                 ))}
-
-                <label style={s.label}>
-                  Fuente tipográfica
-                  <select style={{ ...s.select, marginTop: 4 }} value={data.fontFamily} onChange={(e) => set("fontFamily", e.target.value)}>
-                    {FONTS.map((f) => <option key={f} value={f}>{f}</option>)}
-                  </select>
-                </label>
               </div>
 
               <label style={{ ...s.label, marginTop: 8 }}>
@@ -603,7 +589,6 @@ export default function CompanyWizard() {
                     ))}
                   </div>
                 </div>
-                <div style={s.row}><span style={s.rowLabel}>Fuente</span><span style={{ fontFamily: data.fontFamily }}>{data.fontFamily}</span></div>
                 {data.logoPreview && (
                   <div style={s.row}><span style={s.rowLabel}>Logo</span><img src={data.logoPreview} alt="logo" style={{ height: 24, width: 24, objectFit: "contain" }} /></div>
                 )}
@@ -624,10 +609,12 @@ export default function CompanyWizard() {
 
         </div>
 
-        {/* ── Right: live preview ── */}
-        <div style={{ alignSelf: "start", position: "sticky", top: 24 }}>
-          <BrandingPreview d={data} />
-        </div>
+        {/* ── Right: live preview (from step 2 onward, once branding exists) ── */}
+        {step !== 1 && (
+          <div style={{ alignSelf: "start", position: "sticky", top: 24 }}>
+            <BrandingPreview d={data} />
+          </div>
+        )}
 
       </div>
 
