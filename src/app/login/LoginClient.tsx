@@ -12,19 +12,23 @@ export default function LoginClient() {
   const [password, setPassword] = useState("");
   const [error, setError]       = useState("");
   const [loading, setLoading]   = useState(false);
+  const [companies, setCompanies] = useState<{ id: string; name: string }[] | null>(null);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
+  async function doLogin(companyId?: string) {
     setError("");
     setLoading(true);
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, ...(companyId ? { companyId } : {}) }),
       });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok && d.needsCompanySelection) {
+        setCompanies(d.companies);
+        return;
+      }
       if (res.ok) {
-        const d = await res.json().catch(() => ({}));
         if (d.role === "SUPER_ADMIN") {
           window.location.href = "/superadmin";
         } else if (d.forcePasswordChange) {
@@ -33,12 +37,16 @@ export default function LoginClient() {
           window.location.href = "/dashboard";
         }
       } else {
-        const d = await res.json().catch(() => ({}));
         setError(d.error ?? t("invalidCredentials"));
       }
     } finally {
       setLoading(false);
     }
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    await doLogin();
   }
 
   return (
@@ -94,34 +102,61 @@ export default function LoginClient() {
             </p>
           </div>
 
-          {/* ── Form ── */}
-          <form onSubmit={submit} style={{ padding: "26px 28px 28px", background: "#fff" }}>
-            <label style={ls}>{t("email")}</label>
-            <input
-              className="login-input"
-              style={is} type="email" value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder={t("emailPlaceholder")} required autoFocus
-            />
+          {/* ── Form, or company picker when the email has several workspaces ── */}
+          {companies ? (
+            <div style={{ padding: "26px 28px 28px", background: "#fff" }}>
+              <p style={{ fontSize: 13, color: "#374151", margin: "0 0 14px", fontWeight: 600 }}>
+                Tu correo tiene acceso a varias empresas. Elegí una:
+              </p>
+              {companies.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  disabled={loading}
+                  onClick={() => doLogin(c.id)}
+                  className="login-btn"
+                  style={{ ...btn, background: "#fff", color: NAVY, marginTop: 8, textAlign: "left" }}
+                >
+                  {c.name}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => { setCompanies(null); setError(""); }}
+                style={{ marginTop: 14, background: "none", border: "none", color: "#64748b", fontSize: 12, cursor: "pointer", textDecoration: "underline" }}
+              >
+                ← Volver
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={submit} style={{ padding: "26px 28px 28px", background: "#fff" }}>
+              <label style={ls}>{t("email")}</label>
+              <input
+                className="login-input"
+                style={is} type="email" value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder={t("emailPlaceholder")} required autoFocus
+              />
 
-            <label style={{ ...ls, marginTop: 16 }}>{t("password")}</label>
-            <input
-              className="login-input"
-              style={is} type="password" value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+              <label style={{ ...ls, marginTop: 16 }}>{t("password")}</label>
+              <input
+                className="login-input"
+                style={is} type="password" value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
 
-            {error && (
-              <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "10px 14px", marginTop: 14 }}>
-                <p style={{ color: "#dc2626", fontSize: 13, margin: 0 }}>{error}</p>
-              </div>
-            )}
+              {error && (
+                <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "10px 14px", marginTop: 14 }}>
+                  <p style={{ color: "#dc2626", fontSize: 13, margin: 0 }}>{error}</p>
+                </div>
+              )}
 
-            <button type="submit" disabled={loading} className="login-btn" style={btn}>
-              {loading ? t("signingIn") : t("signIn")}
-            </button>
-          </form>
+              <button type="submit" disabled={loading} className="login-btn" style={btn}>
+                {loading ? t("signingIn") : t("signIn")}
+              </button>
+            </form>
+          )}
         </div>
 
         {/* Footer */}

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, Check, Pencil, X, Trash2, KeyRound, ImagePlus, ArchiveRestore } from "lucide-react";
+import { Copy, Check, Pencil, X, Trash2, KeyRound, ImagePlus, ArchiveRestore, UserPlus } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -251,6 +251,163 @@ function PasswordResetModal({
   );
 }
 
+// ─── AddUserModal ───────────────────────────────────────────────────────────────
+// Lets the super admin add a user (typically COMPANY_ADMIN) directly to a
+// company, without going through that company's own admin invite flow.
+const MAX_ADMINS_PER_COMPANY = 5;
+
+function generateStrongPassword(length = 14): string {
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lower = "abcdefghijkmnpqrstuvwxyz";
+  const digits = "23456789";
+  const all = upper + lower + digits;
+  const pick = (set: string) => set[Math.floor(Math.random() * set.length)];
+  let pw = pick(upper) + pick(lower) + pick(digits);
+  for (let i = pw.length; i < length; i++) pw += pick(all);
+  return pw.split("").sort(() => Math.random() - 0.5).join("");
+}
+
+function AddUserModal({
+  companyId,
+  adminCount,
+  onClose,
+  onCreated,
+}: {
+  companyId: string;
+  adminCount: number;
+  onClose: () => void;
+  onCreated: (user: CompanyUser) => void;
+}) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<"COMPANY_ADMIN" | "EDITOR" | "VIEWER">("COMPANY_ADMIN");
+  const [password, setPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{ password: string; emailSent: boolean } | null>(null);
+
+  const adminLimitReached = role === "COMPANY_ADMIN" && adminCount >= MAX_ADMINS_PER_COMPANY;
+
+  async function submit() {
+    setError(null);
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/superadmin/companies/${companyId}/users`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, role, password }),
+      });
+      const d = await res.json();
+      if (!res.ok) {
+        setError(d.error ?? "Error al crear el usuario");
+      } else {
+        setResult({ password: d.password, emailSent: d.emailSent });
+        onCreated(d.user);
+      }
+    } catch {
+      setError("Error de conexión");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div style={overlay}>
+      <div style={modal}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <UserPlus size={18} color="#2563eb" />
+            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>Agregar usuario</h3>
+          </div>
+          <button onClick={onClose} style={iconBtn}><X size={18} /></button>
+        </div>
+
+        {!result ? (
+          <>
+            <div style={{ marginBottom: 14 }}>
+              <label style={lbl}>Nombre completo</label>
+              <input style={inp} value={name} onChange={(e) => setName(e.target.value)} placeholder="María López" />
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={lbl}>Correo electrónico</label>
+              <input type="email" style={inp} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@empresa.com" />
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={lbl}>Rol</label>
+              <select style={inp} value={role} onChange={(e) => setRole(e.target.value as typeof role)}>
+                <option value="COMPANY_ADMIN">Administrador de empresa</option>
+                <option value="EDITOR">Usuario (editor)</option>
+                <option value="VIEWER">Usuario (lector)</option>
+              </select>
+              {role === "COMPANY_ADMIN" && (
+                <p style={{ fontSize: 11, color: adminLimitReached ? "#dc2626" : "#94a3b8", margin: "4px 0 0" }}>
+                  Administradores actuales: {adminCount} / {MAX_ADMINS_PER_COMPANY}
+                </p>
+              )}
+            </div>
+
+            <div style={{ marginBottom: 6 }}>
+              <label style={lbl}>Contraseña</label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  type={showPw ? "text" : "password"}
+                  style={{ ...inp, flex: 1 }}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Mín. 8 · mayúscula · minúscula · número"
+                />
+                <button type="button" onClick={() => setShowPw((v) => !v)} style={{ ...cancelBtn, fontSize: 12 }}>
+                  {showPw ? "Ocultar" : "Ver"}
+                </button>
+                <button type="button" onClick={() => { setPassword(generateStrongPassword()); setShowPw(true); }} style={{ ...actionBtn, fontSize: 12, padding: "8px 14px" }}>
+                  Generar
+                </button>
+              </div>
+            </div>
+
+            {error && <p style={{ color: "#dc2626", fontSize: 13, margin: "12px 0 0" }}>{error}</p>}
+
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 20 }}>
+              <button onClick={onClose} style={cancelBtn}>Cancelar</button>
+              <button
+                onClick={submit}
+                disabled={saving || adminLimitReached || !name.trim() || !email.trim() || !password}
+                style={{ ...actionBtn, opacity: (saving || adminLimitReached || !name.trim() || !email.trim() || !password) ? 0.6 : 1 }}
+              >
+                {saving ? "Creando…" : "Crear usuario"}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: "16px 18px", marginBottom: 20 }}>
+              <p style={{ margin: "0 0 6px", color: "#166534", fontWeight: 700, fontSize: 13 }}>
+                ✓ Usuario creado — {name}
+              </p>
+              <p style={{ margin: "0 0 12px", color: "#64748b", fontSize: 12 }}>
+                {result.emailSent
+                  ? `Correo de bienvenida enviado a ${email}.`
+                  : "Correo no enviado (configura RESEND_API_KEY) — comparte la contraseña manualmente."}
+                {" "}Esta contraseña se muestra <strong>una sola vez</strong>.
+              </p>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <code style={{ flex: 1, background: "#fff", border: "1px solid #bbf7d0", borderRadius: 7, padding: "10px 14px", fontSize: 16, fontWeight: 700, letterSpacing: 2, color: "#1e293b" }}>
+                  {result.password}
+                </code>
+                <CopyButton text={result.password} label="Copiar" />
+              </div>
+            </div>
+            <button onClick={onClose} style={{ ...actionBtn, background: "#1B3A6B" }}>Cerrar</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── PendingPaymentBanner ──────────────────────────────────────────────────────
 // Shown when billingMode = CHARGED and payment hasn't been confirmed yet — no
 // admin user exists for this company until "Confirmar pago" is clicked.
@@ -444,7 +601,7 @@ function EditCompanyModal({
   const [primaryColor,   setPrimaryColor]   = useState(company.primaryColor);
   const [secondaryColor, setSecondaryColor] = useState(company.secondaryColor);
   const [accentColor,    setAccentColor]    = useState(company.accentColor);
-  const [fontFamily,     setFontFamily]     = useState(company.fontFamily);
+  const [fontFamily] = useState(company.fontFamily);
   const [logoUrl,        setLogoUrl]        = useState(company.logoUrl);
   const [saving,         setSaving]         = useState(false);
   const [error,          setError]          = useState<string | null>(null);
@@ -597,18 +754,6 @@ function EditCompanyModal({
               <input type="text" value={accentColor} onChange={(e) => setAccentColor(e.target.value)} style={{ ...inp, flex: 1, fontFamily: "monospace" }} />
             </div>
           </div>
-
-          <div>
-            <label style={lbl}>Familia tipográfica</label>
-            <select value={fontFamily} onChange={(e) => setFontFamily(e.target.value)} style={inp}>
-              <option value="Inter">Inter</option>
-              <option value="Roboto">Roboto</option>
-              <option value="Open Sans">Open Sans</option>
-              <option value="Montserrat">Montserrat</option>
-              <option value="Poppins">Poppins</option>
-              <option value="Lato">Lato</option>
-            </select>
-          </div>
         </div>
 
         {/* Branding preview */}
@@ -646,6 +791,7 @@ export default function CompanyDetail({ company: initial, auditLogs }: Props) {
   const [activeTab,  setActiveTab]  = useState<"users" | "audit">("users");
   const [showEdit,   setShowEdit]   = useState(false);
   const [showDelete, setShowDelete] = useState(false);
+  const [showAddUser, setShowAddUser] = useState(false);
   const [resetTarget, setResetTarget] = useState<CompanyUser | null>(null);
   const [paymentConfirmed, setPaymentConfirmed] = useState<{ adminName: string; adminEmail: string; password: string } | null>(null);
 
@@ -787,9 +933,6 @@ export default function CompanyDetail({ company: initial, auditLogs }: Props) {
                   </span>
                 </div>
                 <div style={{ display: "flex", gap: 16, marginTop: 6, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 13, color: "#64748b" }}>
-                    <code style={{ background: "#f1f5f9", padding: "2px 7px", borderRadius: 4 }}>{company.slug}</code>
-                  </span>
                   <span style={{ fontSize: 13, color: "#64748b" }}>{company.industry}</span>
                   {company.customDomain && (
                     <span style={{ fontSize: 13, color: "#64748b" }}>{company.customDomain}</span>
@@ -800,7 +943,6 @@ export default function CompanyDetail({ company: initial, auditLogs }: Props) {
                   {[company.primaryColor, company.secondaryColor, company.accentColor].map((c, i) => (
                     <div key={i} title={c} style={{ width: 16, height: 16, borderRadius: 4, background: c, border: "1px solid rgba(0,0,0,0.1)" }} />
                   ))}
-                  <span style={{ fontSize: 11, color: "#94a3b8", marginLeft: 2 }}>{company.fontFamily}</span>
                 </div>
               </div>
             </div>
@@ -893,7 +1035,8 @@ export default function CompanyDetail({ company: initial, auditLogs }: Props) {
         </div>
 
         {/* ── Tabs ── */}
-        <div style={{ display: "flex", gap: 0, borderBottom: "2px solid #e2e8f0", marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "2px solid #e2e8f0", marginBottom: 20 }}>
+          <div style={{ display: "flex", gap: 0 }}>
           {(["users", "audit"] as const).map((tab) => (
             <button
               key={tab}
@@ -909,6 +1052,15 @@ export default function CompanyDetail({ company: initial, auditLogs }: Props) {
               {tab === "users" ? `Usuarios (${company.users.length})` : `Actividad (${auditLogs.length})`}
             </button>
           ))}
+          </div>
+          {!company.deletedAt && (
+            <button
+              onClick={() => setShowAddUser(true)}
+              style={{ display: "flex", alignItems: "center", gap: 6, background: "#1B3A6B", color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600, marginBottom: 8 }}
+            >
+              <UserPlus size={14} /> Agregar usuario
+            </button>
+          )}
         </div>
 
         {/* ── Users tab ── */}
@@ -1027,6 +1179,14 @@ export default function CompanyDetail({ company: initial, auditLogs }: Props) {
           companyId={company.id}
           user={resetTarget}
           onClose={() => setResetTarget(null)}
+        />
+      )}
+      {showAddUser && (
+        <AddUserModal
+          companyId={company.id}
+          adminCount={company.users.filter((u) => u.role === "COMPANY_ADMIN" && u.isActive).length}
+          onClose={() => setShowAddUser(false)}
+          onCreated={(user) => setCompany((prev) => ({ ...prev, users: [...prev.users, user] }))}
         />
       )}
     </main>

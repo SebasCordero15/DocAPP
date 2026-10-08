@@ -7,6 +7,9 @@ import { logAction } from "@/lib/audit";
 const schema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
+  // Supplied on the second request when the same email+password combo
+  // matches more than one company (see "multiple matches" below).
+  companyId: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -15,7 +18,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
-  const { email, password } = parsed.data;
+  const { email, password, companyId } = parsed.data;
 
   // Platform-level super admin (no company association)
   const superAdmin = await prisma.user.findFirst({
@@ -47,15 +50,44 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Credenciales inválidas" }, { status: 401 });
   }
 
-  // Rare case: same email in multiple companies — return informative error
+  // This email has an account in more than one company (common for an admin
+  // who manages several client businesses). Disambiguate by password first —
+  // each company's account usually has its own password, so normally only
+  // one will verify and we can log straight in.
+  let user = matches[0];
   if (matches.length > 1) {
-    return NextResponse.json(
-      { error: "Hay múltiples cuentas con este correo. Contacta a tu administrador." },
-      { status: 401 }
-    );
+    // If the client already told us which company (second request after
+    // picking from the list below), go straight to that one.
+    if (companyId) {
+      const picked = matches.find((m) => m.companyId === companyId);
+      if (!picked) {
+        return NextResponse.json({ error: "Credenciales inválidas" }, { status: 401 });
+      }
+      user = picked;
+    } else {
+      const verifiedMatches = [];
+      for (const m of matches) {
+        if (await verifyPassword(password, m.passwordHash)) verifiedMatches.push(m);
+      }
+      if (verifiedMatches.length === 0) {
+        return NextResponse.json({ error: "Credenciales inválidas" }, { status: 401 });
+      }
+      if (verifiedMatches.length === 1) {
+        user = verifiedMatches[0];
+      } else {
+        // Genuinely ambiguous (same password reused across companies) — let
+        // the user pick which workspace to enter.
+        return NextResponse.json({
+          needsCompanySelection: true,
+          companies: verifiedMatches.map((m) => ({
+            id: m.companyId!,
+            name: m.company?.name ?? "Empresa",
+          })),
+        });
+      }
+    }
   }
 
-  const user = matches[0];
   if (!(await verifyPassword(password, user.passwordHash))) {
     return NextResponse.json({ error: "Credenciales inválidas" }, { status: 401 });
   }
