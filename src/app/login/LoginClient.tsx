@@ -6,13 +6,21 @@ import { useTranslations } from "next-intl";
 const NAVY  = "#1B3A6B";
 const GREEN = "#3CB54A";
 
+interface CompanyOption {
+  id: string;
+  name: string;
+  industry: string | null;
+  logoUrl: string | null;
+  primaryColor: string;
+}
+
 export default function LoginClient() {
   const t = useTranslations("login");
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [error, setError]       = useState("");
   const [loading, setLoading]   = useState(false);
-  const [companies, setCompanies] = useState<{ id: string; name: string }[] | null>(null);
+  const [companies, setCompanies] = useState<CompanyOption[] | null>(null);
 
   async function doLogin(companyId?: string) {
     setError("");
@@ -66,6 +74,8 @@ export default function LoginClient() {
         .login-input:focus { outline: none; border-color: ${GREEN} !important; box-shadow: 0 0 0 3px ${GREEN}28; }
         .login-btn { transition: opacity 0.15s ease, transform 0.15s ease; }
         .login-btn:hover:not(:disabled) { opacity: 0.92; transform: translateY(-1px); }
+        .company-pick-btn { transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease; }
+        .company-pick-btn:hover:not(:disabled) { border-color: ${GREEN} !important; background: #f0fdf4 !important; transform: translateY(-1px); }
       `}</style>
 
       <div className="login-card" style={{ width: 400, padding: "0 16px" }}>
@@ -104,26 +114,53 @@ export default function LoginClient() {
 
           {/* ── Form, or company picker when the email has several workspaces ── */}
           {companies ? (
-            <div style={{ padding: "26px 28px 28px", background: "#fff" }}>
-              <p style={{ fontSize: 13, color: "#374151", margin: "0 0 14px", fontWeight: 600 }}>
-                Tu correo tiene acceso a varias empresas. Elegí una:
+            <div style={{ padding: "22px 20px 24px", background: "#fff" }}>
+              <p style={{ fontSize: 13, color: "#374151", margin: "0 8px 14px", fontWeight: 600 }}>
+                Tu correo tiene acceso a varias empresas. Elegí a cuál querés entrar:
               </p>
-              {companies.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  disabled={loading}
-                  onClick={() => doLogin(c.id)}
-                  className="login-btn"
-                  style={{ ...btn, background: "#fff", color: NAVY, marginTop: 8, textAlign: "left" }}
-                >
-                  {c.name}
-                </button>
-              ))}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {companies.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => doLogin(c.id)}
+                    className="company-pick-btn"
+                    style={{
+                      display: "flex", alignItems: "center", gap: 12,
+                      width: "100%", padding: "10px 12px",
+                      background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10,
+                      cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1,
+                      textAlign: "left",
+                    }}
+                  >
+                    {c.logoUrl ? (
+                      <img src={c.logoUrl} alt="" style={{ width: 40, height: 40, objectFit: "contain", borderRadius: 8, background: "#fff", border: "1px solid #e2e8f0", padding: 3, flexShrink: 0 }} />
+                    ) : (
+                      <div style={{
+                        width: 40, height: 40, borderRadius: 8, flexShrink: 0,
+                        background: c.primaryColor, color: "#fff", fontWeight: 800, fontSize: 16,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                        {c.name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#1e293b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {c.name}
+                      </p>
+                      {c.industry && (
+                        <p style={{ margin: 0, fontSize: 12, color: "#94a3b8" }}>{c.industry}</p>
+                      )}
+                    </div>
+                    <span style={{ color: GREEN, fontSize: 18, fontWeight: 700, flexShrink: 0 }}>→</span>
+                  </button>
+                ))}
+              </div>
               <button
                 type="button"
                 onClick={() => { setCompanies(null); setError(""); }}
-                style={{ marginTop: 14, background: "none", border: "none", color: "#64748b", fontSize: 12, cursor: "pointer", textDecoration: "underline" }}
+                style={{ marginTop: 16, marginLeft: 8, background: "none", border: "none", color: "#64748b", fontSize: 12, cursor: "pointer", textDecoration: "underline" }}
               >
                 ← Volver
               </button>

@@ -82,6 +82,9 @@ export async function POST(req: NextRequest) {
           companies: verifiedMatches.map((m) => ({
             id: m.companyId!,
             name: m.company?.name ?? "Empresa",
+            industry: m.company?.industry ?? null,
+            logoUrl: m.company?.logoUrl ?? null,
+            primaryColor: m.company?.primaryColor ?? "#1B3A6B",
           })),
         });
       }
